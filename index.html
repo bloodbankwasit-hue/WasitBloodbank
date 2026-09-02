@@ -2,8 +2,15 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>شعبة مصرف الدم الرئيسي — واسط</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>مصرف الدم — واسط</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="white">
+<meta name="apple-mobile-web-app-title" content="مصرف الدم">
+<meta name="theme-color" content="#c62828">
+<meta name="description" content="نظام إدارة مصرف الدم الرئيسي في واسط — وزارة الصحة">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23c62828'/><text y='.9em' font-size='75' x='12'>🩸</text></svg>">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
@@ -11,7 +18,8 @@
 /* ===== RESET ===== */
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden}
-body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:13px;direction:rtl;background:#f5f6fa;color:#1a1a1a}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:13px;direction:rtl;background:#f5f6fa;color:#1a1a1a;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
 
 /* ===== TOAST ===== */
 #toastBox{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:7px;pointer-events:none;min-width:260px}
@@ -1549,6 +1557,13 @@ function bnActive(el){
 // START
 // ================================================================
 window.addEventListener('load', appInit);
+
+// تسجيل Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/WasitBloodbank/service-worker.js')
+    .then(() => console.log('SW registered'))
+    .catch(e => console.log('SW error:', e));
+}
 </script>
 </body>
 </html>
