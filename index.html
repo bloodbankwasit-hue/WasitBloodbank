@@ -225,6 +225,116 @@ tbody tr:hover td{background:#fafafa}
 .a-action{flex-shrink:0;width:60px}
 .a-desc{color:#1a1a1a;flex:1}
 
+
+/* ===== DESIGN IMPROVEMENTS ===== */
+.sc-card{box-shadow:0 2px 12px rgba(0,0,0,.06);transition:transform .15s}
+.sc-card:hover{transform:translateY(-1px)}
+.tw{box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.fsec{box-shadow:0 1px 6px rgba(0,0,0,.04)}
+.bc-card{box-shadow:0 4px 16px rgba(0,0,0,.08)}
+.setc{box-shadow:0 1px 6px rgba(0,0,0,.04)}
+.lcard{box-shadow:0 8px 32px rgba(0,0,0,.12)}
+.sb{box-shadow:2px 0 12px rgba(0,0,0,.08)}
+
+/* ===== HAMBURGER (mobile only) ===== */
+.ham{display:none;align-items:center;justify-content:center;width:36px;height:36px;background:none;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer;color:#1a1a1a;font-size:18px;flex-shrink:0}
+.sb-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:4999;display:none}
+.sb-overlay.on{display:block}
+
+/* ===== MOBILE RESPONSIVE ===== */
+@media(max-width:768px){
+  /* Sidebar: slide-in drawer from right */
+  .sb{position:fixed;right:-220px;top:0;bottom:0;z-index:5000;transition:right .25s ease;box-shadow:none;height:100vh}
+  .sb.open{right:0;box-shadow:-6px 0 24px rgba(0,0,0,.18)}
+  
+  /* Show hamburger button */
+  .ham{display:flex}
+  
+  /* Content full width */
+  #app{flex-direction:column}
+  .content{width:100%;min-width:0}
+  
+  /* Topbar */
+  .topbar{padding:8px 12px}
+  .tb-date{display:none}
+  .tb-online span:last-child{display:none}
+  
+  /* Page padding */
+  .page{padding:10px 12px 80px}
+  
+  /* Stats: 2 columns */
+  .sg{grid-template-columns:repeat(2,1fr);gap:8px}
+  .sg .sc-card:last-child{grid-column:span 2}
+  .sc-val{font-size:20px}
+  
+  /* Blood type: 4 cols */
+  .btg{grid-template-columns:repeat(4,1fr);gap:6px}
+  .btc-t{font-size:14px}
+  
+  /* Form: single column */
+  .fgrid{grid-template-columns:1fr !important}
+  .s2,.s3{grid-column:span 1 !important}
+  
+  /* Tables scroll horizontally */
+  .tbl-inner{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{min-width:600px}
+  
+  /* Settings: single col */
+  .setg{grid-template-columns:1fr}
+  
+  /* Modal */
+  .modal{width:96vw;max-height:85vh;padding:16px}
+  
+  /* Action bar */
+  .abar{flex-wrap:wrap}
+  .abar .btn{flex:1;min-width:130px;justify-content:center}
+  
+  /* Barcode card */
+  .bc-card{max-width:100%;margin:0}
+  
+  /* Section headers */
+  .sh-t{font-size:12px}
+  
+  /* Login card */
+  .lcard{width:95vw;padding:22px 18px;margin:0 10px}
+  #loginPage{padding:20px 0;align-items:flex-start;padding-top:60px}
+  
+  /* Pagination */
+  .pag{flex-direction:column;gap:8px;align-items:flex-start}
+  
+  /* Report */
+  .rpt-hd{flex-direction:column;gap:8px}
+  .rh-en{text-align:right}
+  
+  /* Tabs */
+  .tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
+  .tab{white-space:nowrap;flex-shrink:0}
+
+  /* Bottom nav for quick access */
+  .bottom-nav{display:flex !important}
+}
+
+/* Bottom navigation (mobile) */
+.bottom-nav{
+  display:none;
+  position:fixed;
+  bottom:0;left:0;right:0;
+  background:#fff;
+  border-top:1px solid #eeeeee;
+  z-index:4000;
+  padding:6px 0 env(safe-area-inset-bottom,6px);
+  box-shadow:0 -2px 12px rgba(0,0,0,.08);
+}
+.bn-item{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  gap:3px;cursor:pointer;color:#9e9e9e;font-size:9px;
+  padding:4px 2px;border:none;background:none;font-family:inherit;
+  -webkit-tap-highlight-color:transparent;
+}
+.bn-item i{font-size:20px}
+.bn-item.on{color:#c62828}
+.bn-item.on i{color:#c62828}
 @media print{
   .sidebar,.topbar,.abar,.pag,#loader,#toastBox,.overlay{display:none!important}
   .content{overflow:visible}
@@ -549,6 +659,15 @@ tbody tr:hover td{background:#fafafa}
 
     </div><!-- end page -->
   </div><!-- end content -->
+  <!-- Bottom navigation (mobile only) -->
+  <nav class="bottom-nav" id="bottomNav">
+    <button class="bn-item on" onclick="nav('dashboard',null);bnActive(this)"><i class="ti ti-layout-dashboard"></i>الرئيسية</button>
+    <button class="bn-item" onclick="nav('add',null);bnActive(this)"><i class="ti ti-user-plus"></i>إضافة</button>
+    <button class="bn-item" onclick="nav('donors',null);bnActive(this)"><i class="ti ti-users"></i>المتبرعون</button>
+    <button class="bn-item" onclick="nav('search',null);bnActive(this)"><i class="ti ti-search"></i>بحث</button>
+    <button class="bn-item" onclick="nav('stats',null);bnActive(this)"><i class="ti ti-chart-bar"></i>إحصائيات</button>
+  </nav>
+
 </div><!-- end app -->
 
 <!-- ADD REJECTED MODAL -->
@@ -686,6 +805,7 @@ async function nav(name, el){
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
   if(el) el.classList.add('on');
   G('pgTitle').textContent=TITLES[name]||name;
+  closeSb();
   switch(name){
     case 'donors':  await loadDonors(1); break;
     case 'infected':await loadInfected('', document.querySelector('.tab')); break;
@@ -1405,6 +1525,24 @@ async function toggleUserActive(id,cur){
   await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'user_profiles',record_id:id,new_values:{is_active:!cur}});
   toast('تم '+act+' الحساب بنجاح','success');
   await loadUsers();
+}
+
+// ================================================================
+// MOBILE SIDEBAR
+// ================================================================
+function toggleSb(){
+  const sb=document.querySelector('.sb');
+  const ov=G('sbOverlay');
+  sb.classList.toggle('open');
+  ov.classList.toggle('on');
+}
+function closeSb(){
+  document.querySelector('.sb')?.classList.remove('open');
+  G('sbOverlay')?.classList.remove('on');
+}
+function bnActive(el){
+  document.querySelectorAll('.bn-item').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
 }
 
 // ================================================================
