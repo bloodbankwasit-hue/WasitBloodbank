@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>شعبة مصرف الدم الرئيسي — واسط</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<style>
+/* ===== RESET ===== */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:13px;direction:rtl;background:#f5f6fa;color:#1a1a1a}
+
+/* ===== TOAST ===== */
+#toastBox{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:7px;pointer-events:none;min-width:260px}
+.toast{padding:10px 16px;border-radius:8px;font-size:12px;display:flex;align-items:center;gap:8px;animation:tin .2s ease;pointer-events:all;color:#fff}
+.toast.success{background:#2e7d32}.toast.error{background:#c62828}.toast.warning{background:#e65100}.toast.info{background:#1565c0}
+@keyframes tin{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ===== LOADING ===== */
+#loader{position:fixed;inset:0;background:rgba(255,255,255,.88);z-index:8888;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+#loader.on{display:flex}
+.spin{width:34px;height:34px;border:3px solid #eee;border-top-color:#c62828;border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ===== MODAL ===== */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:7700;display:none;align-items:center;justify-content:center}
+.overlay.on{display:flex}
+.modal{background:#fff;border-radius:12px;padding:22px;width:500px;max-width:96vw;max-height:90vh;overflow-y:auto}
+.modal-title{font-size:14px;font-weight:700;color:#1a1a1a;margin-bottom:14px;display:flex;align-items:center;gap:7px}
+.modal-title i{color:#c62828}
+.modal-foot{display:flex;gap:7px;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid #f0f0f0}
+
+/* ===== LOGIN ===== */
+#loginPage{height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#fff0f0 0%,#f5f6fa 60%)}
+.lcard{background:#fff;border:1px solid #e0e0e0;border-radius:16px;padding:32px 36px;width:400px;box-shadow:0 4px 24px rgba(0,0,0,.07)}
+.lbrand{text-align:center;margin-bottom:24px}
+.licon{width:68px;height:68px;background:#c62828;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
+.licon i{font-size:30px;color:#fff}
+.lt1{font-size:15px;font-weight:700;color:#1a1a1a}
+.lt2{font-size:11px;color:#9e9e9e;margin-top:3px}
+.lerr{background:#ffebee;border:1px solid #ffcdd2;color:#c62828;font-size:12px;padding:8px 12px;border-radius:8px;margin-bottom:12px;display:none;align-items:center;gap:6px}
+.lerr.on{display:flex}
+.fg{margin-bottom:14px}
+.fg label{display:block;font-size:11.5px;color:#616161;margin-bottom:5px;font-weight:600}
+.fw{position:relative}
+.fg input{width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;background:#fafafa;color:#1a1a1a;font-size:13px;font-family:inherit;outline:none;transition:border .15s,box-shadow .15s}
+.fg input:focus{border-color:#c62828;box-shadow:0 0 0 3px rgba(198,40,40,.09);background:#fff}
+.eye{position:absolute;left:10px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;color:#9e9e9e;font-size:16px;padding:2px}
+.eye:hover{color:#1a1a1a}
+.lbtn{width:100%;padding:11px;background:#c62828;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;transition:background .15s}
+.lbtn:hover{background:#b71c1c}
+.lbtn:disabled{opacity:.65;cursor:not-allowed}
+.lsec{display:flex;justify-content:center;gap:18px;margin-top:18px;padding-top:14px;border-top:1px solid #f0f0f0}
+.lsec span{display:flex;align-items:center;gap:4px;font-size:10px;color:#9e9e9e}
+.lsec i{font-size:12px;color:#2e7d32}
+
+/* ===== APP SHELL ===== */
+#app{display:none;height:100vh;flex-direction:row}
+#app.on{display:flex}
+
+/* ===== SIDEBAR ===== */
+.sb{width:215px;background:#fff;border-left:1px solid #eeeeee;display:flex;flex-direction:column;flex-shrink:0}
+.sb-head{padding:13px 14px;border-bottom:1px solid #eeeeee}
+.sb-logo{display:flex;align-items:center;gap:9px}
+.sb-dot{width:38px;height:38px;background:#c62828;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sb-dot i{font-size:20px;color:#fff}
+.sb-name{font-size:12px;font-weight:700;color:#1a1a1a;line-height:1.3}
+.sb-org{font-size:10px;color:#9e9e9e}
+.sb-nav{flex:1;overflow-y:auto;padding:6px 0}
+.nb{margin-bottom:3px}
+.nl{font-size:9.5px;color:#bdbdbd;padding:8px 14px 3px;letter-spacing:.5px}
+.ni{display:flex;align-items:center;gap:9px;padding:9px 14px;cursor:pointer;color:#616161;font-size:12.5px;border-right:3px solid transparent;transition:all .12s;user-select:none}
+.ni i{font-size:16px;width:17px;text-align:center;flex-shrink:0}
+.ni:hover{background:#fafafa;color:#1a1a1a}
+.ni.on{background:#fff0f0;color:#c62828;border-right-color:#c62828;font-weight:700}
+.ni.on i{color:#c62828}
+.nbadge{margin-right:auto;background:#c62828;color:#fff;font-size:9px;padding:2px 6px;border-radius:10px}
+.sb-foot{padding:11px 14px;border-top:1px solid #eeeeee}
+.sf-user{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.sf-av{width:32px;height:32px;background:#c62828;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
+.sf-name{font-size:12px;font-weight:700;color:#1a1a1a}
+.sf-role{font-size:10px;color:#9e9e9e}
+.btn-out{width:100%;padding:7px;background:none;border:1px solid #e0e0e0;border-radius:8px;color:#757575;font-size:11.5px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px;transition:all .15s}
+.btn-out:hover{background:#ffebee;color:#c62828;border-color:#ffcdd2}
+
+/* ===== TOPBAR ===== */
+.content{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{background:#fff;border-bottom:1px solid #eeeeee;padding:10px 18px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.tb-title{font-size:14px;font-weight:700;color:#1a1a1a}
+.tb-r{display:flex;align-items:center;gap:12px}
+.tb-date{font-size:11px;color:#9e9e9e}
+.tb-online{display:flex;align-items:center;gap:5px;font-size:11px;color:#2e7d32}
+.tb-online span{width:7px;height:7px;background:#2e7d32;border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+/* ===== PAGE AREA ===== */
+.page{flex:1;overflow-y:auto;padding:16px 18px}
+.sc{display:none}
+.sc.on{display:block}
+
+/* ===== STATS GRID ===== */
+.sg{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
+.sc-card{background:#fff;border:1px solid #eeeeee;border-radius:10px;padding:14px 10px;text-align:center}
+.sc-ico{font-size:22px;margin-bottom:6px}
+.sc-val{font-size:22px;font-weight:700;color:#c62828;line-height:1}
+.sc-lbl{font-size:10px;color:#9e9e9e;margin-top:4px;line-height:1.4}
+
+/* ===== SECTION HEADER ===== */
+.sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.sh-t{font-size:13px;font-weight:700;color:#1a1a1a;display:flex;align-items:center;gap:6px}
+.sh-t i{color:#c62828;font-size:15px}
+.sh-a{font-size:11px;color:#c62828;cursor:pointer}
+
+/* ===== TABLE ===== */
+.tw{background:#fff;border:1px solid #eeeeee;border-radius:10px;overflow:hidden;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:#fafafa;color:#757575;padding:8px 10px;text-align:right;font-size:11px;font-weight:700;border-bottom:1px solid #eeeeee}
+tbody td{padding:7px 10px;border-bottom:1px solid #f5f5f5;color:#1a1a1a;vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:#fafafa}
+.pill{display:inline-block;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600}
+.pg{background:#e8f5e9;color:#2e7d32}
+.pr{background:#ffebee;color:#c62828}
+.py{background:#fff8e1;color:#e65100}
+.pb{background:#e3f2fd;color:#1565c0}
+.ibtn{padding:4px 8px;background:none;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;color:#757575;font-size:13px;transition:all .12s}
+.ibtn:hover{background:#f5f5f5;color:#1a1a1a}
+
+/* ===== FORM ===== */
+.fsec{background:#fff;border:1px solid #eeeeee;border-radius:10px;padding:14px;margin-bottom:12px}
+.fst{font-size:12px;font-weight:700;color:#757575;margin-bottom:10px;padding-bottom:7px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:5px}
+.fst i{color:#c62828;font-size:14px}
+.fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.fgrp{display:flex;flex-direction:column;gap:4px}
+.fgrp label{font-size:11px;color:#757575;font-weight:600}
+.fgrp input,.fgrp select,.fgrp textarea{padding:8px 10px;border:1px solid #e0e0e0;border-radius:8px;background:#fafafa;color:#1a1a1a;font-size:12.5px;font-family:inherit;outline:none;transition:border .15s}
+.fgrp input:focus,.fgrp select:focus{border-color:#c62828;background:#fff}
+.fgrp input.ro{background:#f5f5f5;color:#9e9e9e;cursor:not-allowed}
+.fgrp input.auto{background:#fff8f8;color:#c62828;font-weight:700;cursor:not-allowed}
+.s2{grid-column:span 2}
+.s3{grid-column:span 3}
+
+/* ===== BUTTONS ===== */
+.abar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.btn{display:flex;align-items:center;gap:5px;padding:8px 14px;border-radius:8px;border:1px solid #e0e0e0;background:#fff;color:#1a1a1a;font-size:12.5px;cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .12s}
+.btn:hover{background:#f5f5f5}
+.btn i{font-size:14px}
+.btn-p{background:#c62828;color:#fff;border-color:#c62828}
+.btn-p:hover{background:#b71c1c}
+.btn-s{background:#2e7d32;color:#fff;border-color:#2e7d32}
+.btn-s:hover{background:#1b5e20}
+
+/* ===== BLOOD TYPE GRID ===== */
+.btg{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;margin-bottom:14px}
+.btc{background:#fff;border:1px solid #eeeeee;border-radius:8px;padding:10px 5px;text-align:center;cursor:pointer;transition:all .12s}
+.btc:hover,.btc.warn{border-color:#c62828;background:#fff0f0}
+.btc-t{font-size:16px;font-weight:700;color:#c62828}
+.btc-n{font-size:9.5px;color:#9e9e9e;margin-top:2px}
+
+/* ===== PAGINATION ===== */
+.pag{display:flex;align-items:center;justify-content:space-between;padding:8px 0;font-size:11px;color:#757575}
+.pag-btns{display:flex;gap:4px}
+.pbtn{padding:4px 10px;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;background:#fff;font-size:11px;transition:all .12s;font-family:inherit}
+.pbtn:hover{background:#f5f5f5}
+.pbtn.on{background:#c62828;color:#fff;border-color:#c62828}
+.pbtn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ===== TABS ===== */
+.tabs{display:flex;gap:2px;background:#f5f5f5;border-radius:8px;padding:3px;margin-bottom:12px}
+.tab{padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;color:#757575;transition:all .12s}
+.tab.on{background:#fff;color:#1a1a1a;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
+/* ===== BARCODE CARD ===== */
+.bc-card{background:#fff;border:1px solid #eeeeee;border-radius:10px;padding:18px;max-width:480px;margin:0 auto}
+.bc-info{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.bcf label{font-size:10px;color:#9e9e9e;display:block;margin-bottom:2px}
+.bcf span{font-size:13px;font-weight:700;color:#1a1a1a}
+.bcf.red span{color:#c62828}
+.bc-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bcbtn{padding:12px;border:1px solid #e0e0e0;border-radius:10px;background:#fafafa;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11.5px;color:#1a1a1a;font-family:inherit;transition:all .12s}
+.bcbtn:hover{border-color:#c62828;background:#fff0f0}
+.bcbtn i{font-size:22px;color:#c62828}
+
+/* ===== REPORT ===== */
+.rpt{background:#fff;border:1px solid #eeeeee;border-radius:10px;overflow:hidden}
+.rpt-hd{background:#c62828;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:flex-start}
+.rh-t{font-size:13px;font-weight:700}
+.rh-s{font-size:10px;opacity:.75;margin-top:2px}
+.rh-en{text-align:left;font-size:10px;opacity:.65;line-height:1.6}
+.rpt-body{padding:14px}
+.rs{margin-bottom:14px}
+.rs-t{font-size:11px;font-weight:700;color:#757575;padding:5px 9px;background:#fafafa;border-radius:5px;margin-bottom:7px}
+.rr{display:flex;justify-content:space-between;padding:5px 9px;border-bottom:1px solid #f5f5f5;font-size:12px}
+.rr:last-child{border-bottom:none}
+.rv{font-weight:700;color:#c62828}
+
+/* ===== SETTINGS ===== */
+.setg{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.setc{background:#fff;border:1px solid #eeeeee;border-radius:10px;padding:16px;cursor:pointer;transition:all .12s}
+.setc:hover{border-color:#c62828;background:#fff8f8}
+.setc-ico{width:38px;height:38px;background:#fff0f0;border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:10px}
+.setc-ico i{font-size:20px;color:#c62828}
+.setc-t{font-size:13px;font-weight:700;color:#1a1a1a;margin-bottom:4px}
+.setc-d{font-size:11px;color:#9e9e9e;line-height:1.5}
+
+/* ===== SEARCH BAR ===== */
+.sbar{display:flex;gap:8px;margin-bottom:12px}
+.sinp{flex:1;padding:8px 12px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#1a1a1a;font-size:13px;font-family:inherit;outline:none}
+.sinp:focus{border-color:#c62828}
+
+/* ===== EMPTY STATE ===== */
+.empty{text-align:center;padding:36px 20px;color:#9e9e9e}
+.empty i{font-size:36px;display:block;margin-bottom:10px;opacity:.3}
+.empty p{font-size:12.5px}
+
+/* ===== AUDIT TABLE ===== */
+.audit-row{display:flex;gap:10px;padding:8px 10px;border-bottom:1px solid #f5f5f5;font-size:11px;align-items:flex-start}
+.audit-row:last-child{border-bottom:none}
+.audit-row:hover{background:#fafafa}
+.a-time{color:#9e9e9e;white-space:nowrap;flex-shrink:0;width:120px}
+.a-user{color:#1565c0;flex-shrink:0;width:100px;font-weight:600}
+.a-action{flex-shrink:0;width:60px}
+.a-desc{color:#1a1a1a;flex:1}
+
+@media print{
+  .sidebar,.topbar,.abar,.pag,#loader,#toastBox,.overlay{display:none!important}
+  .content{overflow:visible}
+  .page{padding:0}
+  body{overflow:visible;height:auto}
+}
+</style>
+</head>
+<body>
+
+<div id="toastBox"></div>
+<div id="loader"><div class="spin"></div><span style="font-size:12px;color:#9e9e9e">جاري التحميل...</span></div>
+
+<!-- ===== LOGIN ===== -->
+<div id="loginPage">
+  <div class="lcard">
+    <div class="lbrand">
+      <div class="licon"><i class="ti ti-droplet"></i></div>
+      <div class="lt1">شعبة مصرف الدم الرئيسي — واسط</div>
+      <div class="lt2">وزارة الصحة / دائرة صحة واسط / قسم الأمور الفنية</div>
+    </div>
+    <div class="lerr" id="lerr"><i class="ti ti-alert-circle"></i><span id="lerrMsg">خطأ</span></div>
+    <div class="fg">
+      <label>البريد الإلكتروني</label>
+      <input type="email" id="lemail" placeholder="user@health.gov.iq" onkeydown="if(event.key==='Enter')document.getElementById('lpw').focus()">
+    </div>
+    <div class="fg">
+      <label>كلمة المرور</label>
+      <div class="fw">
+        <input type="password" id="lpw" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+        <button class="eye" onclick="togglePw()" type="button"><i class="ti ti-eye" id="eyeIco"></i></button>
+      </div>
+    </div>
+    <button class="lbtn" onclick="doLogin()" id="lbtn"><i class="ti ti-login"></i> دخول آمن</button>
+    <div class="lsec">
+      <span><i class="ti ti-lock"></i> كلمات مرور مشفّرة</span>
+      <span><i class="ti ti-shield-check"></i> جلسة JWT آمنة</span>
+      <span><i class="ti ti-database"></i> RLS مفعّل</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MAIN APP ===== -->
+<div id="app">
+  <!-- SIDEBAR -->
+  <div class="sb">
+    <div class="sb-head">
+      <div class="sb-logo">
+        <div class="sb-dot"><i class="ti ti-droplet"></i></div>
+        <div><div class="sb-name">مصرف الدم الرئيسي</div><div class="sb-org">واسط — وزارة الصحة</div></div>
+      </div>
+    </div>
+    <div class="sb-nav">
+      <div class="nb"><div class="nl">الرئيسية</div>
+        <div class="ni on" onclick="nav('dashboard',this)"><i class="ti ti-layout-dashboard"></i> لوحة التحكم</div>
+      </div>
+      <div class="nb"><div class="nl">المتبرعون</div>
+        <div class="ni" onclick="nav('add',this)"><i class="ti ti-user-plus"></i> إضافة متبرع</div>
+        <div class="ni" onclick="nav('donors',this)"><i class="ti ti-users"></i> سجل المتبرعين</div>
+        <div class="ni" onclick="nav('search',this)"><i class="ti ti-search"></i> بحث متقدم</div>
+        <div class="ni" onclick="nav('barcode',this)"><i class="ti ti-barcode"></i> الباركود والطباعة</div>
+      </div>
+      <div class="nb"><div class="nl">الحالات</div>
+        <div class="ni" onclick="nav('infected',this)"><i class="ti ti-virus"></i> المصابون <span class="nbadge" id="infBadge" style="display:none">!</span></div>
+        <div class="ni" onclick="nav('rejected',this)"><i class="ti ti-user-x"></i> المرفوضون مؤقتاً</div>
+        <div class="ni" onclick="nav('rare',this)"><i class="ti ti-droplet-half"></i> الفصائل النادرة</div>
+      </div>
+      <div class="nb"><div class="nl">الإدارة</div>
+        <div class="ni" onclick="nav('stats',this)"><i class="ti ti-chart-bar"></i> الإحصائيات</div>
+        <div class="ni" onclick="nav('audit',this)"><i class="ti ti-shield-lock"></i> سجل التتبع</div>
+        <div class="ni" onclick="nav('settings',this)"><i class="ti ti-settings"></i> الإعدادات</div>
+      </div>
+    </div>
+    <div class="sb-foot">
+      <div class="sf-user">
+        <div class="sf-av" id="sfAv">م</div>
+        <div><div class="sf-name" id="sfName">...</div><div class="sf-role" id="sfRole">...</div></div>
+      </div>
+      <button class="btn-out" onclick="doLogout()"><i class="ti ti-logout"></i> تسجيل الخروج</button>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+    <div class="topbar">
+      <div class="tb-title" id="pgTitle">لوحة التحكم</div>
+      <div class="tb-r">
+        <span class="tb-date" id="tbDate"></span>
+        <span class="tb-online"><span></span> متصل</span>
+      </div>
+    </div>
+    <div class="page">
+
+      <!-- DASHBOARD -->
+      <div class="sc on" id="s-dashboard">
+        <div class="sg">
+          <div class="sc-card"><div class="sc-ico">🩸</div><div class="sc-val" id="st0">—</div><div class="sc-lbl">متبرعو اليوم</div></div>
+          <div class="sc-card"><div class="sc-ico">📅</div><div class="sc-val" id="st1">—</div><div class="sc-lbl">إجمالي الشهر</div></div>
+          <div class="sc-card"><div class="sc-ico">🤲</div><div class="sc-val" id="st2">—</div><div class="sc-lbl">طوعيون الشهر</div></div>
+          <div class="sc-card"><div class="sc-ico">📊</div><div class="sc-val" id="st3">—</div><div class="sc-lbl">إجمالي السنة</div></div>
+          <div class="sc-card"><div class="sc-ico">✅</div><div class="sc-val" id="st4">—</div><div class="sc-lbl">إجمالي الكل</div></div>
+        </div>
+        <div class="sh">
+          <div class="sh-t"><i class="ti ti-clock"></i> آخر تبرعات اليوم</div>
+          <span class="sh-a" onclick="nav('donors',document.querySelector('.ni'))">عرض الكل ←</span>
+        </div>
+        <div id="recentTbl"><div class="empty"><i class="ti ti-clock"></i><p>جاري التحميل...</p></div></div>
+        <div class="sh" style="margin-top:4px"><div class="sh-t"><i class="ti ti-droplet-half"></i> مخزون الفصائل</div></div>
+        <div class="btg" id="btGrid"></div>
+      </div>
+
+      <!-- ADD DONOR -->
+      <div class="sc" id="s-add">
+        <div class="fsec">
+          <div class="fst"><i class="ti ti-user"></i> البيانات الشخصية للمتبرع</div>
+          <div class="fgrid">
+            <div class="fgrp s2"><label>الاسم الرباعي واللقب *</label><input type="text" id="f-name" placeholder="علي محمد حسن الموسوي"></div>
+            <div class="fgrp"><label>سنة التولد *</label><input type="number" id="f-by" placeholder="1995" min="1920" max="2007" oninput="calcAge()"></div>
+            <div class="fgrp"><label>العمر</label><input type="text" id="f-age" class="ro" readonly placeholder="يحسب تلقائياً"></div>
+            <div class="fgrp"><label>الجنس *</label><select id="f-gen"><option value="ذكر">ذكر</option><option value="أنثى">أنثى</option></select></div>
+            <div class="fgrp"><label>اسم الأم الثلاثي</label><input type="text" id="f-mom" placeholder="فاطمة حسن علي"></div>
+            <div class="fgrp"><label>رقم البطاقة الوطنية</label><input type="text" id="f-nid" placeholder="19XXXXXXXXXX"></div>
+            <div class="fgrp"><label>رقم الموبايل</label><input type="tel" id="f-mob" placeholder="07XXXXXXXXX"></div>
+            <div class="fgrp s2"><label>عنوان السكن</label><input type="text" id="f-addr" placeholder="المحلة / الحي / المدينة"></div>
+            <div class="fgrp"><label>المهنة</label><input type="text" id="f-job" placeholder="المهنة"></div>
+          </div>
+        </div>
+        <div class="fsec">
+          <div class="fst"><i class="ti ti-droplet"></i> بيانات التبرع والقنينة</div>
+          <div class="fgrid">
+            <div class="fgrp"><label>نوع التبرع *</label><select id="f-dtyp"><option value="تعويضي">تعويضي</option><option value="طوعي">طوعي</option></select></div>
+            <div class="fgrp"><label>نوع القنينة *</label><select id="f-btyp" onchange="calcExpiry()"><option>مفلتر</option><option>رباعي</option><option>ريفيس</option><option>ثنائي</option><option>أحادي</option><option>تريما دم كامل</option><option>تريما صفائح دموية</option><option>حملة تبرع رباعي</option><option>حملة تبرع مفلتر</option><option>رباعي Sag</option></select></div>
+            <div class="fgrp"><label>رقم القنينة (تلقائي)</label><input type="text" id="f-bnum" class="auto" readonly placeholder="جاري..."></div>
+            <div class="fgrp"><label>اسم المريض</label><input type="text" id="f-pat" placeholder="(للتبرع التعويضي فقط)"></div>
+            <div class="fgrp"><label>اسم المستشفى</label><input type="text" id="f-hosp" placeholder="مستشفى..."></div>
+            <div class="fgrp"><label>تاريخ التبرع *</label><input type="date" id="f-ddate"></div>
+            <div class="fgrp"><label>وقت التبرع</label><input type="time" id="f-dtime"></div>
+            <div class="fgrp"><label>تاريخ السحب</label><input type="date" id="f-draw" onchange="calcExpiry()"></div>
+            <div class="fgrp"><label>تاريخ النفاد (تلقائي)</label><input type="date" id="f-exp" class="auto" readonly></div>
+          </div>
+        </div>
+        <div class="fsec">
+          <div class="fst"><i class="ti ti-stethoscope"></i> الفحوصات السريرية والمختبرية</div>
+          <div class="fgrid">
+            <div class="fgrp"><label>فصيلة الدم</label><select id="f-bt"><option value="">غير محدد</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select></div>
+            <div class="fgrp"><label>ضغط الدم (mmHg)</label><input type="text" id="f-bp" placeholder="120/80"></div>
+            <div class="fgrp"><label>الوزن (كغ)</label><input type="number" id="f-wt" placeholder="70" step="0.5"></div>
+            <div class="fgrp"><label>النبض (ن/دقيقة)</label><input type="number" id="f-pulse" placeholder="72"></div>
+            <div class="fgrp"><label>الهيموكلوبين (g/dL)</label><input type="number" id="f-hgb" placeholder="15.3" step="0.1"></div>
+            <div class="fgrp"><label>نتيجة الفحوصات *</label><select id="f-ser" onchange="toggleSer()"><option value="Negative">Negative — سالب</option><option value="Positive">Positive — موجب</option></select></div>
+            <div class="fgrp" id="serTypGrp" style="display:none"><label>نوع الإصابة</label><select id="f-sert"><option value="HIV">HIV</option><option value="HCV">HCV</option><option value="HBsAg">HBsAg</option><option value="سفلس VDRL">سفلس (VDRL)</option></select></div>
+          </div>
+        </div>
+        <div class="abar">
+          <button class="btn btn-p" onclick="saveDonor(true)"><i class="ti ti-device-floppy"></i> حفظ وطباعة الباركود</button>
+          <button class="btn" onclick="saveDonor(false)"><i class="ti ti-check"></i> حفظ فقط</button>
+          <button class="btn" onclick="printForm()"><i class="ti ti-printer"></i> طباعة الاستمارة</button>
+          <button class="btn" onclick="resetForm()" style="margin-right:auto"><i class="ti ti-refresh"></i> مسح النموذج</button>
+        </div>
+      </div>
+
+      <!-- DONORS LIST -->
+      <div class="sc" id="s-donors">
+        <div class="abar">
+          <input type="text" class="sinp" id="dSrch" placeholder="بحث بالاسم، رقم المتبرع، رقم القنينة، رقم الهوية..." onkeydown="if(event.key==='Enter')loadDonors(1)">
+          <button class="btn btn-p" onclick="loadDonors(1)"><i class="ti ti-search"></i> بحث</button>
+          <button class="btn" onclick="exportDonors()"><i class="ti ti-file-spreadsheet"></i> تصدير CSV</button>
+        </div>
+        <div id="dTbl"><div class="empty"><i class="ti ti-users"></i><p>جاري التحميل...</p></div></div>
+        <div class="pag" id="dPag"></div>
+      </div>
+
+      <!-- SEARCH -->
+      <div class="sc" id="s-search">
+        <div class="fsec">
+          <div class="fst"><i class="ti ti-filter"></i> فلاتر البحث المتقدم</div>
+          <div class="fgrid">
+            <div class="fgrp"><label>اسم المتبرع</label><input type="text" id="sr-nm" placeholder="الاسم أو جزء منه"></div>
+            <div class="fgrp"><label>رقم القنينة</label><input type="text" id="sr-bn" placeholder="رقم القنينة"></div>
+            <div class="fgrp"><label>نوع القنينة</label><select id="sr-bt"><option value="">الكل</option><option>مفلتر</option><option>رباعي</option><option>ريفيس</option><option>ثنائي</option><option>أحادي</option><option>تريما دم كامل</option><option>تريما صفائح دموية</option><option>حملة تبرع رباعي</option><option>حملة تبرع مفلتر</option><option>رباعي Sag</option></select></div>
+            <div class="fgrp"><label>فصيلة الدم</label><select id="sr-bl"><option value="">الكل</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select></div>
+            <div class="fgrp"><label>نوع التبرع</label><select id="sr-dt"><option value="">الكل</option><option value="طوعي">طوعي</option><option value="تعويضي">تعويضي</option></select></div>
+            <div class="fgrp"><label>اسم المستشفى</label><input type="text" id="sr-hosp" placeholder="المستشفى"></div>
+            <div class="fgrp"><label>اسم المريض</label><input type="text" id="sr-pat" placeholder="اسم المريض"></div>
+            <div class="fgrp"><label>رقم الموبايل</label><input type="text" id="sr-mob" placeholder="07XXXXXXXXX"></div>
+            <div class="fgrp"><label>اسم الأم</label><input type="text" id="sr-mom" placeholder="اسم الأم"></div>
+            <div class="fgrp"><label>تاريخ التبرع من</label><input type="date" id="sr-df"></div>
+            <div class="fgrp"><label>تاريخ التبرع إلى</label><input type="date" id="sr-dt2"></div>
+            <div class="fgrp"><label>نتيجة الفحوصات</label><select id="sr-ser"><option value="">الكل</option><option value="Negative">Negative — سالب</option><option value="Positive">Positive — موجب</option></select></div>
+          </div>
+          <div class="abar" style="margin-top:10px;margin-bottom:0">
+            <button class="btn btn-p" onclick="doSearch()"><i class="ti ti-search"></i> بحث</button>
+            <button class="btn" onclick="exportSearch()"><i class="ti ti-file-spreadsheet"></i> تصدير CSV</button>
+            <button class="btn" onclick="clearSearch()"><i class="ti ti-refresh"></i> مسح الفلاتر</button>
+          </div>
+        </div>
+        <div id="srRes"></div>
+      </div>
+
+      <!-- BARCODE -->
+      <div class="sc" id="s-barcode">
+        <div class="bc-card">
+          <div style="font-size:13px;font-weight:700;color:#1a1a1a;margin-bottom:14px;display:flex;align-items:center;gap:6px">
+            <i class="ti ti-barcode" style="color:#c62828"></i> طباعة الباركود والكارتات
+          </div>
+          <div style="margin-bottom:14px">
+            <label style="font-size:11px;color:#757575;display:block;margin-bottom:5px;font-weight:600">بحث برقم القنينة</label>
+            <div style="display:flex;gap:8px">
+              <input type="text" id="bcSrch" class="sinp" placeholder="أدخل رقم القنينة..." onkeydown="if(event.key==='Enter')searchBC()">
+              <button class="btn btn-p" onclick="searchBC()"><i class="ti ti-search"></i> بحث</button>
+            </div>
+          </div>
+          <div id="bcRes" style="display:none">
+            <div class="bc-info" id="bcInfo"></div>
+            <div id="bcSvg" style="text-align:center;margin:12px 0;padding:10px;background:#fafafa;border-radius:8px;border:1px solid #eee"></div>
+            <div class="bc-btns">
+              <button class="bcbtn" onclick="printBC('full')"><i class="ti ti-barcode"></i> باركود + كارت</button>
+              <button class="bcbtn" onclick="printBC('expiry')"><i class="ti ti-qrcode"></i> باركود سحب ونفاد</button>
+              <button class="bcbtn" onclick="printBC('card')"><i class="ti ti-id-badge"></i> كارت تبرع</button>
+              <button class="bcbtn" onclick="printBC('simple')"><i class="ti ti-scan"></i> باركود بدون نفاد</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INFECTED -->
+      <div class="sc" id="s-infected">
+        <div class="tabs">
+          <div class="tab on" onclick="loadInfected('',this)">الكل</div>
+          <div class="tab" onclick="loadInfected('HIV',this)">HIV</div>
+          <div class="tab" onclick="loadInfected('HCV',this)">HCV</div>
+          <div class="tab" onclick="loadInfected('HBsAg',this)">HBsAg</div>
+          <div class="tab" onclick="loadInfected('سفلس VDRL',this)">سفلس</div>
+        </div>
+        <div id="infTbl"><div class="empty"><i class="ti ti-virus"></i><p>جاري التحميل...</p></div></div>
+      </div>
+
+      <!-- REJECTED -->
+      <div class="sc" id="s-rejected">
+        <div class="abar">
+          <button class="btn btn-p" onclick="showRejModal()"><i class="ti ti-user-plus"></i> إضافة مرفوض</button>
+          <input type="text" class="sinp" id="rjSrch" placeholder="بحث بالاسم..." style="max-width:260px" onkeydown="if(event.key==='Enter')loadRejected()">
+          <button class="btn" onclick="loadRejected()"><i class="ti ti-search"></i> بحث</button>
+        </div>
+        <div id="rjTbl"><div class="empty"><i class="ti ti-user-x"></i><p>جاري التحميل...</p></div></div>
+      </div>
+
+      <!-- RARE -->
+      <div class="sc" id="s-rare">
+        <div class="sh"><div class="sh-t"><i class="ti ti-droplet-half"></i> الفصائل النادرة — اضغط على فصيلة لعرض قائمة المتبرعين</div></div>
+        <div class="btg" id="rareGrid"></div>
+        <div id="rareTbl"><div class="empty"><i class="ti ti-droplet-half"></i><p>اختر فصيلة من الأعلى</p></div></div>
+      </div>
+
+      <!-- STATS -->
+      <div class="sc" id="s-stats">
+        <div class="abar" style="margin-bottom:14px;align-items:flex-end">
+          <div class="fgrp"><label style="font-size:11px;color:#757575;font-weight:600">من تاريخ</label><input type="date" id="stFrom"></div>
+          <div class="fgrp"><label style="font-size:11px;color:#757575;font-weight:600">إلى تاريخ</label><input type="date" id="stTo"></div>
+          <button class="btn btn-p" onclick="loadStats()"><i class="ti ti-chart-bar"></i> توليد التقرير</button>
+          <button class="btn" onclick="printStats()"><i class="ti ti-printer"></i> طباعة</button>
+        </div>
+        <div id="stRpt" style="display:none"></div>
+      </div>
+
+      <!-- AUDIT LOG -->
+      <div class="sc" id="s-audit">
+        <div class="abar">
+          <button class="btn btn-p" onclick="loadAudit()"><i class="ti ti-refresh"></i> تحديث</button>
+        </div>
+        <div class="tw" id="auditTbl"><div class="empty"><i class="ti ti-shield-lock"></i><p>جاري التحميل...</p></div></div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="sc" id="s-settings">
+        <div class="setg">
+          <div class="setc" onclick="nav('audit',document.querySelector('.ni'))">
+            <div class="setc-ico"><i class="ti ti-shield-lock"></i></div>
+            <div class="setc-t">سجل التتبع (Audit Log)</div>
+            <div class="setc-d">مراجعة جميع العمليات والتعديلات مع التاريخ والمستخدم المسؤول</div>
+          </div>
+          <div class="setc" onclick="toast('إدارة المستخدمين تتم من لوحة تحكم Supabase → Authentication → Users','warning')">
+            <div class="setc-ico"><i class="ti ti-user-cog"></i></div>
+            <div class="setc-t">إدارة المستخدمين</div>
+            <div class="setc-d">إضافة / تعطيل الحسابات وتعيين الأدوار الوظيفية لكل موظف</div>
+          </div>
+          <div class="setc" onclick="exportBackup()">
+            <div class="setc-ico"><i class="ti ti-cloud-download"></i></div>
+            <div class="setc-t">تصدير نسخة احتياطية كاملة</div>
+            <div class="setc-d">تصدير جميع البيانات بصيغة CSV محلياً كنسخة احتياطية إضافية</div>
+          </div>
+          <div class="setc" onclick="toast('تصدير SQL يتم من: Supabase Dashboard → Database → Backups','info',5000)">
+            <div class="setc-ico"><i class="ti ti-database-export"></i></div>
+            <div class="setc-t">تصدير SQL كامل</div>
+            <div class="setc-d">تصدير قاعدة البيانات بالكامل بصيغة SQL من لوحة تحكم Supabase</div>
+          </div>
+          <div class="setc" onclick="showAbout()">
+            <div class="setc-ico"><i class="ti ti-info-circle"></i></div>
+            <div class="setc-t">معلومات النظام</div>
+            <div class="setc-d">الإصدار الحالي وبيانات الاتصال ومعلومات المشروع</div>
+          </div>
+          <div class="setc" style="border-color:#ffcdd2" onclick="dangerZone()">
+            <div class="setc-ico" style="background:#ffebee"><i class="ti ti-alert-triangle" style="color:#c62828"></i></div>
+            <div class="setc-t" style="color:#c62828">منطقة الخطر</div>
+            <div class="setc-d">الحذف الدائم — يتطلب تأكيداً مزدوجاً ومتاح لمدير النظام فقط</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end page -->
+  </div><!-- end content -->
+</div><!-- end app -->
+
+<!-- ADD REJECTED MODAL -->
+<div class="overlay" id="rjModal">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-user-x"></i> إضافة مرفوض من التبرع</div>
+    <div class="fgrid">
+      <div class="fgrp s2"><label>الاسم الكامل *</label><input type="text" id="rj-nm" placeholder="اسم المتبرع المرفوض"></div>
+      <div class="fgrp"><label>العمر</label><input type="number" id="rj-age" placeholder="العمر"></div>
+      <div class="fgrp s2"><label>سبب الرفض *</label><input type="text" id="rj-rsn" placeholder="سبب الرفض التفصيلي"></div>
+      <div class="fgrp"><label>تاريخ الرفض</label><input type="date" id="rj-dt"></div>
+      <div class="fgrp"><label>نوع الرفض</label><select id="rj-typ"><option value="مؤقت">مؤقت</option><option value="دائم">دائم</option></select></div>
+      <div class="fgrp"><label>ملاحظات</label><input type="text" id="rj-note" placeholder="ملاحظات إضافية"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeRjModal()"><i class="ti ti-x"></i> إلغاء</button>
+      <button class="btn btn-p" onclick="saveRejected()"><i class="ti ti-device-floppy"></i> حفظ</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ================================================================
+// ⚠ CONFIG — غيّر هاتين القيمتين بعد إنشاء مشروعك في Supabase
+//   Dashboard → Settings → API → Project URL + anon/public key
+// ================================================================
+const SURL = 'https://XXXXXXXXXXXXXXXXXX.supabase.co';
+const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.XXXXXXXXXX';
+
+// ================================================================
+// INIT
+// ================================================================
+const { createClient } = supabase;
+const db = createClient(SURL, SKEY);
+let SES = null, UPROF = null, DPAGE = 1, SRDATA = [], BCDATA = null;
+const PS = 20;
+
+const TITLES = {
+  dashboard:'لوحة التحكم', add:'إضافة متبرع جديد', donors:'سجل المتبرعين',
+  search:'بحث متقدم', barcode:'الباركود والطباعة', infected:'المصابون',
+  rejected:'المرفوضون مؤقتاً', rare:'الفصائل النادرة',
+  stats:'الإحصائيات', audit:'سجل التتبع', settings:'الإعدادات'
+};
+
+function G(id){ return document.getElementById(id); }
+function N(n){ return n == null ? '—' : n; }
+
+function toast(msg, type='info', dur=3200){
+  const b=G('toastBox'), t=document.createElement('div');
+  t.className=`toast ${type}`;
+  const ic={success:'ti-check',error:'ti-alert-circle',warning:'ti-alert-triangle',info:'ti-info-circle'};
+  t.innerHTML=`<i class="ti ${ic[type]||'ti-info-circle'}"></i><span>${msg}</span>`;
+  b.appendChild(t); setTimeout(()=>t.remove(),dur);
+}
+function load(v){ G('loader').classList.toggle('on',v); }
+function fd(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('ar-IQ',{year:'numeric',month:'2-digit',day:'2-digit'}); }
+function ft(t){ return t ? t.substring(0,5) : '—'; }
+function fnum(n){ return n!=null ? Number(n).toLocaleString('ar-IQ') : '—'; }
+
+// ================================================================
+// AUTH
+// ================================================================
+async function appInit(){
+  G('tbDate').textContent = new Date().toLocaleDateString('ar-IQ',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  setDefaults();
+  try{
+    const {data:{session}} = await db.auth.getSession();
+    if(session){ SES=session; await loadProf(); showApp(); }
+    else showLogin();
+  }catch(e){ showLogin(); }
+  db.auth.onAuthStateChange(async(ev,s)=>{
+    if(ev==='SIGNED_IN'){SES=s; await loadProf(); showApp();}
+    if(ev==='SIGNED_OUT'){SES=null; showLogin();}
+  });
+}
+
+function togglePw(){
+  const p=G('lpw'), i=G('eyeIco');
+  p.type = p.type==='password' ? 'text' : 'password';
+  i.className = p.type==='password' ? 'ti ti-eye' : 'ti ti-eye-off';
+}
+
+async function doLogin(){
+  const email=G('lemail').value.trim(), pw=G('lpw').value;
+  const eb=G('lerr');
+  eb.classList.remove('on');
+  if(!email||!pw){G('lerrMsg').textContent='يرجى إدخال الإيميل وكلمة المرور'; eb.classList.add('on'); return;}
+  G('lbtn').innerHTML='<i class="ti ti-loader"></i> جاري التحقق...';
+  G('lbtn').disabled=true;
+  const {error}=await db.auth.signInWithPassword({email,password:pw});
+  if(error){
+    G('lerrMsg').textContent='البيانات غير صحيحة. تحقق من الإيميل وكلمة المرور.';
+    eb.classList.add('on');
+    G('lbtn').innerHTML='<i class="ti ti-login"></i> دخول آمن';
+    G('lbtn').disabled=false;
+  }
+}
+
+async function loadProf(){
+  if(!SES) return;
+  const {data}=await db.from('user_profiles').select('*').eq('id',SES.user.id).single();
+  UPROF=data;
+  if(data){
+    G('sfName').textContent=data.full_name;
+    G('sfAv').textContent=data.full_name.charAt(0);
+    const rl={admin:'مدير النظام',tech:'فني مختبر',reception:'موظف استقبال',viewer:'عرض فقط'};
+    G('sfRole').textContent=rl[data.role]||data.role;
+  }
+}
+
+async function doLogout(){
+  await db.auth.signOut();
+  toast('تم تسجيل الخروج بنجاح','success');
+}
+
+function showLogin(){
+  G('loginPage').style.display='flex'; G('app').classList.remove('on');
+  G('lbtn').innerHTML='<i class="ti ti-login"></i> دخول آمن'; G('lbtn').disabled=false;
+}
+async function showApp(){
+  G('loginPage').style.display='none'; G('app').classList.add('on');
+  await loadDash();
+}
+
+// ================================================================
+// NAVIGATION
+// ================================================================
+async function nav(name, el){
+  document.querySelectorAll('.sc').forEach(s=>s.classList.remove('on'));
+  const sc=G('s-'+name); if(sc) sc.classList.add('on');
+  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
+  if(el) el.classList.add('on');
+  G('pgTitle').textContent=TITLES[name]||name;
+  switch(name){
+    case 'donors':  await loadDonors(1); break;
+    case 'infected':await loadInfected('', document.querySelector('.tab')); break;
+    case 'rejected':await loadRejected(); break;
+    case 'rare':    await loadRareGrid(); break;
+    case 'add':     await loadNextBN(); break;
+    case 'audit':   await loadAudit(); break;
+    case 'barcode': G('bcRes').style.display='none'; break;
+  }
+}
+
+// ================================================================
+// DASHBOARD
+// ================================================================
+async function loadDash(){
+  const today=new Date().toISOString().split('T')[0];
+  const ms=today.substring(0,7)+'-01';
+  const ys=today.substring(0,4)+'-01-01';
+  try{
+    const [r0,r1,r2,r3,r4]=await Promise.all([
+      db.from('blood_donations').select('*',{count:'exact',head:true}).eq('donation_date',today).eq('is_deleted',false),
+      db.from('blood_donations').select('*',{count:'exact',head:true}).gte('donation_date',ms).eq('is_deleted',false),
+      db.from('blood_donations').select('*',{count:'exact',head:true}).gte('donation_date',ms).eq('donation_type','طوعي').eq('is_deleted',false),
+      db.from('blood_donations').select('*',{count:'exact',head:true}).gte('donation_date',ys).eq('is_deleted',false),
+      db.from('blood_donations').select('*',{count:'exact',head:true}).eq('is_deleted',false)
+    ]);
+    G('st0').textContent=fnum(r0.count||0);
+    G('st1').textContent=fnum(r1.count||0);
+    G('st2').textContent=fnum(r2.count||0);
+    G('st3').textContent=fnum(r3.count||0);
+    G('st4').textContent=fnum(r4.count||0);
+
+    // Recent donations today
+    const {data:rec}=await db.from('blood_donations')
+      .select('bottle_number,bottle_type,donation_type,donation_time,blood_type,serology_result,donors(donor_number,full_name)')
+      .eq('donation_date',today).eq('is_deleted',false)
+      .order('created_at',{ascending:false}).limit(10);
+
+    if(rec&&rec.length){
+      G('recentTbl').innerHTML=`<div class="tw"><table><thead><tr>
+        <th>رقم المتبرع</th><th>اسم المتبرع</th><th>نوع القنينة</th><th>الفصيلة</th>
+        <th>نوع التبرع</th><th>وقت التبرع</th><th>الفحوصات</th>
+      </tr></thead><tbody>${rec.map(r=>`<tr>
+        <td>${N(r.donors?.donor_number)}</td>
+        <td>${N(r.donors?.full_name)}</td>
+        <td>${r.bottle_type}</td>
+        <td>${N(r.blood_type)}</td>
+        <td><span class="pill ${r.donation_type==='طوعي'?'pg':'py'}">${r.donation_type}</span></td>
+        <td>${ft(r.donation_time)}</td>
+        <td><span class="pill ${r.serology_result==='Negative'?'pg':'pr'}">${r.serology_result==='Negative'?'سالبة':'موجبة'}</span></td>
+      </tr>`).join('')}</tbody></table></div>`;
+    } else {
+      G('recentTbl').innerHTML='<div class="empty"><i class="ti ti-clock"></i><p>لا توجد تبرعات اليوم حتى الآن</p></div>';
+    }
+
+    // Blood type counts
+    const {data:btd}=await db.from('blood_donations').select('blood_type').eq('is_deleted',false).not('blood_type','is',null);
+    const btc={};
+    (btd||[]).forEach(r=>{btc[r.blood_type]=(btc[r.blood_type]||0)+1;});
+    const bts=['A+','A-','B+','B-','O+','O-','AB+','AB-'];
+    const rare=['O-','AB-','A-','B-'];
+    G('btGrid').innerHTML=bts.map(bt=>`<div class="btc ${rare.includes(bt)?'warn':''}">
+      <div class="btc-t">${bt}</div>
+      <div class="btc-n">${fnum(btc[bt]||0)}${rare.includes(bt)?' ⚠':''}</div>
+    </div>`).join('');
+
+    // Infected badge
+    const {count:ic}=await db.from('blood_donations').select('*',{count:'exact',head:true}).eq('serology_result','Positive').eq('is_deleted',false);
+    if(ic>0){G('infBadge').textContent=ic; G('infBadge').style.display='inline-block';}
+  }catch(e){toast('خطأ في تحميل البيانات: '+e.message,'error');}
+}
+
+// ================================================================
+// ADD DONOR
+// ================================================================
+function setDefaults(){
+  const td=new Date().toISOString().split('T')[0];
+  const tn=new Date().toTimeString().substring(0,5);
+  const dd=G('f-ddate'), dt=G('f-dtime');
+  if(dd) dd.value=td; if(dt) dt.value=tn;
+}
+
+async function loadNextBN(){
+  const {data}=await db.from('blood_donations').select('bottle_number').order('bottle_number',{ascending:false}).limit(1);
+  G('f-bnum').value=data&&data.length ? data[0].bottle_number+1 : 1;
+}
+
+function calcAge(){
+  const by=parseInt(G('f-by').value);
+  if(by>1900&&by<2010) G('f-age').value=(new Date().getFullYear()-by)+' سنة';
+}
+
+function calcExpiry(){
+  const draw=G('f-draw').value; if(!draw) return;
+  const bt=G('f-btyp').value;
+  const days=['ثنائي','أحادي','تريما صفائح دموية'].includes(bt)?5:42;
+  const e=new Date(draw); e.setDate(e.getDate()+days);
+  G('f-exp').value=e.toISOString().split('T')[0];
+}
+
+function toggleSer(){ G('serTypGrp').style.display=G('f-ser').value==='Positive'?'flex':'none'; }
+
+async function saveDonor(printAfter=false){
+  const nm=G('f-name').value.trim(), by=parseInt(G('f-by').value), dd=G('f-ddate').value;
+  if(!nm||!by||!dd){toast('يرجى تعبئة: الاسم، سنة التولد، تاريخ التبرع','error'); return;}
+  load(true);
+  try{
+    const {data:dn,error:de}=await db.from('donors').insert({
+      full_name:nm, birth_year:by, gender:G('f-gen').value,
+      mother_name:G('f-mom').value.trim()||null, national_id:G('f-nid').value.trim()||null,
+      mobile:G('f-mob').value.trim()||null, address:G('f-addr').value.trim()||null,
+      occupation:G('f-job').value.trim()||null, created_by:SES?.user?.id
+    }).select().single();
+    if(de) throw de;
+
+    const ser=G('f-ser').value;
+    const {data:don,error:doe}=await db.from('blood_donations').insert({
+      donor_id:dn.id, bottle_type:G('f-btyp').value, donation_type:G('f-dtyp').value,
+      patient_name:G('f-pat').value.trim()||null, hospital_name:G('f-hosp').value.trim()||null,
+      donation_date:dd, donation_time:G('f-dtime').value||null,
+      draw_date:G('f-draw').value||null, expiry_date:G('f-exp').value||null,
+      blood_type:G('f-bt').value||null, blood_pressure:G('f-bp').value.trim()||null,
+      weight:parseFloat(G('f-wt').value)||null, pulse:parseInt(G('f-pulse').value)||null,
+      hemoglobin:parseFloat(G('f-hgb').value)||null,
+      serology_result:ser, serology_type:ser==='Positive'?G('f-sert').value:null,
+      created_by:SES?.user?.id
+    }).select().single();
+    if(doe) throw doe;
+
+    await db.from('audit_log').insert({
+      user_id:SES?.user?.id, user_name:UPROF?.full_name,
+      action:'INSERT', table_name:'blood_donations',
+      record_id:don.id, new_values:{donor:nm, bottle:don.bottle_number}
+    });
+
+    toast(`✅ تم الحفظ — رقم القنينة: ${don.bottle_number}`,'success');
+    if(printAfter){ BCDATA={...don,donors:{full_name:nm,donor_number:dn.donor_number}}; setTimeout(()=>printBC('full'),400); }
+    resetForm(); await loadNextBN();
+  }catch(e){toast('خطأ في الحفظ: '+e.message,'error');}
+  finally{load(false);}
+}
+
+function resetForm(){
+  ['f-name','f-by','f-age','f-mom','f-nid','f-mob','f-addr','f-job','f-pat','f-hosp','f-draw','f-exp','f-bp','f-wt','f-pulse','f-hgb'].forEach(id=>{const e=G(id);if(e)e.value='';});
+  G('f-bt').value=''; G('f-ser').value='Negative'; G('f-dtyp').value='تعويضي'; G('f-btyp').value='مفلتر';
+  G('serTypGrp').style.display='none'; setDefaults();
+}
+
+function printForm(){
+  const nm=G('f-name').value.trim();
+  if(!nm){toast('أدخل اسم المتبرع أولاً','warning'); return;}
+  const vals={name:nm,by:G('f-by').value,gen:G('f-gen').value,mom:G('f-mom').value,nid:G('f-nid').value,mob:G('f-mob').value,addr:G('f-addr').value,job:G('f-job').value,dtyp:G('f-dtyp').value,btyp:G('f-btyp').value,bnum:G('f-bnum').value,pat:G('f-pat').value,hosp:G('f-hosp').value,ddate:G('f-ddate').value,dtime:G('f-dtime').value,bt:G('f-bt').value,bp:G('f-bp').value,wt:G('f-wt').value,pulse:G('f-pulse').value,hgb:G('f-hgb').value,ser:G('f-ser').value};
+  const w=window.open('','_blank','width=800,height=700');
+  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>استمارة التبرع</title>
+  <style>body{font-family:'Segoe UI',Arial,sans-serif;direction:rtl;padding:20px;font-size:12px}
+  .hdr{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #c62828;padding-bottom:12px;margin-bottom:18px}
+  .tc{text-align:center}.tc h2{font-size:15px;color:#c62828;margin-bottom:4px}.tc p{font-size:10px;color:#757575}
+  .en{font-size:10px;color:#757575;line-height:1.6}
+  .bn{border:2px solid #c62828;padding:6px 14px;border-radius:8px;font-size:14px;font-weight:bold;color:#c62828}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+  .f{border:1px solid #ddd;border-radius:6px;padding:7px 10px}
+  .fl{font-size:10px;color:#9e9e9e;margin-bottom:2px}.fv{font-size:12px;font-weight:700;min-height:18px}
+  .sec{font-size:11px;font-weight:bold;background:#fff0f0;color:#c62828;padding:5px 10px;border-radius:4px;margin:12px 0 8px}
+  .sig{display:flex;justify-content:space-between;margin-top:30px;padding-top:14px;border-top:1px dashed #ddd;font-size:11px;color:#757575}
+  @media print{@page{margin:10mm}}</style></head><body>
+  <div class="hdr">
+    <div class="en">Ministry of Health<br>Wasit Health Directorate<br>Technical Affairs Dept.<br><strong>Blood Donor Questionnaire</strong></div>
+    <div class="tc"><h2>استمارة تبرع بالدم</h2><p>شعبة مصرف الدم الرئيسي — واسط</p><p>وزارة الصحة / دائرة صحة واسط</p></div>
+    <div><div class="bn">رقم القنينة: ${vals.bnum}</div><div style="font-size:10px;color:#757575;margin-top:6px">التاريخ: ${vals.ddate}<br>الوقت: ${vals.dtime}</div></div>
+  </div>
+  <div class="sec">البيانات الشخصية</div>
+  <div class="g2">
+    <div class="f"><div class="fl">الاسم الرباعي واللقب</div><div class="fv">${vals.name}</div></div>
+    <div class="f"><div class="fl">سنة التولد</div><div class="fv">${vals.by}</div></div>
+    <div class="f"><div class="fl">الجنس</div><div class="fv">${vals.gen}</div></div>
+    <div class="f"><div class="fl">اسم الأم</div><div class="fv">${vals.mom}</div></div>
+    <div class="f"><div class="fl">رقم البطاقة الوطنية</div><div class="fv">${vals.nid}</div></div>
+    <div class="f"><div class="fl">رقم الموبايل</div><div class="fv">${vals.mob}</div></div>
+  </div>
+  <div class="sec">بيانات التبرع</div>
+  <div class="g2">
+    <div class="f"><div class="fl">نوع التبرع</div><div class="fv">${vals.dtyp}</div></div>
+    <div class="f"><div class="fl">نوع القنينة</div><div class="fv">${vals.btyp}</div></div>
+    <div class="f"><div class="fl">اسم المريض</div><div class="fv">${vals.pat}</div></div>
+    <div class="f"><div class="fl">اسم المستشفى</div><div class="fv">${vals.hosp}</div></div>
+  </div>
+  <div class="sec">الفحوصات السريرية والمختبرية</div>
+  <div class="g2">
+    <div class="f"><div class="fl">فصيلة الدم</div><div class="fv">${vals.bt}</div></div>
+    <div class="f"><div class="fl">ضغط الدم</div><div class="fv">${vals.bp}</div></div>
+    <div class="f"><div class="fl">الوزن (كغ)</div><div class="fv">${vals.wt}</div></div>
+    <div class="f"><div class="fl">النبض</div><div class="fv">${vals.pulse}</div></div>
+    <div class="f"><div class="fl">الهيموكلوبين</div><div class="fv">${vals.hgb}</div></div>
+    <div class="f"><div class="fl">نتيجة الفحوصات</div><div class="fv" style="color:${vals.ser==='Negative'?'#2e7d32':'#c62828'}">${vals.ser}</div></div>
+  </div>
+  <div class="sig">
+    <div>توقيع الفني المختص: ___________________</div>
+    <div>توقيع المتبرع: ___________________</div>
+    <div>طابع الشعبة</div>
+  </div>
+  <script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
+  w.document.close();
+}
+
+// ================================================================
+// DONORS LIST
+// ================================================================
+async function loadDonors(page=1){
+  DPAGE=page; const s=G('dSrch').value.trim(); load(true);
+  try{
+    let q=db.from('blood_donations')
+      .select('bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,id,donors!inner(donor_number,full_name,birth_year,national_id)',{count:'exact'})
+      .eq('is_deleted',false).order('created_at',{ascending:false})
+      .range((page-1)*PS, page*PS-1);
+    if(s){ q=db.from('blood_donations')
+      .select('bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,id,donors!inner(donor_number,full_name,birth_year,national_id)',{count:'exact'})
+      .eq('is_deleted',false)
+      .or(`bottle_number.eq.${isNaN(s)?0:s},donors.national_id.ilike.%${s}%,donors.donor_number.eq.${isNaN(s)?0:s}`)
+      .order('created_at',{ascending:false}).range((page-1)*PS,page*PS-1);
+    }
+    const {data,count,error}=await q; if(error) throw error;
+    const now=new Date();
+    if(data&&data.length){
+      G('dTbl').innerHTML=`<div class="tw"><table><thead><tr>
+        <th>رقم المتبرع</th><th>الاسم الكامل</th><th>العمر</th><th>الفصيلة</th>
+        <th>نوع القنينة</th><th>رقم القنينة</th><th>نوع التبرع</th>
+        <th>تاريخ التبرع</th><th>تاريخ النفاد</th><th>الفحوصات</th><th></th>
+      </tr></thead><tbody>${data.map(r=>{
+        const age=r.donors?.birth_year ? new Date().getFullYear()-r.donors.birth_year : '—';
+        const exp=r.expiry_date&&new Date(r.expiry_date)<now;
+        return`<tr>
+          <td>${N(r.donors?.donor_number)}</td>
+          <td>${N(r.donors?.full_name)}</td>
+          <td>${age}</td>
+          <td>${N(r.blood_type)}</td>
+          <td>${r.bottle_type}</td>
+          <td style="font-weight:700;color:#c62828">${r.bottle_number}</td>
+          <td><span class="pill ${r.donation_type==='طوعي'?'pg':'py'}">${r.donation_type}</span></td>
+          <td>${fd(r.donation_date)}</td>
+          <td style="color:${exp?'#c62828':'inherit'}">${fd(r.expiry_date)}${exp?' ⚠':''}</td>
+          <td><span class="pill ${r.serology_result==='Negative'?'pg':'pr'}">${r.serology_result==='Negative'?'سالبة':'موجبة'}</span></td>
+          <td><button class="ibtn" onclick="openBC(${r.bottle_number})" title="باركود"><i class="ti ti-barcode"></i></button></td>
+        </tr>`;}).join('')}</tbody></table></div>`;
+      const tp=Math.ceil(count/PS);
+      const start=Math.max(1,Math.min(page-2,tp-4));
+      G('dPag').innerHTML=`<span>إجمالي: ${fnum(count)} سجل — الصفحة ${page} من ${tp}</span>
+        <div class="pag-btns">
+          <button class="pbtn" onclick="loadDonors(${page-1})" ${page<=1?'disabled':''}>→</button>
+          ${Array.from({length:Math.min(5,tp)},(_,i)=>{const p=start+i;return`<button class="pbtn ${p===page?'on':''}" onclick="loadDonors(${p})">${p}</button>`;}).join('')}
+          <button class="pbtn" onclick="loadDonors(${page+1})" ${page>=tp?'disabled':''}>←</button>
+        </div>`;
+    } else {
+      G('dTbl').innerHTML='<div class="empty"><i class="ti ti-users"></i><p>لا توجد نتائج</p></div>';
+      G('dPag').innerHTML='';
+    }
+  }catch(e){toast('خطأ: '+e.message,'error');}
+  finally{load(false);}
+}
+
+async function exportDonors(){
+  toast('جاري تحضير الملف...','info'); load(true);
+  const {data}=await db.from('blood_donations')
+    .select('*,donors(donor_number,full_name,birth_year,gender,mother_name,national_id,mobile,address,occupation)')
+    .eq('is_deleted',false).order('bottle_number',{ascending:false});
+  load(false); if(!data) return;
+  const hd=['رقم المتبرع','الاسم','سنة التولد','الجنس','اسم الأم','البطاقة','الموبايل','العنوان','المهنة','رقم القنينة','نوع القنينة','نوع التبرع','اسم المريض','المستشفى','تاريخ التبرع','وقت التبرع','تاريخ السحب','تاريخ النفاد','فصيلة الدم','ضغط الدم','الوزن','النبض','الهيموكلوبين','الفحوصات'];
+  const rows=data.map(r=>[r.donors?.donor_number,r.donors?.full_name,r.donors?.birth_year,r.donors?.gender,r.donors?.mother_name,r.donors?.national_id,r.donors?.mobile,r.donors?.address,r.donors?.occupation,r.bottle_number,r.bottle_type,r.donation_type,r.patient_name,r.hospital_name,r.donation_date,r.donation_time,r.draw_date,r.expiry_date,r.blood_type,r.blood_pressure,r.weight,r.pulse,r.hemoglobin,r.serology_result].map(v=>`"${v??''}"`));
+  const csv='\uFEFF'+[hd.join(','),...rows.map(r=>r.join(','))].join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`مصرف_الدم_${new Date().toISOString().split('T')[0]}.csv`; a.click();
+  toast('تم التصدير بنجاح','success');
+}
+
+// ================================================================
+// SEARCH
+// ================================================================
+async function doSearch(){
+  load(true);
+  try{
+    let q=db.from('blood_donations')
+      .select('bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,patient_name,hospital_name,donors(donor_number,full_name,birth_year,mobile,mother_name)')
+      .eq('is_deleted',false).order('donation_date',{ascending:false}).limit(300);
+    const bn=G('sr-bn').value.trim();
+    if(bn) q=q.eq('bottle_number',parseInt(bn));
+    if(G('sr-bt').value) q=q.eq('bottle_type',G('sr-bt').value);
+    if(G('sr-bl').value) q=q.eq('blood_type',G('sr-bl').value);
+    if(G('sr-dt').value) q=q.eq('donation_type',G('sr-dt').value);
+    if(G('sr-hosp').value.trim()) q=q.ilike('hospital_name','%'+G('sr-hosp').value.trim()+'%');
+    if(G('sr-pat').value.trim()) q=q.ilike('patient_name','%'+G('sr-pat').value.trim()+'%');
+    if(G('sr-df').value) q=q.gte('donation_date',G('sr-df').value);
+    if(G('sr-dt2').value) q=q.lte('donation_date',G('sr-dt2').value);
+    if(G('sr-ser').value) q=q.eq('serology_result',G('sr-ser').value);
+    const {data,error}=await q; if(error) throw error;
+    const nm=G('sr-nm').value.trim(), mob=G('sr-mob').value.trim(), mom=G('sr-mom').value.trim();
+    SRDATA=(data||[]).filter(r=>
+      (!nm||r.donors?.full_name?.includes(nm))&&
+      (!mob||r.donors?.mobile?.includes(mob))&&
+      (!mom||r.donors?.mother_name?.includes(mom))
+    );
+    if(SRDATA.length){
+      G('srRes').innerHTML=`<div style="margin-bottom:8px;font-size:12px;color:#757575">عدد النتائج: <strong>${SRDATA.length}</strong></div>
+      <div class="tw"><table><thead><tr>
+        <th>رقم المتبرع</th><th>الاسم</th><th>الفصيلة</th><th>نوع القنينة</th><th>رقم القنينة</th>
+        <th>نوع التبرع</th><th>تاريخ التبرع</th><th>تاريخ النفاد</th><th>الفحوصات</th><th></th>
+      </tr></thead><tbody>${SRDATA.map(r=>`<tr>
+        <td>${N(r.donors?.donor_number)}</td><td>${N(r.donors?.full_name)}</td>
+        <td>${N(r.blood_type)}</td><td>${r.bottle_type}</td>
+        <td style="font-weight:700;color:#c62828">${r.bottle_number}</td>
+        <td><span class="pill ${r.donation_type==='طوعي'?'pg':'py'}">${r.donation_type}</span></td>
+        <td>${fd(r.donation_date)}</td><td>${fd(r.expiry_date)}</td>
+        <td><span class="pill ${r.serology_result==='Negative'?'pg':'pr'}">${r.serology_result==='Negative'?'سالبة':'موجبة'}</span></td>
+        <td><button class="ibtn" onclick="openBC(${r.bottle_number})"><i class="ti ti-barcode"></i></button></td>
+      </tr>`).join('')}</tbody></table></div>`;
+    } else {
+      G('srRes').innerHTML='<div class="empty"><i class="ti ti-search"></i><p>لا توجد نتائج مطابقة</p></div>';
+    }
+  }catch(e){toast('خطأ في البحث: '+e.message,'error');}
+  finally{load(false);}
+}
+
+function clearSearch(){
+  ['sr-nm','sr-bn','sr-hosp','sr-pat','sr-mob','sr-mom','sr-df','sr-dt2'].forEach(id=>{const e=G(id);if(e)e.value='';});
+  ['sr-bt','sr-bl','sr-dt','sr-ser'].forEach(id=>{const e=G(id);if(e)e.value='';});
+  G('srRes').innerHTML=''; SRDATA=[];
+}
+
+function exportSearch(){
+  if(!SRDATA.length){toast('لا توجد نتائج','warning'); return;}
+  const hd=['رقم المتبرع','الاسم','الفصيلة','نوع القنينة','رقم القنينة','نوع التبرع','تاريخ التبرع','تاريخ النفاد','الفحوصات'];
+  const rows=SRDATA.map(r=>[r.donors?.donor_number,r.donors?.full_name,r.blood_type,r.bottle_type,r.bottle_number,r.donation_type,r.donation_date,r.expiry_date,r.serology_result].map(v=>`"${v??''}"`));
+  const csv='\uFEFF'+[hd.join(','),...rows.map(r=>r.join(','))].join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`بحث_${new Date().toISOString().split('T')[0]}.csv`; a.click();
+}
+
+// ================================================================
+// BARCODE
+// ================================================================
+async function searchBC(){
+  const t=G('bcSrch').value.trim(); if(!t){toast('أدخل رقم القنينة','warning'); return;}
+  load(true);
+  const {data}=await db.from('blood_donations')
+    .select('*,donors(donor_number,full_name)')
+    .eq('bottle_number',parseInt(t)).eq('is_deleted',false).limit(1);
+  load(false);
+  if(data&&data.length){BCDATA=data[0]; showBC(BCDATA);}
+  else toast('لم يتم العثور على القنينة رقم '+t,'warning');
+}
+
+async function openBC(bn){
+  await nav('barcode', document.querySelector('[onclick*="barcode"]'));
+  G('bcSrch').value=bn; await searchBC();
+}
+
+function showBC(r){
+  G('bcInfo').innerHTML=`
+    <div class="bcf"><label>رقم المتبرع</label><span>${N(r.donors?.donor_number)}</span></div>
+    <div class="bcf"><label>اسم المتبرع</label><span>${N(r.donors?.full_name)}</span></div>
+    <div class="bcf red"><label>رقم القنينة</label><span>${r.bottle_number}</span></div>
+    <div class="bcf"><label>نوع القنينة</label><span>${r.bottle_type}</span></div>
+    <div class="bcf"><label>تاريخ السحب</label><span>${fd(r.draw_date)}</span></div>
+    <div class="bcf red"><label>تاريخ النفاد</label><span>${fd(r.expiry_date)}</span></div>`;
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  JsBarcode(svg,String(r.bottle_number).padStart(8,'0'),{format:'CODE128',width:2,height:50,displayValue:true,font:'Arial',fontSize:12});
+  G('bcSvg').innerHTML=''; G('bcSvg').appendChild(svg); G('bcRes').style.display='block';
+}
+
+function printBC(type){
+  const r=BCDATA; if(!r){toast('لا توجد بيانات للطباعة','warning'); return;}
+  const showExp=type!=='simple';
+  const w=window.open('','_blank','width=650,height=520');
+  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>باركود</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+  <style>body{font-family:'Segoe UI',Arial,sans-serif;direction:rtl;padding:20px;background:#fff}
+  .card{border:1px solid #ddd;border-radius:10px;padding:18px;max-width:340px;margin:0 auto}
+  .hd{display:flex;align-items:center;gap:9px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #eee}
+  .hd-ico{width:36px;height:36px;background:#c62828;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px}
+  .hd-t{font-size:12px;font-weight:bold;color:#1a1a1a}.hd-s{font-size:10px;color:#9e9e9e}
+  .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f5f5f5;font-size:12px}
+  .row:last-of-type{border-bottom:none}.rl{color:#9e9e9e}.rv{font-weight:bold;color:#1a1a1a}
+  .rv.red{color:#c62828}
+  .bc{text-align:center;padding:10px;margin:12px 0;background:#fafafa;border-radius:8px;border:1px solid #eee}
+  @media print{@page{margin:6mm}}</style></head><body>
+  <div class="card">
+    <div class="hd"><div class="hd-ico">🩸</div>
+      <div><div class="hd-t">مصرف الدم الرئيسي — واسط</div><div class="hd-s">وزارة الصحة</div></div>
+    </div>
+    <div class="row"><span class="rl">رقم المتبرع</span><span class="rv">${N(r.donors?.donor_number)}</span></div>
+    <div class="row"><span class="rl">اسم المتبرع</span><span class="rv">${N(r.donors?.full_name)}</span></div>
+    <div class="row"><span class="rl">رقم القنينة</span><span class="rv red">${r.bottle_number}</span></div>
+    <div class="row"><span class="rl">نوع القنينة</span><span class="rv">${r.bottle_type}</span></div>
+    <div class="row"><span class="rl">تاريخ السحب</span><span class="rv">${fd(r.draw_date)}</span></div>
+    ${showExp?`<div class="row"><span class="rl">تاريخ النفاد</span><span class="rv red">${fd(r.expiry_date)}</span></div>`:''}
+    <div class="bc"><svg id="bcs"></svg></div>
+  </div>
+  <script>JsBarcode('#bcs','${String(r.bottle_number).padStart(8,'0')}',{format:'CODE128',width:2,height:50,displayValue:true,font:'Arial',fontSize:12});setTimeout(()=>window.print(),600);<\/script>
+  </body></html>`);
+  w.document.close();
+}
+
+// ================================================================
+// INFECTED
+// ================================================================
+async function loadInfected(type, tabEl){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  if(tabEl) tabEl.classList.add('on');
+  load(true);
+  let q=db.from('blood_donations')
+    .select('bottle_number,serology_result,serology_type,donation_date,id,donors(donor_number,full_name,mobile)')
+    .eq('serology_result','Positive').eq('is_deleted',false).order('created_at',{ascending:false});
+  if(type) q=q.eq('serology_type',type);
+  const {data}=await q; load(false);
+  if(data&&data.length){
+    G('infTbl').innerHTML=`<div class="tw"><table><thead><tr>
+      <th>رقم المتبرع</th><th>اسم المتبرع</th><th>رقم القنينة</th>
+      <th>نوع الإصابة</th><th>تاريخ الاكتشاف</th><th>رقم الموبايل</th>
+    </tr></thead><tbody>${data.map(r=>`<tr>
+      <td>${N(r.donors?.donor_number)}</td>
+      <td>${N(r.donors?.full_name)}</td>
+      <td style="color:#c62828;font-weight:700">${r.bottle_number}</td>
+      <td><span class="pill pr">${r.serology_type||'موجب'}</span></td>
+      <td>${fd(r.donation_date)}</td>
+      <td dir="ltr">${N(r.donors?.mobile)}</td>
+    </tr>`).join('')}</tbody></table></div>`;
+  } else {
+    G('infTbl').innerHTML='<div class="empty"><i class="ti ti-shield-check" style="color:#2e7d32"></i><p>لا توجد حالات إيجابية</p></div>';
+  }
+}
+
+// ================================================================
+// REJECTED
+// ================================================================
+async function loadRejected(){
+  const s=G('rjSrch').value.trim(); load(true);
+  let q=db.from('rejected_donors').select('*').eq('is_deleted',false).order('rejection_date',{ascending:false});
+  if(s) q=q.ilike('full_name','%'+s+'%');
+  const {data}=await q; load(false);
+  if(data&&data.length){
+    G('rjTbl').innerHTML=`<div class="tw"><table><thead><tr>
+      <th>الاسم</th><th>العمر</th><th>سبب الرفض</th><th>تاريخ الرفض</th><th>نوع الرفض</th><th>ملاحظات</th>
+    </tr></thead><tbody>${data.map(r=>`<tr>
+      <td>${r.full_name}</td><td>${N(r.age)}</td><td>${r.rejection_reason}</td>
+      <td>${fd(r.rejection_date)}</td>
+      <td><span class="pill ${r.rejection_type==='مؤقت'?'py':'pr'}">${r.rejection_type}</span></td>
+      <td>${N(r.notes)}</td>
+    </tr>`).join('')}</tbody></table></div>`;
+  } else {
+    G('rjTbl').innerHTML='<div class="empty"><i class="ti ti-user-x"></i><p>لا توجد سجلات</p></div>';
+  }
+}
+
+function showRejModal(){ G('rj-dt').value=new Date().toISOString().split('T')[0]; G('rjModal').classList.add('on'); }
+function closeRjModal(){ G('rjModal').classList.remove('on'); ['rj-nm','rj-age','rj-rsn','rj-note'].forEach(id=>G(id).value=''); }
+
+async function saveRejected(){
+  const nm=G('rj-nm').value.trim(), rsn=G('rj-rsn').value.trim();
+  if(!nm||!rsn){toast('الاسم وسبب الرفض إلزاميان','error'); return;}
+  const {error}=await db.from('rejected_donors').insert({
+    full_name:nm, age:parseInt(G('rj-age').value)||null,
+    rejection_reason:rsn, rejection_date:G('rj-dt').value,
+    rejection_type:G('rj-typ').value, notes:G('rj-note').value.trim()||null,
+    created_by:SES?.user?.id
+  });
+  if(error){toast('خطأ: '+error.message,'error'); return;}
+  toast('تم الحفظ بنجاح','success'); closeRjModal(); await loadRejected();
+}
+
+// ================================================================
+// RARE BLOOD TYPES
+// ================================================================
+async function loadRareGrid(){
+  const {data:btd}=await db.from('blood_donations').select('blood_type').eq('is_deleted',false).not('blood_type','is',null);
+  const btc={};
+  (btd||[]).forEach(r=>{btc[r.blood_type]=(btc[r.blood_type]||0)+1;});
+  const bts=['A+','A-','B+','B-','O+','O-','AB+','AB-'];
+  const rare=['O-','AB-','A-','B-'];
+  G('rareGrid').innerHTML=bts.map(bt=>`<div class="btc ${rare.includes(bt)?'warn':''}" onclick="loadRareList('${bt}')">
+    <div class="btc-t">${bt}</div>
+    <div class="btc-n">${fnum(btc[bt]||0)}${rare.includes(bt)?' ⚠':''}</div>
+  </div>`).join('');
+}
+
+async function loadRareList(bt){
+  load(true);
+  const {data}=await db.from('blood_donations')
+    .select('bottle_number,donation_date,blood_type,donors(donor_number,full_name,mobile,address)')
+    .eq('blood_type',bt).eq('is_deleted',false)
+    .order('donation_date',{ascending:false}).limit(100);
+  load(false);
+  if(data&&data.length){
+    G('rareTbl').innerHTML=`<div style="margin-bottom:8px;font-size:12px;font-weight:700;color:#c62828">فصيلة ${bt} — ${data.length} سجل</div>
+    <div class="tw"><table><thead><tr>
+      <th>رقم المتبرع</th><th>اسم المتبرع</th><th>الفصيلة</th><th>رقم الموبايل</th><th>تاريخ التبرع</th><th>عنوان السكن</th>
+    </tr></thead><tbody>${data.map(r=>`<tr>
+      <td>${N(r.donors?.donor_number)}</td>
+      <td>${N(r.donors?.full_name)}</td>
+      <td style="font-weight:700;color:#c62828">${r.blood_type}</td>
+      <td dir="ltr">${N(r.donors?.mobile)}</td>
+      <td>${fd(r.donation_date)}</td>
+      <td>${N(r.donors?.address)}</td>
+    </tr>`).join('')}</tbody></table></div>
+    <div class="abar" style="margin-top:10px">
+      <button class="btn btn-p" onclick="window.print()"><i class="ti ti-printer"></i> طباعة تقرير فصيلة ${bt}</button>
+    </div>`;
+  } else {
+    G('rareTbl').innerHTML='<div class="empty"><i class="ti ti-droplet-half"></i><p>لا توجد سجلات لفصيلة '+bt+'</p></div>';
+  }
+}
+
+// ================================================================
+// STATISTICS
+// ================================================================
+async function loadStats(){
+  const f=G('stFrom').value, t=G('stTo').value;
+  if(!f||!t){toast('يرجى تحديد الفترة الزمنية','warning'); return;}
+  load(true);
+  const {data}=await db.from('blood_donations')
+    .select('donation_type,bottle_type,blood_type,serology_result,donors(gender)')
+    .gte('donation_date',f).lte('donation_date',t).eq('is_deleted',false);
+  load(false);
+  if(!data?.length){toast('لا توجد بيانات في هذه الفترة','warning'); return;}
+  const byTyp={}, byBot={}, byBld={}, byGen={ذكر:0,أنثى:0};
+  const bts=['مفلتر','رباعي','ريفيس','ثنائي','أحادي','تريما دم كامل','تريما صفائح دموية','حملة تبرع رباعي','حملة تبرع مفلتر','رباعي Sag'];
+  data.forEach(r=>{
+    byTyp[r.donation_type]=(byTyp[r.donation_type]||0)+1;
+    byBot[r.bottle_type]=(byBot[r.bottle_type]||0)+1;
+    if(r.blood_type) byBld[r.blood_type]=(byBld[r.blood_type]||0)+1;
+    if(r.donors?.gender) byGen[r.donors.gender]=(byGen[r.donors.gender]||0)+1;
+  });
+  G('stRpt').style.display='block';
+  G('stRpt').innerHTML=`<div class="rpt">
+    <div class="rpt-hd">
+      <div><div class="rh-t">شعبة مصرف الدم الرئيسي — واسط</div>
+        <div class="rh-s">قسم الأمور الفنية / دائرة صحة واسط / وزارة الصحة</div>
+        <div class="rh-s">الفترة: من ${f} إلى ${t} | الإجمالي: ${fnum(data.length)} تبرع</div>
+      </div>
+      <div class="rh-en">Ministry of Health<br>Wasit Health Directorate<br>Main Blood Bank Division</div>
+    </div>
+    <div class="rpt-body">
+      <div class="rs"><div class="rs-t">إحصائية حسب نوع التبرع</div>
+        ${['طوعي','تعويضي'].map(t=>`<div class="rr"><span>${t}</span><span class="rv">${fnum(byTyp[t]||0)}</span></div>`).join('')}
+      </div>
+      <div class="rs"><div class="rs-t">إحصائية حسب الجنس</div>
+        ${Object.entries(byGen).map(([g,c])=>`<div class="rr"><span>${g}</span><span class="rv">${fnum(c)}</span></div>`).join('')}
+      </div>
+      <div class="rs"><div class="rs-t">إحصائية حسب نوع القنينة</div>
+        ${bts.filter(b=>byBot[b]).map(b=>`<div class="rr"><span>${b}</span><span class="rv">${fnum(byBot[b])}</span></div>`).join('')}
+        ${!Object.keys(byBot).length?'<div class="rr"><span>لا توجد بيانات</span><span class="rv">0</span></div>':''}
+      </div>
+      <div class="rs"><div class="rs-t">إحصائية حسب فصيلة الدم</div>
+        ${Object.entries(byBld).sort((a,b)=>b[1]-a[1]).map(([b,c])=>`<div class="rr"><span>${b}</span><span class="rv">${fnum(c)}</span></div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+function printStats(){
+  if(G('stRpt').style.display==='none'){toast('يرجى توليد التقرير أولاً','warning'); return;}
+  const c=G('stRpt').innerHTML;
+  const w=window.open('','_blank','width=700,height=900');
+  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>تقرير إحصائي</title>
+  <style>body{font-family:'Segoe UI',Arial,sans-serif;direction:rtl;padding:20px;background:#fff;font-size:12px}
+  .rpt{border:1px solid #ddd;border-radius:8px;overflow:hidden}
+  .rpt-hd{background:#c62828;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:flex-start}
+  .rh-t{font-size:13px;font-weight:700}.rh-s{font-size:10px;opacity:.8;margin-top:2px}.rh-en{text-align:left;font-size:10px;opacity:.7;line-height:1.6}
+  .rpt-body{padding:14px}.rs{margin-bottom:12px}.rs-t{font-size:11px;font-weight:700;color:#757575;padding:4px 8px;background:#fafafa;border-radius:4px;margin-bottom:6px}
+  .rr{display:flex;justify-content:space-between;padding:4px 8px;border-bottom:1px solid #f5f5f5;font-size:11px}.rr:last-child{border-bottom:none}.rv{font-weight:700;color:#c62828}
+  @media print{@page{margin:10mm}}</style></head>
+  <body>${c}<script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
+  w.document.close();
+}
+
+// ================================================================
+// AUDIT LOG
+// ================================================================
+async function loadAudit(){
+  load(true);
+  const {data}=await db.from('audit_log').select('*').order('created_at',{ascending:false}).limit(100);
+  load(false);
+  if(data&&data.length){
+    const rows=data.map(r=>`<div class="audit-row">
+      <span class="a-time">${new Date(r.created_at).toLocaleString('ar-IQ')}</span>
+      <span class="a-user">${r.user_name||'النظام'}</span>
+      <span class="a-action"><span class="pill ${r.action==='INSERT'?'pg':r.action==='DELETE'?'pr':'py'}">${r.action}</span></span>
+      <span class="a-desc">${r.table_name} — ${r.record_id||''} ${r.new_values?JSON.stringify(r.new_values).substring(0,60)+'...':''}</span>
+    </div>`).join('');
+    G('auditTbl').innerHTML=`<div class="tw" style="max-height:480px;overflow-y:auto">${rows}</div>`;
+  } else {
+    G('auditTbl').innerHTML='<div class="empty"><i class="ti ti-shield-lock"></i><p>لا توجد سجلات بعد</p></div>';
+  }
+}
+
+// ================================================================
+// BACKUP & SETTINGS
+// ================================================================
+async function exportBackup(){
+  toast('جاري تحضير النسخة الاحتياطية...','info'); load(true);
+  const [r1,r2,r3]=await Promise.all([
+    db.from('donors').select('*').eq('is_deleted',false),
+    db.from('blood_donations').select('*').eq('is_deleted',false),
+    db.from('rejected_donors').select('*').eq('is_deleted',false)
+  ]);
+  load(false);
+  const toCSV=(rows,keys)=>{
+    if(!rows?.length) return '';
+    return'\uFEFF'+[keys.join(','),...rows.map(r=>keys.map(k=>`"${r[k]??''}"`).join(','))].join('\n');
+  };
+  const dn=['id','donor_number','full_name','birth_year','gender','mother_name','national_id','mobile','address','occupation','created_at'];
+  const dk=['id','donor_id','bottle_number','bottle_type','donation_type','patient_name','hospital_name','donation_date','donation_time','draw_date','expiry_date','blood_type','blood_pressure','weight','pulse','hemoglobin','serology_result','serology_type','created_at'];
+  const rk=['id','full_name','age','rejection_reason','rejection_date','rejection_type','notes','created_at'];
+  [[r1.data,dn,'donors'],[r2.data,dk,'donations'],[r3.data,rk,'rejected']].forEach(([data,keys,name])=>{
+    if(!data?.length) return;
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([toCSV(data,keys)],{type:'text/csv;charset=utf-8'}));
+    a.download=`backup_${name}_${new Date().toISOString().split('T')[0]}.csv`; a.click();
+  });
+  toast('تم تصدير النسخة الاحتياطية (3 ملفات CSV)','success');
+}
+
+function showAbout(){
+  toast('نظام مصرف الدم — واسط | الإصدار 2.0.0 | Powered by Supabase + GitHub Pages','info',6000);
+}
+
+function dangerZone(){
+  if(UPROF?.role!=='admin'){toast('هذا الإجراء متاح للمدير فقط','error'); return;}
+  toast('للحذف الدائم: اتصل بمسؤول قاعدة البيانات مباشرةً','warning',5000);
+}
+
+// ================================================================
+// START
+// ================================================================
+window.addEventListener('load', appInit);
+</script>
+</body>
+</html>
