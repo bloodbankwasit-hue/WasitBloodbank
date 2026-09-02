@@ -296,6 +296,7 @@ tbody tr:hover td{background:#fafafa}
         <div class="ni" onclick="nav('stats',this)"><i class="ti ti-chart-bar"></i> الإحصائيات</div>
         <div class="ni" onclick="nav('audit',this)"><i class="ti ti-shield-lock"></i> سجل التتبع</div>
         <div class="ni" onclick="nav('settings',this)"><i class="ti ti-settings"></i> الإعدادات</div>
+        <div class="ni" id="navUsers" style="display:none" onclick="nav('users',this)"><i class="ti ti-user-cog"></i> إدارة الحسابات</div>
       </div>
     </div>
     <div class="sb-foot">
@@ -534,6 +535,18 @@ tbody tr:hover td{background:#fafafa}
         </div>
       </div>
 
+
+      <!-- USERS MANAGEMENT (Admin Only) -->
+      <div class="sc" id="s-users">
+        <div id="nonAdminWarn" style="display:none" class="empty"><i class="ti ti-lock"></i><p>هذه الصفحة متاحة للمدير فقط</p></div>
+        <div id="adminUsersPanel">
+          <div class="abar">
+            <button class="btn btn-p" onclick="showAddUserModal()"><i class="ti ti-user-plus"></i> إضافة مستخدم جديد</button>
+          </div>
+          <div id="usersTbl"><div class="empty"><i class="ti ti-user-cog"></i><p>جاري التحميل...</p></div></div>
+        </div>
+      </div>
+
     </div><!-- end page -->
   </div><!-- end content -->
 </div><!-- end app -->
@@ -638,12 +651,16 @@ async function loadProf(){
   if(!SES) return;
   const {data}=await db.from('user_profiles').select('*').eq('id',SES.user.id).single();
   UPROF=data;
-  if(data){
-    G('sfName').textContent=data.full_name;
-    G('sfAv').textContent=data.full_name.charAt(0);
-    const rl={admin:'مدير النظام',tech:'فني مختبر',reception:'موظف استقبال',viewer:'عرض فقط'};
-    G('sfRole').textContent=rl[data.role]||data.role;
+  if(!data||!data.is_active){
+    await db.auth.signOut(); showLogin();
+    setTimeout(()=>toast('هذا الحساب معطّل أو غير مسجّل. تواصل مع مدير النظام.','error'),400);
+    return;
   }
+  G('sfName').textContent=data.full_name;
+  G('sfAv').textContent=data.full_name.charAt(0);
+  const rl={admin:'مدير النظام',tech:'فني مختبر',reception:'موظف استقبال',viewer:'عرض فقط'};
+  G('sfRole').textContent=rl[data.role]||data.role;
+  G('navUsers').style.display=data.role==='admin'?'flex':'none';
 }
 
 async function doLogout(){
@@ -676,6 +693,7 @@ async function nav(name, el){
     case 'rare':    await loadRareGrid(); break;
     case 'add':     await loadNextBN(); break;
     case 'audit':   await loadAudit(); break;
+    case 'users':   await loadUsers(); break;
     case 'barcode': G('bcRes').style.display='none'; break;
   }
 }
@@ -1297,6 +1315,96 @@ function showAbout(){
 function dangerZone(){
   if(UPROF?.role!=='admin'){toast('هذا الإجراء متاح للمدير فقط','error'); return;}
   toast('للحذف الدائم: اتصل بمسؤول قاعدة البيانات مباشرةً','warning',5000);
+}
+
+// ================================================================
+// USER MANAGEMENT (Admin Only)
+// ================================================================
+async function loadUsers(){
+  if(UPROF?.role!=='admin'){
+    G('nonAdminWarn').style.display='block';
+    G('adminUsersPanel').style.display='none'; return;
+  }
+  G('nonAdminWarn').style.display='none';
+  G('adminUsersPanel').style.display='block';
+  load(true);
+  const{data}=await db.from('user_profiles').select('*').order('created_at',{ascending:true});
+  load(false);
+  const rl={admin:'مدير النظام',tech:'فني مختبر',reception:'موظف استقبال',viewer:'عرض فقط'};
+  if(data&&data.length){
+    G('usersTbl').innerHTML=`<div class="tw"><table><thead><tr>
+      <th>الاسم الكامل</th><th>الدور الوظيفي</th><th>الحالة</th><th>تاريخ الإنشاء</th><th>إجراءات</th>
+    </tr></thead><tbody>${data.map(u=>`<tr>
+      <td>${u.full_name}</td>
+      <td><span class="pill ${u.role==='admin'?'pr':u.role==='tech'?'pb':'pg'}">${rl[u.role]||u.role}</span></td>
+      <td><span class="pill ${u.is_active?'pg':'pr'}">${u.is_active?'نشط':'معطّل'}</span></td>
+      <td>${fd(u.created_at)}</td>
+      <td>${u.id!==SES?.user?.id?`
+        <button class="ibtn" onclick="showEditUser('${u.id}','${u.full_name}','${u.role}')" title="تعديل"><i class="ti ti-edit"></i></button>
+        <button class="ibtn" onclick="toggleUserActive('${u.id}',${u.is_active})" title="${u.is_active?'تعطيل':'تفعيل'}">
+          <i class="ti ${u.is_active?'ti-user-off':'ti-user-check'}"></i>
+        </button>`:'<span style="font-size:10px;color:#9e9e9e">حسابك الحالي</span>'}
+      </td>
+    </tr>`).join('')}</tbody></table></div>`;
+  } else {
+    G('usersTbl').innerHTML='<div class="empty"><i class="ti ti-user-cog"></i><p>لا يوجد مستخدمون</p></div>';
+  }
+}
+
+function showAddUserModal(){
+  ['au-name','au-email','au-pw'].forEach(id=>G(id).value='');
+  G('au-role').value='tech';
+  G('addUserModal').classList.add('on');
+}
+
+async function createUser(){
+  const nm=G('au-name').value.trim(),em=G('au-email').value.trim(),pw=G('au-pw').value,rl=G('au-role').value;
+  if(!nm||!em||!pw){toast('يرجى تعبئة جميع الحقول','error');return;}
+  if(pw.length<8){toast('كلمة المرور يجب أن تكون 8 أحرف على الأقل','error');return;}
+  load(true);
+  try{
+    const{data,error}=await db.auth.signUp({email:em,password:pw});
+    if(error) throw error;
+    const uid=data.user?.id;
+    if(!uid) throw new Error('فشل الإنشاء — تأكد من تعطيل "Confirm email" في Supabase → Authentication → Settings');
+    const{error:pe}=await db.from('user_profiles').insert({id:uid,full_name:nm,role:rl,is_active:true});
+    if(pe) throw pe;
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'INSERT',table_name:'user_profiles',record_id:uid,new_values:{name:nm,role:rl,email:em}});
+    toast('✅ تم إنشاء حساب '+nm+' بنجاح','success');
+    G('addUserModal').classList.remove('on');
+    await loadUsers();
+  }catch(e){toast('خطأ: '+e.message,'error');}
+  finally{load(false);}
+}
+
+function showEditUser(id,name,role){
+  G('eu-id').value=id;G('eu-name').value=name;G('eu-role').value=role;
+  G('editUserModal').classList.add('on');
+}
+
+async function saveUserEdit(){
+  const id=G('eu-id').value,nm=G('eu-name').value.trim(),rl=G('eu-role').value;
+  if(!nm){toast('أدخل الاسم','error');return;}
+  load(true);
+  const{error}=await db.from('user_profiles').update({full_name:nm,role:rl}).eq('id',id);
+  load(false);
+  if(error){toast('خطأ: '+error.message,'error');return;}
+  await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'user_profiles',record_id:id,new_values:{name:nm,role:rl}});
+  toast('تم حفظ التعديلات','success');
+  G('editUserModal').classList.remove('on');
+  await loadUsers();
+}
+
+async function toggleUserActive(id,cur){
+  const act=cur?'تعطيل':'تفعيل';
+  if(!confirm('هل تريد '+act+' هذا الحساب؟')) return;
+  load(true);
+  const{error}=await db.from('user_profiles').update({is_active:!cur}).eq('id',id);
+  load(false);
+  if(error){toast('خطأ: '+error.message,'error');return;}
+  await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'user_profiles',record_id:id,new_values:{is_active:!cur}});
+  toast('تم '+act+' الحساب بنجاح','success');
+  await loadUsers();
 }
 
 // ================================================================
