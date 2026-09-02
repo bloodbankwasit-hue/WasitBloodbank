@@ -245,7 +245,8 @@ tbody tr:hover td{background:#fafafa}
 .sb{box-shadow:2px 0 12px rgba(0,0,0,.08)}
 
 /* ===== HAMBURGER (mobile only) ===== */
-.ham{display:none;align-items:center;justify-content:center;width:36px;height:36px;background:none;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer;color:#1a1a1a;font-size:18px;flex-shrink:0}
+.ham{display:none;align-items:center;justify-content:center;width:40px;height:40px;background:#c62828;border:none;border-radius:10px;cursor:pointer;color:#fff;font-size:20px;font-weight:700;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+.ham:active{background:#b71c1c}
 .sb-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:4999;display:none}
 .sb-overlay.on{display:block}
 
@@ -336,13 +337,13 @@ tbody tr:hover td{background:#fafafa}
 }
 .bn-item{
   flex:1;display:flex;flex-direction:column;align-items:center;
-  gap:3px;cursor:pointer;color:#9e9e9e;font-size:9px;
+  gap:2px;cursor:pointer;color:#9e9e9e;font-size:9px;
   padding:4px 2px;border:none;background:none;font-family:inherit;
   -webkit-tap-highlight-color:transparent;
 }
-.bn-item i{font-size:20px}
-.bn-item.on{color:#c62828}
-.bn-item.on i{color:#c62828}
+.bn-item>span{font-size:9px;display:block}
+.bn-item>*:first-child{font-size:22px;line-height:1}
+.bn-item.on{color:#c62828;font-weight:700}
 @media print{
   .sidebar,.topbar,.abar,.pag,#loader,#toastBox,.overlay{display:none!important}
   .content{overflow:visible}
@@ -669,11 +670,11 @@ tbody tr:hover td{background:#fafafa}
   </div><!-- end content -->
   <!-- Bottom navigation (mobile only) -->
   <nav class="bottom-nav" id="bottomNav">
-    <button class="bn-item on" onclick="nav('dashboard',null);bnActive(this)"><i class="ti ti-layout-dashboard"></i>الرئيسية</button>
-    <button class="bn-item" onclick="nav('add',null);bnActive(this)"><i class="ti ti-user-plus"></i>إضافة</button>
-    <button class="bn-item" onclick="nav('donors',null);bnActive(this)"><i class="ti ti-users"></i>المتبرعون</button>
-    <button class="bn-item" onclick="nav('search',null);bnActive(this)"><i class="ti ti-search"></i>بحث</button>
-    <button class="bn-item" onclick="nav('stats',null);bnActive(this)"><i class="ti ti-chart-bar"></i>إحصائيات</button>
+    <button class="bn-item on" onclick="nav('dashboard',null);bnActive(this)">🏠<span>الرئيسية</span></button>
+    <button class="bn-item" onclick="nav('add',null);bnActive(this)">➕<span>إضافة</span></button>
+    <button class="bn-item" onclick="nav('donors',null);bnActive(this)">👥<span>المتبرعون</span></button>
+    <button class="bn-item" onclick="nav('search',null);bnActive(this)">🔍<span>بحث</span></button>
+    <button class="bn-item" onclick="toggleSb()">☰<span>القائمة</span></button>
   </nav>
 
 </div><!-- end app -->
