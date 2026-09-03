@@ -977,17 +977,21 @@ async function showApp(){
   const isAdmin = UPROF?.isAdmin;
   const perms   = UPROF?.permissions;
 
-  dbg('isAdmin='+isAdmin+' perms='+JSON.stringify(perms));
-  if(isAdmin){
-    dbg('Navigating to dashboard...');
+  // Re-read role directly — don't trust cached isAdmin flag
+  const userRole = UPROF?.role;
+  const isActualAdmin = (userRole === 'admin');
+  dbg('role='+userRole+' isAdmin='+isActualAdmin);
+
+  if(isActualAdmin){
+    dbg('Admin → Dashboard');
     await nav('dashboard', G('navDashboard'));
   } else if(Array.isArray(perms) && perms.length > 0){
-    // Employee → first permitted screen
-    const order = ['reception','draw','lab','supply','donors','search','stats','dashboard'];
-    const first  = order.find(p=>perms.includes(p)) || 'dashboard';
+    const order=['reception','draw','lab','supply','donors','search','stats','dashboard'];
+    const first=order.find(p=>perms.includes(p))||'dashboard';
+    dbg('Employee → '+first);
     await nav(first, G(PERM_NAV[first]));
   } else {
-    // Fallback → Dashboard
+    dbg('Fallback → Dashboard');
     await nav('dashboard', G('navDashboard'));
   }
 }
