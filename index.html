@@ -19,7 +19,7 @@
 /* ===== RESET ===== */
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden}
-body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:13px;direction:rtl;background:#f5f6fa;color:#1a1a1a;-webkit-tap-highlight-color:transparent}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:15px;direction:rtl;background:#f5f6fa;color:#1a1a1a;-webkit-tap-highlight-color:transparent}
 html{-webkit-text-size-adjust:100%}
 
 /* ===== TOAST ===== */
@@ -273,7 +273,7 @@ tbody tr:hover td{background:#fafafa}
   .tb-online span:last-child{display:none}
   
   /* Page padding */
-  .page{padding:10px 12px 130px !important}
+  .page{padding:10px 12px 150px !important}
   
   /* Stats: 2 columns */
   .sg{grid-template-columns:repeat(2,1fr);gap:8px}
@@ -325,7 +325,7 @@ tbody tr:hover td{background:#fafafa}
   .tab{white-space:nowrap;flex-shrink:0}
 
   /* Bottom nav for quick access */
-  .bottom-nav{display:flex !important}
+  .bottom-nav{display:flex !important;align-items:center}
 }
 
 /* Bottom navigation (mobile) */
@@ -333,25 +333,26 @@ tbody tr:hover td{background:#fafafa}
   display:none;
   position:fixed;bottom:0;left:0;right:0;
   background:#ffffff;
-  border-top:1px solid #f0f0f0;
+  border-top:2px solid #f0f0f0;
   z-index:4000;
-  padding:8px 4px env(safe-area-inset-bottom,10px);
-  box-shadow:0 -4px 24px rgba(0,0,0,.10);
+  padding:10px 4px env(safe-area-inset-bottom,14px);
+  box-shadow:0 -4px 24px rgba(0,0,0,.12);
   gap:0;
+  min-height:72px;
 }
 .bn-item{
-  flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;
   cursor:pointer;color:#bdbdbd;font-size:10px;font-weight:500;
   padding:4px 2px;border:none;background:none;font-family:inherit;
   -webkit-tap-highlight-color:transparent;border-radius:12px;
   transition:all .15s;
 }
-.bn-item>*:first-child{font-size:24px;line-height:1.1}
-.bn-item>span{font-size:10px;display:block;margin-top:1px}
+.bn-item>*:first-child{font-size:32px;line-height:1.1}
+.bn-item>span{font-size:10px;display:block;margin-top:2px}
 .bn-item.on{color:#c62828}
 .bn-item.on>*:first-child{
   background:#fff0f0;border-radius:14px;
-  padding:4px 12px;display:block;
+  padding:4px 14px;display:block;
 }
 @media print{
   .sidebar,.topbar,.abar,.pag,#loader,#toastBox,.overlay{display:none!important}
