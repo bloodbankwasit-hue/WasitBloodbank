@@ -404,7 +404,6 @@ tbody tr:hover td{background:#fafafa}
 <body>
 
 <div id="toastBox"></div>
-<div id="debugPanel" style="position:fixed;bottom:80px;left:0;right:0;background:rgba(0,0,0,.85);color:#0f0;font-family:monospace;font-size:11px;padding:8px;z-index:9999;max-height:180px;overflow-y:auto;display:none"></div>
 <div id="loader"><div class="spin"></div><span style="font-size:12px;color:#9e9e9e">جاري التحميل...</span></div>
 
 <!-- ===== LOGIN ===== -->
@@ -848,27 +847,16 @@ function fnum(n){ return n!=null ? Number(n).toLocaleString('ar-IQ') : '—'; }
 // ================================================================
 // AUTH
 // ================================================================
-function dbg(msg){
-  const p=document.getElementById('debugPanel');
-  if(!p) return;
-  p.style.display='block';
-  p.innerHTML += '<div>['+new Date().toLocaleTimeString()+'] '+msg+'</div>';
-  p.scrollTop=p.scrollHeight;
-  console.log('[DBG]',msg);
-}
-
 async function appInit(){
   G('tbDate').textContent = new Date().toLocaleDateString('ar-IQ',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   setDefaults();
   try{
-    dbg('appInit started');
   const {data:{session}} = await db.auth.getSession();
-    if(session){ dbg('Session found: '+session.user.email); SES=session; await loadProf(); showApp(); }
+    if(session){ SES=session; await loadProf(); showApp(); }
     else showLogin();
   }catch(e){ showLogin(); }
   db.auth.onAuthStateChange(async(ev,s)=>{
     if(ev==='SIGNED_IN'){
-      dbg('onAuthStateChange: SIGNED_IN');
       SES=s;
       // Reset login button
       const lbtn=G('lbtn');
@@ -903,8 +891,7 @@ async function doLogin(){
 }
 
 async function loadProf(){
-  if(!SES){ dbg('loadProf: no session'); return; }
-  dbg('loadProf called for: '+SES.user.email);
+  if(!SES){ return; }
   const {data}=await db.from('user_profiles').select('*').eq('id',SES.user.id).single();
   UPROF=data;
   if(!data||!data.is_active){
@@ -964,7 +951,6 @@ function showLogin(){
   G('lbtn').innerHTML='<i class="ti ti-login"></i> دخول آمن'; G('lbtn').disabled=false;
 }
 async function showApp(){
-  dbg('showApp called, UPROF='+(UPROF?UPROF.full_name:'NULL'));
   // 1. Hide login, show app
   G('loginPage').style.display='none';
   G('app').classList.add('on');
@@ -979,18 +965,14 @@ async function showApp(){
   // Re-read role directly — don't trust cached isAdmin flag
   const userRole = UPROF?.role;
   const isActualAdmin = (userRole === 'admin');
-  dbg('role='+userRole+' isAdmin='+isActualAdmin);
 
   if(isActualAdmin){
-    dbg('Admin → Dashboard');
     await nav('dashboard', G('navDashboard'));
   } else if(Array.isArray(perms) && perms.length > 0){
     const order=['reception','draw','lab','supply','donors','search','stats','dashboard'];
     const first=order.find(p=>perms.includes(p))||'dashboard';
-    dbg('Employee → '+first);
     await nav(first, G(PERM_NAV[first]));
   } else {
-    dbg('Fallback → Dashboard');
     await nav('dashboard', G('navDashboard'));
   }
 }
@@ -1000,19 +982,15 @@ async function showApp(){
 // NAVIGATION
 // ================================================================
 async function nav(name, el){
-  dbg('nav('+name+') innerW='+window.innerWidth);
   document.querySelectorAll('.sc').forEach(s=>s.classList.remove('on'));
   const sc=G('s-'+name);
-  dbg('screen found='+(sc?'YES':'NO')+' class='+sc?.className);
   if(sc) sc.classList.add('on');
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
   if(el) el.classList.add('on');
   G('pgTitle').textContent=TITLES[name]||name;
   closeSb();
   const sbEl=document.querySelector('.sb');
-  dbg('sb display='+sbEl?.style.display+' class='+sbEl?.className);
   const pageEl=document.querySelector('.page');
-  dbg('page w='+pageEl?.offsetWidth+' h='+pageEl?.offsetHeight);
   switch(name){
     case 'dashboard': await loadDash(); break;
     case 'donors':    await loadDonors(1); break;
@@ -1034,9 +1012,7 @@ async function nav(name, el){
 // DASHBOARD
 // ================================================================
 async function loadDash(){
-  dbg('loadDash called! innerW='+window.innerWidth);
   const dashEl=G('s-dashboard');
-  dbg('s-dashboard on='+(dashEl?.classList.contains('on')?'YES':'NO')+' w='+dashEl?.offsetWidth);
   const today=new Date().toISOString().split('T')[0];
   const ms=today.substring(0,7)+'-01';
   const ys=today.substring(0,4)+'-01-01';
