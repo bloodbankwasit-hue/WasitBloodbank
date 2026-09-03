@@ -941,6 +941,33 @@ function hasPermission(key){
 
 // configurePermissionsUI removed — handled by setupNavVisibility + showApp
 
+function setupNavVisibility(isAdmin, perms){
+  try{
+    const actualAdmin = isAdmin || (UPROF?.role === 'admin');
+    // Show/hide all nav items
+    Object.keys(PERM_NAV).forEach(p=>{
+      const el=G(PERM_NAV[p]);
+      if(!el) return;
+      el.style.display = (actualAdmin || perms.includes(p)) ? 'flex' : 'none';
+    });
+    // Show/hide workflow section
+    const wf = G('navWorkflow');
+    if(wf){
+      const hasWF = actualAdmin || ['reception','draw','lab','supply'].some(p=>perms.includes(p));
+      wf.style.display = hasWF ? 'block' : 'none';
+    }
+    // For admin: ensure all items explicitly shown
+    if(actualAdmin){
+      ['navDashboard','navReception','navDraw','navLab','navSupply',
+       'navDonors','navSearch','navBarcode','navInfected','navRejected',
+       'navRare','navStats','navAudit','navSettings','navUsers'].forEach(id=>{
+        const el=G(id); if(el) el.style.display='flex';
+      });
+      const wf2=G('navWorkflow'); if(wf2) wf2.style.display='block';
+    }
+  }catch(e){ console.log('nav err:',e); }
+}
+
 async function doLogout(){
   await db.auth.signOut();
   toast('تم تسجيل الخروج بنجاح','success');
