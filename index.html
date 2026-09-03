@@ -1001,12 +1001,19 @@ async function showApp(){
 // NAVIGATION
 // ================================================================
 async function nav(name, el){
+  dbg('nav('+name+') innerW='+window.innerWidth);
   document.querySelectorAll('.sc').forEach(s=>s.classList.remove('on'));
-  const sc=G('s-'+name); if(sc) sc.classList.add('on');
+  const sc=G('s-'+name);
+  dbg('screen found='+(sc?'YES':'NO')+' class='+sc?.className);
+  if(sc) sc.classList.add('on');
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
   if(el) el.classList.add('on');
   G('pgTitle').textContent=TITLES[name]||name;
   closeSb();
+  const sbEl=document.querySelector('.sb');
+  dbg('sb display='+sbEl?.style.display+' class='+sbEl?.className);
+  const pageEl=document.querySelector('.page');
+  dbg('page w='+pageEl?.offsetWidth+' h='+pageEl?.offsetHeight);
   switch(name){
     case 'dashboard': await loadDash(); break;
     case 'donors':    await loadDonors(1); break;
@@ -1028,7 +1035,9 @@ async function nav(name, el){
 // DASHBOARD
 // ================================================================
 async function loadDash(){
-  dbg('loadDash called!');
+  dbg('loadDash called! innerW='+window.innerWidth);
+  const dashEl=G('s-dashboard');
+  dbg('s-dashboard on='+(dashEl?.classList.contains('on')?'YES':'NO')+' w='+dashEl?.offsetWidth);
   const today=new Date().toISOString().split('T')[0];
   const ms=today.substring(0,7)+'-01';
   const ys=today.substring(0,4)+'-01-01';
