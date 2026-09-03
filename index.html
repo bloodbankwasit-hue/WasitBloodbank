@@ -404,6 +404,7 @@ tbody tr:hover td{background:#fafafa}
 <body>
 
 <div id="toastBox"></div>
+<div id="debugPanel" style="position:fixed;bottom:80px;left:0;right:0;background:rgba(0,0,0,.85);color:#0f0;font-family:monospace;font-size:11px;padding:8px;z-index:9999;max-height:180px;overflow-y:auto;display:none"></div>
 <div id="loader"><div class="spin"></div><span style="font-size:12px;color:#9e9e9e">جاري التحميل...</span></div>
 
 <!-- ===== LOGIN ===== -->
@@ -848,16 +849,27 @@ function fnum(n){ return n!=null ? Number(n).toLocaleString('ar-IQ') : '—'; }
 // ================================================================
 // AUTH
 // ================================================================
+function dbg(msg){
+  const p=document.getElementById('debugPanel');
+  if(!p) return;
+  p.style.display='block';
+  p.innerHTML += '<div>['+new Date().toLocaleTimeString()+'] '+msg+'</div>';
+  p.scrollTop=p.scrollHeight;
+  console.log('[DBG]',msg);
+}
+
 async function appInit(){
   G('tbDate').textContent = new Date().toLocaleDateString('ar-IQ',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   setDefaults();
   try{
-    const {data:{session}} = await db.auth.getSession();
-    if(session){ SES=session; await loadProf(); showApp(); }
+    dbg('appInit started');
+  const {data:{session}} = await db.auth.getSession();
+    if(session){ dbg('Session found: '+session.user.email); SES=session; await loadProf(); showApp(); }
     else showLogin();
   }catch(e){ showLogin(); }
   db.auth.onAuthStateChange(async(ev,s)=>{
     if(ev==='SIGNED_IN'){
+      dbg('onAuthStateChange: SIGNED_IN');
       SES=s;
       // Reset login button
       const lbtn=G('lbtn');
@@ -892,7 +904,8 @@ async function doLogin(){
 }
 
 async function loadProf(){
-  if(!SES) return;
+  if(!SES){ dbg('loadProf: no session'); return; }
+  dbg('loadProf called for: '+SES.user.email);
   const {data}=await db.from('user_profiles').select('*').eq('id',SES.user.id).single();
   UPROF=data;
   if(!data||!data.is_active){
@@ -952,6 +965,7 @@ function showLogin(){
   G('lbtn').innerHTML='<i class="ti ti-login"></i> دخول آمن'; G('lbtn').disabled=false;
 }
 async function showApp(){
+  dbg('showApp called, UPROF='+(UPROF?UPROF.full_name:'NULL'));
   // 1. Hide login, show app
   G('loginPage').style.display='none';
   G('app').classList.add('on');
@@ -963,8 +977,9 @@ async function showApp(){
   const isAdmin = UPROF?.isAdmin;
   const perms   = UPROF?.permissions;
 
+  dbg('isAdmin='+isAdmin+' perms='+JSON.stringify(perms));
   if(isAdmin){
-    // Admin → Dashboard
+    dbg('Navigating to dashboard...');
     await nav('dashboard', G('navDashboard'));
   } else if(Array.isArray(perms) && perms.length > 0){
     // Employee → first permitted screen
@@ -1009,6 +1024,7 @@ async function nav(name, el){
 // DASHBOARD
 // ================================================================
 async function loadDash(){
+  dbg('loadDash called!');
   const today=new Date().toISOString().split('T')[0];
   const ms=today.substring(0,7)+'-01';
   const ys=today.substring(0,4)+'-01-01';
