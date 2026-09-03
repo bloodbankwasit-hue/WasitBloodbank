@@ -19,6 +19,7 @@
 /* ===== RESET ===== */
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden}
+#loginPage ~ .bottom-nav, #loginPage:not([style*="none"]) ~ * .bottom-nav{display:none !important}
 body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:15px;direction:rtl;background:#f5f6fa;color:#1a1a1a;-webkit-tap-highlight-color:transparent}
 html{-webkit-text-size-adjust:100%}
 
@@ -324,8 +325,8 @@ tbody tr:hover td{background:#fafafa}
   .tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
   .tab{white-space:nowrap;flex-shrink:0}
 
-  /* Bottom nav for quick access */
-  .bottom-nav{display:flex !important;align-items:center}
+  /* Bottom nav - only when app is open */
+  #app.on > .bottom-nav{display:flex !important;align-items:center}
 }
 
 /* Bottom navigation (mobile) */
@@ -444,7 +445,7 @@ tbody tr:hover td{background:#fafafa}
     </div>
     <div class="sb-nav">
       <div class="nb"><div class="nl">الرئيسية</div>
-        <div class="ni on" onclick="nav('dashboard',this)"><i class="ti ti-layout-dashboard"></i> لوحة التحكم</div>
+        <div class="ni on" id="navDashboard" onclick="nav('dashboard',this)"><i class="ti ti-layout-dashboard"></i> لوحة التحكم</div>
       </div>
       <div class="nb"><div class="nl">المتبرعون</div>
         <div class="ni" id="navAdd" onclick="nav('add',this)"><i class="ti ti-user-plus"></i> إضافة متبرع</div>
@@ -931,29 +932,36 @@ function hasPermission(key){
 }
 
 function configurePermissionsUI(isAdmin, perms){
-  // Show/hide all nav items based on permissions
-  const allPerms = Object.keys(PERM_NAV);
-  allPerms.forEach(p => {
-    const navId = PERM_NAV[p];
-    const el = G(navId);
-    if(!el) return;
-    const show = isAdmin || perms.includes(p);
-    el.style.display = show ? 'flex' : 'none';
-  });
+  try{
+    // Show/hide all nav items based on permissions
+    Object.keys(PERM_NAV).forEach(p => {
+      const el = G(PERM_NAV[p]);
+      if(!el) return;
+      el.style.display = (isAdmin || perms.includes(p)) ? 'flex' : 'none';
+    });
 
-  // Show workflow section if any workflow perm exists
-  const workflowPerms = ['reception','draw','lab','supply'];
-  const hasWorkflow = isAdmin || workflowPerms.some(p => perms.includes(p));
-  const wf = G('navWorkflow');
-  if(wf) wf.style.display = hasWorkflow ? 'block' : 'none';
+    // Workflow section
+    const wf = G('navWorkflow');
+    if(wf){
+      const hasWF = isAdmin || ['reception','draw','lab','supply'].some(p=>perms.includes(p));
+      wf.style.display = hasWF ? 'block' : 'none';
+    }
 
-  // Navigate to first allowed screen
-  const firstPerm = isAdmin ? 'dashboard' : perms[0];
-  if(firstPerm && PERM_SCREEN[firstPerm]){
-    setTimeout(()=>{
-      const navEl = G(PERM_NAV[firstPerm]);
-      nav(PERM_SCREEN[firstPerm], navEl);
-    }, 150);
+    // Navigate to first allowed screen
+    const firstPerm = isAdmin ? 'dashboard' : (perms[0] || 'dashboard');
+    const screenName = PERM_SCREEN[firstPerm] || 'dashboard';
+    const navEl = G(PERM_NAV[firstPerm] || 'navDashboard');
+
+    setTimeout(async ()=>{
+      try{
+        await nav(screenName, navEl);
+      }catch(e){ console.log('Nav error:', e); }
+    }, 200);
+
+  }catch(e){
+    console.log('Config error:', e);
+    // Fallback: just load dashboard
+    setTimeout(()=>loadDash(), 300);
   }
 }
 
@@ -967,8 +975,9 @@ function showLogin(){
   G('lbtn').innerHTML='<i class="ti ti-login"></i> دخول آمن'; G('lbtn').disabled=false;
 }
 async function showApp(){
-  G('loginPage').style.display='none'; G('app').classList.add('on');
-  await loadDash();
+  G('loginPage').style.display='none';
+  G('app').classList.add('on');
+  // Navigation handled by configurePermissionsUI
 }
 
 // ================================================================
