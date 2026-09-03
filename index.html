@@ -276,7 +276,7 @@ tbody tr:hover td{background:#fafafa}
   .page{padding:10px 12px 150px !important}
   
   /* Stats: 2 columns */
-  .sg{grid-template-columns:repeat(2,1fr);gap:8px}
+  .sg{grid-template-columns:repeat(2,1fr);gap:10px}
   .sg .sc-card:last-child{grid-column:span 2}
   .sc-val{font-size:20px}
   
@@ -335,24 +335,27 @@ tbody tr:hover td{background:#fafafa}
   background:#ffffff;
   border-top:1.5px solid #f0f0f0;
   z-index:4000;
-  padding:6px 2px env(safe-area-inset-bottom,8px);
+  padding:8px 4px env(safe-area-inset-bottom,10px);
   box-shadow:0 -4px 20px rgba(0,0,0,.10);
   gap:0;
+  align-items:center;
 }
 .bn-item{
-  flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
-  cursor:pointer;color:#bdbdbd;font-size:9px;font-weight:600;
-  padding:3px 1px;border:none;background:none;font-family:inherit;
-  -webkit-tap-highlight-color:transparent;border-radius:10px;
-  transition:all .15s;min-width:0;
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;
+  cursor:pointer;color:#bdbdbd;
+  padding:4px 2px;border:none;background:none;font-family:inherit;
+  -webkit-tap-highlight-color:transparent;
+  transition:all .15s;min-width:0;position:relative;
 }
-.bn-item>*:first-child{font-size:30px;line-height:1}
-.bn-item>span{font-size:9px;display:block;margin-top:1px;white-space:nowrap}
+.bn-item>*:first-child{font-size:34px;line-height:1;display:block}
+.bn-item>span{display:none}
+.bn-item::after{
+  content:'';width:6px;height:6px;border-radius:50%;
+  background:transparent;display:block;transition:all .15s;
+}
 .bn-item.on{color:#c62828}
-.bn-item.on>*:first-child{
-  background:#fff0f0;border-radius:12px;
-  padding:3px 10px;display:block;
-}
+.bn-item.on::after{background:#c62828}
+.bn-item.on>*:first-child{transform:scale(1.15)}
 @media print{
   .sidebar,.topbar,.abar,.pag,#loader,#toastBox,.overlay{display:none!important}
   .content{overflow:visible}
@@ -679,11 +682,11 @@ tbody tr:hover td{background:#fafafa}
   </div><!-- end content -->
   <!-- Bottom navigation (mobile only) -->
   <nav class="bottom-nav" id="bottomNav">
-    <button class="bn-item on" onclick="nav('dashboard',null);bnActive(this)">🏠<span>الرئيسية</span></button>
-    <button class="bn-item" onclick="nav('add',null);bnActive(this)">➕<span>إضافة</span></button>
-    <button class="bn-item" onclick="nav('donors',null);bnActive(this)">👥<span>المتبرعون</span></button>
-    <button class="bn-item" onclick="nav('search',null);bnActive(this)">🔍<span>بحث</span></button>
-    <button class="bn-item" onclick="toggleSb()">☰<span>القائمة</span></button>
+    <button class="bn-item on" onclick="nav('dashboard',null);bnActive(this)" title="الرئيسية"><span>🏠</span></button>
+    <button class="bn-item" onclick="nav('add',null);bnActive(this)" title="إضافة متبرع"><span>➕</span></button>
+    <button class="bn-item" onclick="nav('donors',null);bnActive(this)" title="المتبرعون"><span>👥</span></button>
+    <button class="bn-item" onclick="nav('search',null);bnActive(this)" title="بحث"><span>🔍</span></button>
+    <button class="bn-item" onclick="toggleSb()" title="القائمة الكاملة"><span>☰</span></button>
   </nav>
 
 </div><!-- end app -->
