@@ -72,7 +72,8 @@ html{-webkit-text-size-adjust:100%}
 #app.on{display:flex}
 
 /* ===== SIDEBAR ===== */
-.sb{width:215px;background:#fff;border-left:1px solid #eeeeee;display:flex;flex-direction:column;flex-shrink:0}
+.sb{width:215px;background:#fff;border-left:1px solid #eeeeee;display:flex;flex-direction:column;flex-shrink:0;transition:all .2s}
+@media(min-width:769px){.sb{display:flex !important;position:relative;right:auto;top:auto;bottom:auto;height:auto}}
 .sb-head{
   padding:0;border-bottom:none;
   background:linear-gradient(135deg,#c62828 0%,#8b0000 100%);
@@ -257,10 +258,10 @@ tbody tr:hover td{background:#fafafa}
 
 /* ===== MOBILE RESPONSIVE ===== */
 @media(max-width:768px){
-  /* Sidebar: hidden by default, overlay when open */
-  .sb{display:none;position:fixed;right:0;top:0;bottom:0;z-index:5000;height:100vh;width:220px}
-  .sb.open{display:flex !important;flex-direction:column;animation:slideIn .22s ease}
-  @keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
+  /* Sidebar handled by JS */
+  .sb{display:none !important}
+  .sb.open{display:flex !important;flex-direction:column;position:fixed;right:0;top:0;bottom:0;z-index:5000;height:100vh;width:220px;animation:slideIn .2s ease}
+  @keyframes slideIn{from{transform:translateX(220px)}to{transform:translateX(0)}}
   
   /* Show hamburger button */
   .ham{display:flex}
@@ -977,13 +978,19 @@ function showLogin(){
 async function showApp(){
   G('loginPage').style.display='none';
   G('app').classList.add('on');
-  // Force dashboard screen active
+  // Force dashboard active
   document.querySelectorAll('.sc').forEach(s=>s.classList.remove('on'));
   const dash=G('s-dashboard');
   if(dash) dash.classList.add('on');
   G('pgTitle').textContent='لوحة التحكم';
-  try{ await loadDash(); }catch(e){ console.log('dash err:',e); }
+  // Handle sidebar visibility
+  applyMobileLayout();
+  try{ await loadDash(); }catch(e){
+    console.log('dash err:',e);
+    ['st0','st1','st2','st3','st4'].forEach(id=>{const e=G(id);if(e)e.textContent='0';});
+  }
 }
+
 
 // ================================================================
 // NAVIGATION
@@ -2072,12 +2079,19 @@ function toggleSb(){
   const ov=G('sbOverlay');
   if(!sb) return;
   const isOpen=sb.classList.contains('open');
-  if(isOpen){sb.classList.remove('open'); if(ov) ov.classList.remove('on');}
-  else{sb.classList.add('open'); if(ov) ov.classList.add('on');}
+  if(isOpen){
+    sb.classList.remove('open');
+    sb.style.display='none';
+    if(ov) ov.classList.remove('on');
+  } else {
+    sb.classList.add('open');
+    sb.style.cssText='display:flex;flex-direction:column;position:fixed;right:0;top:0;bottom:0;z-index:5000;height:100vh;width:220px';
+    if(ov) ov.classList.add('on');
+  }
 }
 function closeSb(){
   const sb=document.querySelector('.sb');
-  if(sb) sb.classList.remove('open');
+  if(sb){sb.classList.remove('open');sb.style.display='none';}
   const ov=G('sbOverlay');
   if(ov) ov.classList.remove('on');
 }
@@ -2089,7 +2103,16 @@ function bnActive(el){
 // ================================================================
 // START
 // ================================================================
-window.addEventListener('load', appInit);
+// Apply mobile layout on load
+function applyMobileLayout(){
+  const isMob=window.innerWidth<=768;
+  const sb=document.querySelector('.sb');
+  if(!sb) return;
+  if(isMob){ if(!sb.classList.contains('open')) sb.style.display='none'; }
+  else { sb.style.cssText='display:flex;flex-direction:column'; }
+}
+window.addEventListener('resize', applyMobileLayout);
+window.addEventListener('load', ()=>{ appInit(); setTimeout(applyMobileLayout,100); });
 
 // Service Worker removed - app requires internet for Supabase
 </script>
