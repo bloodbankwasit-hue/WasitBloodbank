@@ -855,7 +855,14 @@ async function appInit(){
     else showLogin();
   }catch(e){ showLogin(); }
   db.auth.onAuthStateChange(async(ev,s)=>{
-    if(ev==='SIGNED_IN'){SES=s; await loadProf(); showApp();}
+    if(ev==='SIGNED_IN'){
+      SES=s;
+      // Reset login button
+      const lbtn=G('lbtn');
+      if(lbtn){lbtn.innerHTML='<i class="ti ti-login"></i> دخول آمن';lbtn.disabled=false;}
+      try{ await loadProf(); }catch(e){console.log('loadProf err:',e);}
+      try{ await showApp(); }catch(e){console.log('showApp err:',e);}
+    }
     if(ev==='SIGNED_OUT'){SES=null; showLogin();}
   });
 }
@@ -933,36 +940,28 @@ function hasPermission(key){
 
 function configurePermissionsUI(isAdmin, perms){
   try{
-    // Show/hide all nav items based on permissions
-    Object.keys(PERM_NAV).forEach(p => {
-      const el = G(PERM_NAV[p]);
-      if(!el) return;
-      el.style.display = (isAdmin || perms.includes(p)) ? 'flex' : 'none';
+    // Show/hide nav items based on permissions
+    Object.keys(PERM_NAV).forEach(p=>{
+      const el=G(PERM_NAV[p]); if(!el) return;
+      el.style.display=(isAdmin||perms.includes(p))?'flex':'none';
     });
-
-    // Workflow section
-    const wf = G('navWorkflow');
+    // Workflow section visibility
+    const wf=G('navWorkflow');
     if(wf){
-      const hasWF = isAdmin || ['reception','draw','lab','supply'].some(p=>perms.includes(p));
-      wf.style.display = hasWF ? 'block' : 'none';
+      const hasWF=isAdmin||['reception','draw','lab','supply'].some(p=>perms.includes(p));
+      wf.style.display=hasWF?'block':'none';
     }
-
-    // Navigate to first allowed screen
-    const firstPerm = isAdmin ? 'dashboard' : (perms[0] || 'dashboard');
-    const screenName = PERM_SCREEN[firstPerm] || 'dashboard';
-    const navEl = G(PERM_NAV[firstPerm] || 'navDashboard');
-
-    setTimeout(async ()=>{
-      try{
-        await nav(screenName, navEl);
-      }catch(e){ console.log('Nav error:', e); }
-    }, 200);
-
-  }catch(e){
-    console.log('Config error:', e);
-    // Fallback: just load dashboard
-    setTimeout(()=>loadDash(), 300);
-  }
+    // For non-admin with single workflow role, auto-navigate after dashboard loads
+    if(!isAdmin && perms.length>0){
+      const workflowFirst=['reception','draw','lab','supply'].find(p=>perms.includes(p));
+      if(workflowFirst && perms.length===1){
+        setTimeout(()=>{
+          const el=G(PERM_NAV[workflowFirst]);
+          nav(PERM_SCREEN[workflowFirst], el);
+        }, 500);
+      }
+    }
+  }catch(e){ console.log('configUI error:',e); }
 }
 
 async function doLogout(){
@@ -977,7 +976,7 @@ function showLogin(){
 async function showApp(){
   G('loginPage').style.display='none';
   G('app').classList.add('on');
-  // Navigation handled by configurePermissionsUI
+  try{ await loadDash(); }catch(e){ console.log('dash error:',e); }
 }
 
 // ================================================================
