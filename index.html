@@ -989,7 +989,8 @@ async function nav(name, el){
   G('pgTitle').textContent=TITLES[name]||name;
   closeSb();
   switch(name){
-    case 'donors':  await loadDonors(1); break;
+    case 'dashboard': await loadDash(); break;
+    case 'donors':    await loadDonors(1); break;
     case 'infected':await loadInfected('', document.querySelector('.tab')); break;
     case 'rejected':await loadRejected(); break;
     case 'rare':    await loadRareGrid(); break;
