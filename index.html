@@ -447,20 +447,20 @@ tbody tr:hover td{background:#fafafa}
         <div class="ni on" onclick="nav('dashboard',this)"><i class="ti ti-layout-dashboard"></i> لوحة التحكم</div>
       </div>
       <div class="nb"><div class="nl">المتبرعون</div>
-        <div class="ni" onclick="nav('add',this)"><i class="ti ti-user-plus"></i> إضافة متبرع</div>
-        <div class="ni" onclick="nav('donors',this)"><i class="ti ti-users"></i> سجل المتبرعين</div>
-        <div class="ni" onclick="nav('search',this)"><i class="ti ti-search"></i> بحث متقدم</div>
-        <div class="ni" onclick="nav('barcode',this)"><i class="ti ti-barcode"></i> الباركود والطباعة</div>
+        <div class="ni" id="navAdd" onclick="nav('add',this)"><i class="ti ti-user-plus"></i> إضافة متبرع</div>
+        <div class="ni" id="navDonors" onclick="nav('donors',this)"><i class="ti ti-users"></i> سجل المتبرعين</div>
+        <div class="ni" id="navSearch" onclick="nav('search',this)"><i class="ti ti-search"></i> بحث متقدم</div>
+        <div class="ni" id="navBarcode" onclick="nav('barcode',this)"><i class="ti ti-barcode"></i> الباركود والطباعة</div>
       </div>
       <div class="nb"><div class="nl">الحالات</div>
-        <div class="ni" onclick="nav('infected',this)"><i class="ti ti-virus"></i> المصابون <span class="nbadge" id="infBadge" style="display:none">!</span></div>
-        <div class="ni" onclick="nav('rejected',this)"><i class="ti ti-user-x"></i> المرفوضون مؤقتاً</div>
-        <div class="ni" onclick="nav('rare',this)"><i class="ti ti-droplet-half"></i> الفصائل النادرة</div>
+        <div class="ni" id="navInfected" onclick="nav('infected',this)"><i class="ti ti-virus"></i> المصابون <span class="nbadge" id="infBadge" style="display:none">!</span></div>
+        <div class="ni" id="navRejected" onclick="nav('rejected',this)"><i class="ti ti-user-x"></i> المرفوضون مؤقتاً</div>
+        <div class="ni" id="navRare" onclick="nav('rare',this)"><i class="ti ti-droplet-half"></i> الفصائل النادرة</div>
       </div>
       <div class="nb"><div class="nl">الإدارة</div>
-        <div class="ni" onclick="nav('stats',this)"><i class="ti ti-chart-bar"></i> الإحصائيات</div>
-        <div class="ni" onclick="nav('audit',this)"><i class="ti ti-shield-lock"></i> سجل التتبع</div>
-        <div class="ni" onclick="nav('settings',this)"><i class="ti ti-settings"></i> الإعدادات</div>
+        <div class="ni" id="navStats" onclick="nav('stats',this)"><i class="ti ti-chart-bar"></i> الإحصائيات</div>
+        <div class="ni" id="navAudit" onclick="nav('audit',this)"><i class="ti ti-shield-lock"></i> سجل التتبع</div>
+        <div class="ni" id="navSettings" onclick="nav('settings',this)"><i class="ti ti-settings"></i> الإعدادات</div>
         <div class="ni" id="navUsers" style="display:none" onclick="nav('users',this)"><i class="ti ti-user-cog"></i> إدارة الحسابات</div>
       </div>
       <div class="nb" id="navWorkflow" style="display:none">
@@ -898,33 +898,62 @@ async function loadProf(){
   configureRoleUI(data.role);
 }
 
-function configureRoleUI(role){
-  const show=(id)=>{ const e=G(id); if(e) e.style.display='flex'; };
-  const hide=(id)=>{ const e=G(id); if(e) e.style.display='none'; };
-  const rl={admin:'مدير النظام',tech:'فني سحب',reception:'موظف استقبال',lab:'فني مختبر',supply:'موظف تجهيز',viewer:'عرض فقط'};
+// Map: permission key → nav element id
+const PERM_NAV = {
+  dashboard:  'navDashboard',
+  reception:  'navReception',
+  draw:       'navDraw',
+  lab:        'navLab',
+  supply:     'navSupply',
+  donors:     'navDonors',
+  search:     'navSearch',
+  barcode:    'navBarcode',
+  infected:   'navInfected',
+  rejected:   'navRejected',
+  rare:       'navRare',
+  stats:      'navStats',
+  audit:      'navAudit',
+  settings:   'navSettings',
+  users:      'navUsers'
+};
 
-  // Update role labels
-  const allRoles={admin:'مدير النظام',tech:'فني سحب',reception:'موظف استقبال',lab:'فني مختبر',supply:'موظف تجهيز',viewer:'عرض فقط'};
-  G('sfRole').textContent = allRoles[role]||role;
+const PERM_SCREEN = {
+  dashboard:'dashboard', reception:'reception', draw:'draw',
+  lab:'lab', supply:'supply', donors:'donors', search:'search',
+  barcode:'barcode', infected:'infected', rejected:'rejected',
+  rare:'rare', stats:'stats', audit:'audit', settings:'settings', users:'users'
+};
 
-  // Hide all workflow nav first
-  ['navWorkflow','navReception','navDraw','navLab','navSupply'].forEach(hide);
+function hasPermission(key){
+  if(!UPROF) return false;
+  if(UPROF.permissions==='__all__') return true;
+  return Array.isArray(UPROF.permissions) && UPROF.permissions.includes(key);
+}
 
-  if(role==='admin'){
-    show('navWorkflow');
-    ['navReception','navDraw','navLab','navSupply'].forEach(show);
-  } else if(role==='reception'){
-    show('navWorkflow'); show('navReception');
-    setTimeout(()=>nav('reception', G('navReception')),100);
-  } else if(role==='tech'){
-    show('navWorkflow'); show('navDraw');
-    setTimeout(()=>nav('draw', G('navDraw')),100);
-  } else if(role==='lab'){
-    show('navWorkflow'); show('navLab');
-    setTimeout(()=>nav('lab', G('navLab')),100);
-  } else if(role==='supply'){
-    show('navWorkflow'); show('navSupply');
-    setTimeout(()=>nav('supply', G('navSupply')),100);
+function configurePermissionsUI(isAdmin, perms){
+  // Show/hide all nav items based on permissions
+  const allPerms = Object.keys(PERM_NAV);
+  allPerms.forEach(p => {
+    const navId = PERM_NAV[p];
+    const el = G(navId);
+    if(!el) return;
+    const show = isAdmin || perms.includes(p);
+    el.style.display = show ? 'flex' : 'none';
+  });
+
+  // Show workflow section if any workflow perm exists
+  const workflowPerms = ['reception','draw','lab','supply'];
+  const hasWorkflow = isAdmin || workflowPerms.some(p => perms.includes(p));
+  const wf = G('navWorkflow');
+  if(wf) wf.style.display = hasWorkflow ? 'block' : 'none';
+
+  // Navigate to first allowed screen
+  const firstPerm = isAdmin ? 'dashboard' : perms[0];
+  if(firstPerm && PERM_SCREEN[firstPerm]){
+    setTimeout(()=>{
+      const navEl = G(PERM_NAV[firstPerm]);
+      nav(PERM_SCREEN[firstPerm], navEl);
+    }, 150);
   }
 }
 
@@ -1891,6 +1920,42 @@ async function saveDispatch(){
 }
 
 // ================================================================
+// PERMISSIONS HELPERS
+// ================================================================
+const ALL_PERMS = [
+  {key:'dashboard',  label:'🏠 لوحة التحكم'},
+  {key:'reception',  label:'📋 الاستقبال'},
+  {key:'draw',       label:'🩸 السحب'},
+  {key:'lab',        label:'🔬 المختبر'},
+  {key:'supply',     label:'📦 التجهيز'},
+  {key:'donors',     label:'👥 سجل المتبرعين'},
+  {key:'search',     label:'🔍 البحث المتقدم'},
+  {key:'barcode',    label:'📊 الباركود والطباعة'},
+  {key:'infected',   label:'⚠️ المصابون'},
+  {key:'rejected',   label:'🚫 المرفوضون'},
+  {key:'rare',       label:'💉 الفصائل النادرة'},
+  {key:'stats',      label:'📈 الإحصائيات'},
+  {key:'audit',      label:'🔒 سجل التتبع'},
+  {key:'settings',   label:'⚙️ الإعدادات'},
+];
+
+function renderPermCheckboxes(containerId, selected=[]){
+  const box = G(containerId);
+  if(!box) return;
+  box.innerHTML = ALL_PERMS.map(p=>`
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;background:#fafafa;border:1px solid #e0e0e0;border-radius:8px;padding:7px 10px">
+      <input type="checkbox" value="${p.key}" ${selected.includes(p.key)?'checked':''} style="width:16px;height:16px;accent-color:#c62828">
+      ${p.label}
+    </label>`).join('');
+}
+
+function getCheckedPerms(containerId){
+  const box = G(containerId);
+  if(!box) return [];
+  return Array.from(box.querySelectorAll('input[type=checkbox]:checked')).map(cb=>cb.value);
+}
+
+// ================================================================
 // USER MANAGEMENT (Admin Only)
 // ================================================================
 async function loadUsers(){
@@ -1901,7 +1966,7 @@ async function loadUsers(){
   G('nonAdminWarn').style.display='none';
   G('adminUsersPanel').style.display='block';
   load(true);
-  const{data}=await db.from('user_profiles').select('*').order('created_at',{ascending:true});
+  const{data}=await db.from('user_profiles').select('id,full_name,role,is_active,created_at,permissions').order('created_at',{ascending:true});
   load(false);
   const rl={admin:'مدير النظام',tech:'فني مختبر',reception:'موظف استقبال',viewer:'عرض فقط'};
   if(data&&data.length){
@@ -1909,7 +1974,7 @@ async function loadUsers(){
       <th>الاسم الكامل</th><th>الدور الوظيفي</th><th>الحالة</th><th>تاريخ الإنشاء</th><th>إجراءات</th>
     </tr></thead><tbody>${data.map(u=>`<tr>
       <td>${u.full_name}</td>
-      <td><span class="pill ${u.role==='admin'?'pr':u.role==='tech'?'pb':'pg'}">${rl[u.role]||u.role}</span></td>
+      <td><span style='font-size:11px;color:#757575'>${u.role==='admin'?'مدير النظام ✅':((u.permissions||[]).length+' قسم')}</span></td>
       <td><span class="pill ${u.is_active?'pg':'pr'}">${u.is_active?'نشط':'معطّل'}</span></td>
       <td>${fd(u.created_at)}</td>
       <td>${u.id!==SES?.user?.id?`
@@ -1926,7 +1991,7 @@ async function loadUsers(){
 
 function showAddUserModal(){
   ['au-name','au-email','au-pw'].forEach(id=>G(id).value='');
-  G('au-role').value='tech';
+  renderPermCheckboxes('au-perms', []);
   G('addUserModal').classList.add('on');
 }
 
@@ -1950,8 +2015,10 @@ async function createUser(){
   finally{load(false);}
 }
 
-function showEditUser(id,name,role){
-  G('eu-id').value=id;G('eu-name').value=name;G('eu-role').value=role;
+function showEditUser(id,name,role,perms){
+  G('eu-id').value=id; G('eu-name').value=name;
+  const permArr = perms ? JSON.parse(perms) : [];
+  renderPermCheckboxes('eu-perms', permArr);
   G('editUserModal').classList.add('on');
 }
 
