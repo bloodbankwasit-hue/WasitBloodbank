@@ -257,16 +257,17 @@ tbody tr:hover td{background:#fafafa}
 
 /* ===== MOBILE RESPONSIVE ===== */
 @media(max-width:768px){
-  /* Sidebar: slide-in drawer from right */
-  .sb{position:fixed;right:-220px;top:0;bottom:0;z-index:5000;transition:right .25s ease;box-shadow:none;height:100vh}
-  .sb.open{right:0;box-shadow:-6px 0 24px rgba(0,0,0,.18)}
+  /* Sidebar: hidden by default, overlay when open */
+  .sb{display:none;position:fixed;right:0;top:0;bottom:0;z-index:5000;height:100vh;width:220px}
+  .sb.open{display:flex !important;flex-direction:column;animation:slideIn .22s ease}
+  @keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
   
   /* Show hamburger button */
   .ham{display:flex}
   
-  /* Content full width */
-  #app{flex-direction:column}
-  .content{width:100%;min-width:0}
+  /* Content full width - sidebar is overlay */
+  #app{flex-direction:row}
+  .content{width:100%;min-width:0;flex:1}
   
   /* Topbar */
   .topbar{padding:8px 12px}
@@ -976,7 +977,12 @@ function showLogin(){
 async function showApp(){
   G('loginPage').style.display='none';
   G('app').classList.add('on');
-  try{ await loadDash(); }catch(e){ console.log('dash error:',e); }
+  // Force dashboard screen active
+  document.querySelectorAll('.sc').forEach(s=>s.classList.remove('on'));
+  const dash=G('s-dashboard');
+  if(dash) dash.classList.add('on');
+  G('pgTitle').textContent='لوحة التحكم';
+  try{ await loadDash(); }catch(e){ console.log('dash err:',e); }
 }
 
 // ================================================================
@@ -1020,11 +1026,10 @@ async function loadDash(){
       db.from('blood_donations').select('*',{count:'exact',head:true}).gte('donation_date',ys).eq('is_deleted',false),
       db.from('blood_donations').select('*',{count:'exact',head:true}).eq('is_deleted',false)
     ]);
-    G('st0').textContent=fnum(r0.count||0);
-    G('st1').textContent=fnum(r1.count||0);
-    G('st2').textContent=fnum(r2.count||0);
-    G('st3').textContent=fnum(r3.count||0);
-    G('st4').textContent=fnum(r4.count||0);
+    ['st0','st1','st2','st3','st4'].forEach((id,i)=>{
+      const vals=[r0.count,r1.count,r2.count,r3.count,r4.count];
+      const el=G(id); if(el) el.textContent=fnum(vals[i]||0);
+    });
 
     // Recent donations today
     const {data:rec}=await db.from('blood_donations')
@@ -1063,7 +1068,11 @@ async function loadDash(){
     // Infected badge
     const {count:ic}=await db.from('blood_donations').select('*',{count:'exact',head:true}).eq('serology_result','Positive').eq('is_deleted',false);
     if(ic>0){G('infBadge').textContent=ic; G('infBadge').style.display='inline-block';}
-  }catch(e){toast('خطأ في تحميل البيانات: '+e.message,'error');}
+  }catch(e){
+    console.log('loadDash error:',e);
+    ['st0','st1','st2','st3','st4'].forEach(id=>{ const el=G(id); if(el) el.textContent='0'; });
+    const rt=G('recentTbl'); if(rt) rt.innerHTML='<div class="empty"><i class="ti ti-wifi-off"></i><p>تعذّر تحميل البيانات</p></div>';
+  }
 }
 
 // ================================================================
@@ -2061,12 +2070,16 @@ async function toggleUserActive(id,cur){
 function toggleSb(){
   const sb=document.querySelector('.sb');
   const ov=G('sbOverlay');
-  sb.classList.toggle('open');
-  ov.classList.toggle('on');
+  if(!sb) return;
+  const isOpen=sb.classList.contains('open');
+  if(isOpen){sb.classList.remove('open'); if(ov) ov.classList.remove('on');}
+  else{sb.classList.add('open'); if(ov) ov.classList.add('on');}
 }
 function closeSb(){
-  document.querySelector('.sb')?.classList.remove('open');
-  G('sbOverlay')?.classList.remove('on');
+  const sb=document.querySelector('.sb');
+  if(sb) sb.classList.remove('open');
+  const ov=G('sbOverlay');
+  if(ov) ov.classList.remove('on');
 }
 function bnActive(el){
   document.querySelectorAll('.bn-item').forEach(b=>b.classList.remove('on'));
