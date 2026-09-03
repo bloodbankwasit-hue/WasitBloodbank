@@ -356,6 +356,40 @@ tbody tr:hover td{background:#fafafa}
 .bn-item.on{color:#c62828}
 .bn-item.on::after{background:#c62828}
 .bn-item.on>*:first-child{transform:scale(1.15)}
+
+/* ===== WORKFLOW STATUS ===== */
+.sp{display:inline-block;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600}
+.sp-draw{background:#e3f2fd;color:#1565c0}
+.sp-lab{background:#fff8e1;color:#e65100}
+.sp-stock{background:#e8f5e9;color:#2e7d32}
+.sp-out{background:#f3e5f5;color:#6a1b9a}
+.sp-rej{background:#ffebee;color:#c62828}
+
+/* ===== REJECTED WARNING ===== */
+.rej-warn{background:#ffebee;border:2px solid #ffcdd2;border-radius:12px;padding:14px;margin-bottom:14px;display:none;gap:10px;align-items:flex-start}
+.rej-warn.show{display:flex}
+.rej-warn-t{font-size:15px;font-weight:700;color:#c62828}
+.rej-warn-r{font-size:13px;color:#757575;margin-top:3px}
+
+/* ===== FLOW CARDS ===== */
+.flow-card{background:#fff;border:1.5px solid #eeeeee;border-radius:14px;padding:14px 12px;margin-bottom:8px;display:flex;align-items:center;gap:12px;transition:all .15s;box-shadow:0 1px 6px rgba(0,0,0,.05)}
+.flow-card:hover{border-color:#c62828;box-shadow:0 3px 14px rgba(198,40,40,.10)}
+.fc-av{width:44px;height:44px;background:#fff0f0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.fc-name{font-size:14px;font-weight:700;color:#1a1a1a}
+.fc-sub{font-size:12px;color:#9e9e9e;margin-top:2px}
+.fc-act{margin-right:auto;flex-shrink:0}
+
+/* ===== STOCK GRID ===== */
+.stock-bt{background:#fff;border:2px solid #eeeeee;border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;transition:all .15s;box-shadow:0 1px 6px rgba(0,0,0,.05)}
+.stock-bt:hover{border-color:#c62828;background:#fff0f0}
+.stock-bt.empty-bt{opacity:.45}
+.stock-bt-type{font-size:20px;font-weight:800;color:#c62828}
+.stock-bt-count{font-size:13px;color:#757575;margin-top:4px;font-weight:600}
+
+/* ===== BIG ACTION BUTTON ===== */
+.btn-action{width:100%;padding:16px;background:#c62828;color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;transition:background .15s}
+.btn-action:hover{background:#b71c1c}
+.btn-action:active{background:#8b0000}
 @media print{
   .sidebar,.topbar,.abar,.pag,#loader,#toastBox,.overlay{display:none!important}
   .content{overflow:visible}
@@ -429,6 +463,14 @@ tbody tr:hover td{background:#fafafa}
         <div class="ni" onclick="nav('settings',this)"><i class="ti ti-settings"></i> الإعدادات</div>
         <div class="ni" id="navUsers" style="display:none" onclick="nav('users',this)"><i class="ti ti-user-cog"></i> إدارة الحسابات</div>
       </div>
+      <div class="nb" id="navWorkflow" style="display:none">
+        <div class="nl">سير العمل</div>
+        <div class="ni" id="navReception" style="display:none" onclick="nav('reception',this)"><i class="ti ti-clipboard-plus"></i> الاستقبال</div>
+        <div class="ni" id="navDraw" style="display:none" onclick="nav('draw',this)"><i class="ti ti-droplet"></i> السحب</div>
+        <div class="ni" id="navLab" style="display:none" onclick="nav('lab',this)"><i class="ti ti-microscope"></i> المختبر</div>
+        <div class="ni" id="navSupply" style="display:none" onclick="nav('supply',this)"><i class="ti ti-package"></i> التجهيز</div>
+      </div>
+    </div>
     </div>
     <div class="sb-foot">
       <div class="sf-user">
@@ -678,6 +720,58 @@ tbody tr:hover td{background:#fafafa}
         </div>
       </div>
 
+
+      <!-- ========== RECEPTION ========== -->
+      <div class="sc" id="s-reception">
+        <div class="rej-warn" id="rejWarn">
+          <div style="font-size:28px">🚫</div>
+          <div><div class="rej-warn-t" id="rejWarnTitle">مرفوض من التبرع</div><div class="rej-warn-r" id="rejWarnReason"></div></div>
+        </div>
+        <div class="fsec">
+          <div class="fst"><i class="ti ti-user"></i> بيانات المتبرع</div>
+          <div class="fgrid">
+            <div class="fgrp s2"><label>الاسم الرباعي واللقب *</label><input type="text" id="rc-name" placeholder="ابدأ بكتابة الاسم..." onblur="checkRejectedName()"></div>
+            <div class="fgrp"><label>سنة التولد *</label><input type="number" id="rc-by" placeholder="1995" min="1920" max="2007" oninput="calcRcAge()"></div>
+            <div class="fgrp"><label>العمر</label><input type="text" id="rc-age" class="ro" readonly placeholder="تلقائي"></div>
+            <div class="fgrp"><label>الجنس *</label><select id="rc-gen"><option value="ذكر">ذكر</option><option value="أنثى">أنثى</option></select></div>
+            <div class="fgrp"><label>اسم الأم</label><input type="text" id="rc-mom" placeholder="اسم الأم الثلاثي"></div>
+            <div class="fgrp"><label>رقم البطاقة الوطنية</label><input type="text" id="rc-nid" placeholder="19XXXXXXXXXX"></div>
+            <div class="fgrp"><label>رقم الموبايل</label><input type="tel" id="rc-mob" placeholder="07XXXXXXXXX"></div>
+            <div class="fgrp s2"><label>عنوان السكن</label><input type="text" id="rc-addr" placeholder="المحلة / الحي / المدينة"></div>
+            <div class="fgrp"><label>المهنة</label><input type="text" id="rc-job" placeholder="المهنة"></div>
+          </div>
+        </div>
+        <div class="fsec">
+          <div class="fst"><i class="ti ti-droplet"></i> نوع التبرع</div>
+          <div class="fgrid">
+            <div class="fgrp"><label>نوع التبرع *</label><select id="rc-dtype" onchange="toggleRcPat()"><option value="تعويضي">تعويضي</option><option value="طوعي">طوعي</option></select></div>
+            <div class="fgrp" id="rc-pat-grp"><label>اسم المريض</label><input type="text" id="rc-pat" placeholder="اسم المريض"></div>
+            <div class="fgrp" id="rc-hosp-grp"><label>اسم المستشفى</label><input type="text" id="rc-hosp" placeholder="المستشفى"></div>
+          </div>
+        </div>
+        <button class="btn-action" onclick="saveReception()">✅ تأكيد القبول وإرسال للسحب</button>
+        <button class="btn" onclick="resetReception()" style="width:100%;justify-content:center;margin-top:8px"><i class="ti ti-refresh"></i> مسح النموذج</button>
+      </div>
+
+      <!-- ========== DRAW ========== -->
+      <div class="sc" id="s-draw">
+        <div class="sh"><div class="sh-t"><i class="ti ti-droplet"></i> قائمة انتظار السحب</div></div>
+        <div id="drawList"><div class="empty"><i class="ti ti-clock"></i><p>جاري التحميل...</p></div></div>
+      </div>
+
+      <!-- ========== LAB ========== -->
+      <div class="sc" id="s-lab">
+        <div class="sh"><div class="sh-t"><i class="ti ti-microscope"></i> قائمة الفحص المختبري</div></div>
+        <div id="labList"><div class="empty"><i class="ti ti-microscope"></i><p>جاري التحميل...</p></div></div>
+      </div>
+
+      <!-- ========== SUPPLY ========== -->
+      <div class="sc" id="s-supply">
+        <div class="sh"><div class="sh-t"><i class="ti ti-package"></i> خزين القناني</div></div>
+        <div class="btg" id="supplyGrid"></div>
+        <div id="supplyList"></div>
+      </div>
+
     </div><!-- end page -->
   </div><!-- end content -->
   <!-- Bottom navigation (mobile only) -->
@@ -801,6 +895,37 @@ async function loadProf(){
   const rl={admin:'مدير النظام',tech:'فني مختبر',reception:'موظف استقبال',viewer:'عرض فقط'};
   G('sfRole').textContent=rl[data.role]||data.role;
   G('navUsers').style.display=data.role==='admin'?'flex':'none';
+  configureRoleUI(data.role);
+}
+
+function configureRoleUI(role){
+  const show=(id)=>{ const e=G(id); if(e) e.style.display='flex'; };
+  const hide=(id)=>{ const e=G(id); if(e) e.style.display='none'; };
+  const rl={admin:'مدير النظام',tech:'فني سحب',reception:'موظف استقبال',lab:'فني مختبر',supply:'موظف تجهيز',viewer:'عرض فقط'};
+
+  // Update role labels
+  const allRoles={admin:'مدير النظام',tech:'فني سحب',reception:'موظف استقبال',lab:'فني مختبر',supply:'موظف تجهيز',viewer:'عرض فقط'};
+  G('sfRole').textContent = allRoles[role]||role;
+
+  // Hide all workflow nav first
+  ['navWorkflow','navReception','navDraw','navLab','navSupply'].forEach(hide);
+
+  if(role==='admin'){
+    show('navWorkflow');
+    ['navReception','navDraw','navLab','navSupply'].forEach(show);
+  } else if(role==='reception'){
+    show('navWorkflow'); show('navReception');
+    setTimeout(()=>nav('reception', G('navReception')),100);
+  } else if(role==='tech'){
+    show('navWorkflow'); show('navDraw');
+    setTimeout(()=>nav('draw', G('navDraw')),100);
+  } else if(role==='lab'){
+    show('navWorkflow'); show('navLab');
+    setTimeout(()=>nav('lab', G('navLab')),100);
+  } else if(role==='supply'){
+    show('navWorkflow'); show('navSupply');
+    setTimeout(()=>nav('supply', G('navSupply')),100);
+  }
 }
 
 async function doLogout(){
@@ -834,7 +959,11 @@ async function nav(name, el){
     case 'rare':    await loadRareGrid(); break;
     case 'add':     await loadNextBN(); break;
     case 'audit':   await loadAudit(); break;
-    case 'users':   await loadUsers(); break;
+    case 'users':      await loadUsers(); break;
+    case 'reception':  setupReception(); break;
+    case 'draw':       await loadDraw(); break;
+    case 'lab':        await loadLab(); break;
+    case 'supply':     await loadSupply(); break;
     case 'barcode': G('bcRes').style.display='none'; break;
   }
 }
@@ -1456,6 +1585,309 @@ function showAbout(){
 function dangerZone(){
   if(UPROF?.role!=='admin'){toast('هذا الإجراء متاح للمدير فقط','error'); return;}
   toast('للحذف الدائم: اتصل بمسؤول قاعدة البيانات مباشرةً','warning',5000);
+}
+
+// ================================================================
+// WORKFLOW — RECEPTION (الاستقبال)
+// ================================================================
+function setupReception(){
+  const today=new Date().toISOString().split('T')[0];
+  // Set today's date defaults if needed
+}
+
+function toggleRcPat(){
+  const isTaw = G('rc-dtype').value==='طوعي';
+  ['rc-pat-grp','rc-hosp-grp'].forEach(id=>{
+    const e=G(id); if(e) e.style.display=isTaw?'none':'flex';
+  });
+}
+
+function calcRcAge(){
+  const by=parseInt(G('rc-by').value);
+  if(by>1900&&by<2010) G('rc-age').value=(new Date().getFullYear()-by)+' سنة';
+}
+
+async function checkRejectedName(){
+  const nm=G('rc-name').value.trim();
+  const w=G('rejWarn');
+  if(nm.length<3){ w.classList.remove('show'); return; }
+  const{data}=await db.from('rejected_donors')
+    .select('full_name,rejection_reason,rejection_type')
+    .ilike('full_name','%'+nm+'%').eq('is_deleted',false).limit(1);
+  if(data&&data.length){
+    G('rejWarnTitle').textContent='⛔ '+data[0].full_name+' — '+data[0].rejection_type;
+    G('rejWarnReason').textContent='السبب: '+data[0].rejection_reason;
+    w.classList.add('show');
+  } else {
+    w.classList.remove('show');
+  }
+}
+
+async function saveReception(){
+  if(G('rejWarn').classList.contains('show')){
+    toast('المتبرع مرفوض — لا يمكن المتابعة','error'); return;
+  }
+  const nm=G('rc-name').value.trim(), by=parseInt(G('rc-by').value);
+  if(!nm||!by){ toast('يرجى تعبئة الاسم وسنة التولد','error'); return; }
+  load(true);
+  try{
+    const{data:dn,error:de}=await db.from('donors').insert({
+      full_name:nm, birth_year:by, gender:G('rc-gen').value,
+      mother_name:G('rc-mom').value.trim()||null,
+      national_id:G('rc-nid').value.trim()||null,
+      mobile:G('rc-mob').value.trim()||null,
+      address:G('rc-addr').value.trim()||null,
+      occupation:G('rc-job').value.trim()||null,
+      created_by:SES?.user?.id
+    }).select().single();
+    if(de) throw de;
+
+    const{data:don,error:doe}=await db.from('blood_donations').insert({
+      donor_id:dn.id,
+      bottle_type:'مفلتر',
+      donation_type:G('rc-dtype').value,
+      patient_name:G('rc-pat').value.trim()||null,
+      hospital_name:G('rc-hosp').value.trim()||null,
+      donation_date:new Date().toISOString().split('T')[0],
+      donation_time:new Date().toTimeString().substring(0,5),
+      status:'pending_draw',
+      created_by:SES?.user?.id
+    }).select().single();
+    if(doe) throw doe;
+
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'INSERT',table_name:'blood_donations',record_id:don.id,new_values:{donor:nm,status:'pending_draw'}});
+    toast('✅ تم قبول '+nm+' — أُرسل لوحدة السحب','success',4000);
+    resetReception();
+  }catch(e){toast('خطأ: '+e.message,'error');}
+  finally{load(false);}
+}
+
+function resetReception(){
+  ['rc-name','rc-by','rc-age','rc-mom','rc-nid','rc-mob','rc-addr','rc-job','rc-pat','rc-hosp'].forEach(id=>{const e=G(id);if(e)e.value='';});
+  G('rc-dtype').value='تعويضي';
+  G('rejWarn').classList.remove('show');
+  toggleRcPat();
+}
+
+// ================================================================
+// WORKFLOW — DRAW (السحب)
+// ================================================================
+async function loadDraw(){
+  load(true);
+  const{data}=await db.from('blood_donations')
+    .select('id,donation_type,donation_date,donation_time,donors(full_name,birth_year,gender,mobile)')
+    .eq('status','pending_draw').eq('is_deleted',false)
+    .order('created_at',{ascending:true});
+  load(false);
+  if(data&&data.length){
+    G('drawList').innerHTML=data.map(r=>`<div class="flow-card">
+      <div class="fc-av">🩸</div>
+      <div style="flex:1">
+        <div class="fc-name">${r.donors?.full_name||'—'}</div>
+        <div class="fc-sub">${r.donors?.gender||''} | ${r.donors?.birth_year?new Date().getFullYear()-r.donors.birth_year+' سنة':''} | ${r.donation_type} | ${r.donation_time?.substring(0,5)||''}</div>
+      </div>
+      <div class="fc-act">
+        <button class="btn btn-p" onclick="openDrawModal('${r.id}','${r.donors?.full_name||''}','${r.donation_type}','${r.donors?.mobile||''}')">
+          <i class="ti ti-droplet"></i> سحب
+        </button>
+      </div>
+    </div>`).join('');
+  } else {
+    G('drawList').innerHTML='<div class="empty"><i class="ti ti-check"></i><p>لا يوجد متبرعون في الانتظار</p></div>';
+  }
+}
+
+async function openDrawModal(id,name,dtype,mob){
+  G('dm-id').value=id;
+  G('dm-donor-name').textContent=name;
+  G('dm-donor-sub').textContent=dtype+' | '+mob;
+  G('dm-bt').value=''; G('dm-btyp').value='مفلتر';
+  G('dm-draw').value=new Date().toISOString().split('T')[0];
+  // Get next bottle number
+  const bn=await getNextBottleNumber();
+  G('dm-bnum').value=bn||'لا يوجد تسلسل نشط';
+  calcDmExpiry();
+  G('drawModal').classList.add('on');
+}
+
+async function getNextBottleNumber(){
+  const{data}=await db.from('bottle_sequences')
+    .select('*').eq('is_active',true).order('created_at',{ascending:false}).limit(1);
+  if(!data||!data.length){ toast('لا يوجد تسلسل قناني نشط — أضف من الإعدادات','error'); return null; }
+  const seq=data[0];
+  if(seq.current_number>seq.end_number){
+    toast('انتهى التسلسل رقم '+seq.end_number+' — أضف تسلسلاً جديداً','error'); return null;
+  }
+  await db.from('bottle_sequences').update({current_number:seq.current_number+1}).eq('id',seq.id);
+  return seq.current_number;
+}
+
+function calcDmExpiry(){
+  const draw=G('dm-draw').value; if(!draw) return;
+  const bt=G('dm-btyp').value;
+  const days=['ثنائي','أحادي','تريما صفائح دموية'].includes(bt)?5:42;
+  const e=new Date(draw); e.setDate(e.getDate()+days);
+  G('dm-exp').value=e.toISOString().split('T')[0];
+}
+
+async function saveDraw(){
+  const id=G('dm-id').value;
+  const bt=G('dm-bt').value, bn=G('dm-bnum').value;
+  if(!bt){ toast('يرجى اختيار فصيلة الدم','error'); return; }
+  if(!bn||isNaN(parseInt(bn))){ toast('رقم القنينة غير صحيح','error'); return; }
+  load(true);
+  try{
+    const{error}=await db.from('blood_donations').update({
+      blood_type:bt, bottle_type:G('dm-btyp').value,
+      bottle_number:parseInt(bn),
+      draw_date:G('dm-draw').value, expiry_date:G('dm-exp').value,
+      status:'pending_lab', created_by:SES?.user?.id
+    }).eq('id',id);
+    if(error) throw error;
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'pending_lab',bottle:bn,blood_type:bt}});
+    toast('✅ تم حفظ بيانات القنينة — أُرسل للمختبر','success',4000);
+    G('drawModal').classList.remove('on');
+    // Print barcode
+    const{data:don}=await db.from('blood_donations').select('*,donors(full_name,donor_number)').eq('id',id).single();
+    if(don){ BCDATA=don; setTimeout(()=>printBC('full'),300); }
+    await loadDraw();
+  }catch(e){toast('خطأ: '+e.message,'error');}
+  finally{load(false);}
+}
+
+// ================================================================
+// WORKFLOW — LAB (المختبر)
+// ================================================================
+async function loadLab(){
+  load(true);
+  const{data}=await db.from('blood_donations')
+    .select('id,blood_type,bottle_number,bottle_type,donation_date,donors(full_name,birth_year,gender)')
+    .eq('status','pending_lab').eq('is_deleted',false)
+    .order('created_at',{ascending:true});
+  load(false);
+  if(data&&data.length){
+    G('labList').innerHTML=data.map(r=>`<div class="flow-card">
+      <div class="fc-av">🔬</div>
+      <div style="flex:1">
+        <div class="fc-name">${r.donors?.full_name||'—'}</div>
+        <div class="fc-sub">قنينة: ${r.bottle_number||'—'} | ${r.blood_type||'—'} | ${r.bottle_type}</div>
+      </div>
+      <div class="fc-act">
+        <button class="btn btn-p" onclick="openLabModal('${r.id}','${r.donors?.full_name||''}','${r.bottle_number||''}','${r.blood_type||''}')">
+          <i class="ti ti-microscope"></i> فحص
+        </button>
+      </div>
+    </div>`).join('');
+  } else {
+    G('labList').innerHTML='<div class="empty"><i class="ti ti-check"></i><p>لا توجد عينات في الانتظار</p></div>';
+  }
+}
+
+function openLabModal(id,name,bn,bt){
+  G('lm-id').value=id;
+  G('lm-donor-name').textContent=name;
+  G('lm-donor-sub').textContent='قنينة رقم: '+bn+' | فصيلة: '+bt;
+  G('lm-ser').value='Negative'; toggleLmInf();
+  ['lm-hgb','lm-bp','lm-wt','lm-pulse'].forEach(id=>G(id).value='');
+  G('labModal').classList.add('on');
+}
+
+function toggleLmInf(){ G('lm-inf-grp').style.display=G('lm-ser').value==='Positive'?'flex':'none'; }
+
+async function saveLab(){
+  const id=G('lm-id').value, ser=G('lm-ser').value;
+  load(true);
+  try{
+    const newStatus=ser==='Positive'?'rejected_positive':'in_stock';
+    const{error}=await db.from('blood_donations').update({
+      hemoglobin:parseFloat(G('lm-hgb').value)||null,
+      blood_pressure:G('lm-bp').value.trim()||null,
+      weight:parseFloat(G('lm-wt').value)||null,
+      pulse:parseInt(G('lm-pulse').value)||null,
+      serology_result:ser,
+      serology_type:ser==='Positive'?G('lm-inf').value:null,
+      status:newStatus
+    }).eq('id',id);
+    if(error) throw error;
+
+    if(ser==='Positive'){
+      // Add to rejected donors
+      const{data:don}=await db.from('blood_donations').select('donors(full_name)').eq('id',id).single();
+      if(don?.donors?.full_name){
+        await db.from('rejected_donors').insert({
+          full_name:don.donors.full_name, rejection_reason:'إصابة: '+G('lm-inf').value,
+          rejection_date:new Date().toISOString().split('T')[0], rejection_type:'دائم',
+          created_by:SES?.user?.id
+        });
+      }
+      toast('⚠️ نتيجة موجبة — تم نقل المتبرع للمرفوضين دائماً','warning',5000);
+    } else {
+      toast('✅ نتيجة سالبة — القنينة أُضيفت للخزين','success',4000);
+    }
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:newStatus,serology:ser}});
+    G('labModal').classList.remove('on');
+    await loadLab();
+  }catch(e){toast('خطأ: '+e.message,'error');}
+  finally{load(false);}
+}
+
+// ================================================================
+// WORKFLOW — SUPPLY (التجهيز)
+// ================================================================
+async function loadSupply(selectedBT){
+  const bts=['A+','A-','B+','B-','O+','O-','AB+','AB-'];
+  const{data:counts}=await db.from('blood_donations').select('blood_type').eq('status','in_stock').eq('is_deleted',false);
+  const cnt={};
+  (counts||[]).forEach(r=>{ cnt[r.blood_type]=(cnt[r.blood_type]||0)+1; });
+  G('supplyGrid').innerHTML=bts.map(bt=>`<div class="stock-bt ${(cnt[bt]||0)===0?'empty-bt':''}" onclick="loadSupplyList('${bt}')">
+    <div class="stock-bt-type">${bt}</div>
+    <div class="stock-bt-count">${cnt[bt]||0} قنينة</div>
+  </div>`).join('');
+  if(selectedBT) await loadSupplyList(selectedBT);
+}
+
+async function loadSupplyList(bt){
+  const{data}=await db.from('blood_donations')
+    .select('id,bottle_number,bottle_type,blood_type,expiry_date,donors(full_name)')
+    .eq('status','in_stock').eq('blood_type',bt).eq('is_deleted',false)
+    .order('expiry_date',{ascending:true});
+  if(data&&data.length){
+    G('supplyList').innerHTML=`<div style="font-size:14px;font-weight:700;color:#c62828;margin:12px 0 8px">فصيلة ${bt} — ${data.length} قنينة</div>`+
+    data.map(r=>`<div class="flow-card">
+      <div class="fc-av">🩸</div>
+      <div style="flex:1">
+        <div class="fc-name">قنينة رقم: <strong>${r.bottle_number}</strong> | ${r.bottle_type}</div>
+        <div class="fc-sub">المتبرع: ${r.donors?.full_name||'—'} | تنتهي: ${fd(r.expiry_date)}</div>
+      </div>
+      <div class="fc-act">
+        <button class="btn btn-p" onclick="openDispatch('${r.id}','${r.bottle_number}','${bt}','${r.bottle_type}')">
+          <i class="ti ti-package"></i> صرف
+        </button>
+      </div>
+    </div>`).join('');
+  } else {
+    G('supplyList').innerHTML='<div class="empty"><i class="ti ti-package"></i><p>لا توجد قناني من فصيلة '+bt+'</p></div>';
+  }
+}
+
+function openDispatch(id,bn,bt,btyp){
+  G('disp-id').value=id;
+  G('disp-info').innerHTML='<strong>قنينة رقم: '+bn+'</strong> | فصيلة: '+bt+' | '+btyp;
+  G('disp-hosp').value='';
+  G('dispModal').classList.add('on');
+}
+
+async function saveDispatch(){
+  const id=G('disp-id').value, hosp=G('disp-hosp').value.trim();
+  if(!hosp){ toast('يرجى إدخال اسم المستشفى','error'); return; }
+  load(true);
+  const{error}=await db.from('blood_donations').update({status:'dispatched',hospital_name:hosp}).eq('id',id);
+  load(false);
+  if(error){ toast('خطأ: '+error.message,'error'); return; }
+  await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'dispatched',hospital:hosp}});
+  toast('✅ تم صرف القنينة لـ'+hosp,'success');
+  G('dispModal').classList.remove('on');
+  await loadSupply();
 }
 
 // ================================================================
