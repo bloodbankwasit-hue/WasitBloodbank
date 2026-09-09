@@ -2001,9 +2001,12 @@ function getCheckedPerms(containerId){
 // USER MANAGEMENT (Admin Only)
 // ================================================================
 async function loadUsers(){
-  if(UPROF?.role!=='admin'){
-    G('nonAdminWarn').style.display='block';
-    G('adminUsersPanel').style.display='none'; return;
+  // Check admin - use multiple sources
+  const isAdminNow = (UPROF?.role==='admin') || (SES && UPROF?.role==='admin');
+  if(!isAdminNow){
+    const wp=G('nonAdminWarn'); if(wp) wp.style.display='block';
+    const ap=G('adminUsersPanel'); if(ap) ap.style.display='none';
+    return;
   }
   G('nonAdminWarn').style.display='none';
   G('adminUsersPanel').style.display='block';
