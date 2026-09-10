@@ -1615,8 +1615,24 @@ function newDonor(){
   _lastDonation = null;
 }
 
-// Print from donors list
-function printDonorFromList(d){
+// Donor data store for print
+const _donorStore = new Map();
+let _donorStoreId = 0;
+
+function storeDonorForPrint(data){
+  const id = ++_donorStoreId;
+  _donorStore.set(id, data);
+  return id;
+}
+
+function printDonorFromList(storeId){
+  const d = _donorStore.get(storeId);
+  if(!d){ toast('تعذر تحميل بيانات المتبرع','error'); return; }
+  _lastDonation = d;
+  G('printChoiceModal').classList.add('on');
+}
+
+
   if(typeof d === 'string') try{ d=JSON.parse(decodeURIComponent(d)); }catch(e){
     try{ d=JSON.parse(d.replace(/&quot;/g,'"')); }catch(e2){ return; }
   }
@@ -2460,7 +2476,7 @@ async function loadDonors(page=1){
           <td>${fd(r.donation_date)}</td>
           <td style="color:${exp?'#BE123C':'inherit'}">${fd(r.expiry_date)}${exp?' ⚠':''}</td>
           <td><span class="pill ${(['in_stock','dispatched','rejected_positive'].includes(r.status)&&r.serology_result)?r.serology_result==='Negative'?'pg':'pr':'py'}">${(['in_stock','dispatched','rejected_positive'].includes(r.status)&&r.serology_result)?r.serology_result==='Negative'?'سالبة ✅':'موجبة ⚠️':'لم يُفحص'}</span></td>
-          <td><button class="ibtn" onclick="printDonorFromList(${JSON.stringify({donor_name:r.donors?.full_name,bottle_number:r.bottle_number,bottle_type:r.bottle_type,donation_date:r.donation_date,donation_type:r.donation_type,birth_year:r.donors?.birth_year,gender:r.donors?.gender,mobile:r.donors?.mobile,national_id:r.donors?.national_id,address:r.donors?.address,expiry_date:r.expiry_date}).replace(/'/g,'&quot;').replace(/"/g,'&quot;')})" title="طباعة" style="color:#BE123C"><i class="ti ti-printer"></i></button></td>
+          <td><button class="ibtn" onclick="printDonorFromList(storeDonorForPrint({donor_name:'${(r.donors?.full_name||'').replace(/'/g,'')}',bottle_number:${r.bottle_number||0},bottle_type:'${r.bottle_type||''}',donation_date:'${r.donation_date||''}',donation_type:'${r.donation_type||''}',birth_year:${r.donors?.birth_year||0},gender:'${r.donors?.gender||''}',mobile:'${r.donors?.mobile||''}',national_id:'${r.donors?.national_id||''}',address:'${(r.donors?.address||'').replace(/'/g,'')}',expiry_date:'${r.expiry_date||''}',blood_type:'${r.blood_type||''}' }))" title="طباعة" style="color:#BE123C"><i class="ti ti-printer"></i></button></td>
         </tr>`;}).join('')}</tbody></table></div>`;
       const tp=Math.ceil(count/PS);
       const start=Math.max(1,Math.min(page-2,tp-4));
