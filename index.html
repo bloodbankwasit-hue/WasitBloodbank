@@ -1257,15 +1257,27 @@ async function appInit(){
     else showLogin();
   }catch(e){ showLogin(); }
   db.auth.onAuthStateChange(async(ev,s)=>{
-    if(ev==='SIGNED_IN'){
+    // Handle session events
+    if(ev==='SIGNED_IN' || ev==='TOKEN_REFRESHED' || ev==='INITIAL_SESSION'){
+      if(!s) return;
       SES=s;
       // Reset login button
       const lbtn=G('lbtn');
-      if(lbtn){lbtn.innerHTML='<i class="ti ti-login"></i> دخول آمن';lbtn.disabled=false;}
-      try{ await loadProf(); }catch(e){console.log('loadProf err:',e);}
-      try{ await showApp(); }catch(e){console.log('showApp err:',e);}
+      if(lbtn){lbtn.innerHTML='🔐 دخول آمن';lbtn.disabled=false;}
+      // Reload profile only if changed or not loaded
+      if(!UPROF || UPROF.id !== s.user?.id){
+        try{ await loadProf(); }catch(e){console.log('loadProf err:',e);}
+      }
+      // Show app only if login page is still visible
+      const lp=G('loginPage');
+      if(lp && lp.style.display!=='none'){
+        try{ await showApp(); }catch(e){console.log('showApp err:',e);}
+      }
     }
-    if(ev==='SIGNED_OUT'){SES=null; showLogin();}
+    if(ev==='SIGNED_OUT'){
+      SES=null; UPROF=null;
+      showLogin();
+    }
   });
 }
 
@@ -1381,6 +1393,8 @@ function setupNavVisibility(isAdmin, perms){
 }
 
 async function doLogout(){
+  localStorage.removeItem('bb_lastPage');
+  IS_FRESH_LOGIN = false;
   await db.auth.signOut();
   toast('تم تسجيل الخروج بنجاح','success');
 }
@@ -1397,7 +1411,7 @@ async function showApp(){
   // Fresh login → dashboard. Returning user → last page
   const targetPage = IS_FRESH_LOGIN
     ? 'dashboard'
-    : (sessionStorage.getItem('lastPage') || 'dashboard');
+    : (localStorage.getItem('bb_lastPage') || 'dashboard');
   IS_FRESH_LOGIN = false;
 
   const isMob = window.innerWidth <= 768;
@@ -1411,7 +1425,7 @@ async function showApp(){
 
 async function nav(name, el){
   if(name && name!=='workhome' && name!=='account')
-    sessionStorage.setItem('lastPage', name);
+    localStorage.setItem('bb_lastPage', name);
   document.querySelectorAll('.sc').forEach(s=>s.classList.remove('on'));
   const sc=G('s-'+name);
   if(sc) sc.classList.add('on');
