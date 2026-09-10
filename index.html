@@ -11,6 +11,7 @@
 <meta name="theme-color" content="#BE123C">
 <meta name="description" content="نظام إدارة مصرف الدم الرئيسي في واسط — وزارة الصحة">
 <link rel="apple-touch-icon" href="icon.png">
+<link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -468,6 +469,28 @@ tbody tr:hover td{background:#fafafa}
   .page-title-bar{display:flex}
 }
 
+
+/* ═══════ OFFLINE SYSTEM ═══════ */
+.offline-bar{
+  position:fixed;top:0;left:0;right:0;z-index:9999;
+  background:#92400E;color:#fff;
+  padding:9px 16px;font-size:13px;font-weight:600;
+  display:none;align-items:center;justify-content:space-between;
+  gap:10px;box-shadow:0 2px 12px rgba(0,0,0,.2);
+}
+.offline-bar.show{display:flex}
+.offline-bar.syncing{background:#0F766E}
+.ob-left{display:flex;align-items:center;gap:8px}
+.ob-dot{width:8px;height:8px;border-radius:50%;background:#FCD34D;flex-shrink:0}
+.ob-dot.sync{background:#6EE7B7;animation:blink .8s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.ob-badge{background:rgba(255,255,255,.25);border-radius:20px;padding:2px 10px;font-size:11px}
+
+.offline-btn-disabled{opacity:.45;cursor:not-allowed !important;pointer-events:none}
+.offline-queue-card{background:#FEF3C7;border:1px solid #FCD34D;border-radius:12px;padding:12px 14px;margin-bottom:8px}
+.oqc-title{font-size:13px;font-weight:700;color:#92400E}
+.oqc-sub{font-size:11px;color:#B45309;margin-top:3px}
+.oqc-count{background:#92400E;color:#fff;border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700}
 @media print{
   .sidebar,.topbar,.abar,.pag,#loader,#toastBox,.overlay{display:none!important}
   .content{overflow:visible}
@@ -512,6 +535,14 @@ tbody tr:hover td{background:#fafafa}
 
 <!-- ===== MAIN APP ===== -->
 <div id="app">
+  <!-- OFFLINE STATUS BAR -->
+  <div class="offline-bar" id="offlineBar">
+    <div class="ob-left">
+      <span class="ob-dot" id="obDot"></span>
+      <span id="obMsg">لا يوجد اتصال بالإنترنت</span>
+    </div>
+    <span class="ob-badge" id="obBadge"></span>
+  </div>
   <!-- SIDEBAR -->
   <div class="sb">
     <div class="sb-head">
@@ -579,10 +610,10 @@ tbody tr:hover td{background:#fafafa}
       </div>
       <div class="ah-user">
         <div class="ah-user-l">
-          <div class="ah-av" id="sfAv">م</div>
+          <div class="ah-av" id="ahAv">م</div>
           <div>
-            <div class="ah-uname" id="sfName">...</div>
-            <div class="ah-urole" id="sfRole">...</div>
+            <div class="ah-uname" id="ahName">...</div>
+            <div class="ah-urole" id="ahRole">...</div>
           </div>
         </div>
         <div class="ah-dept" id="ahDept">—</div>
@@ -978,7 +1009,245 @@ function fnum(n){ return n!=null ? Number(n).toLocaleString('ar-IQ') : '—'; }
 // ================================================================
 // AUTH
 // ================================================================
+// ================================================================
+// OFFLINE ENGINE
+// ================================================================
+const DB_NAME   = 'bloodbank_offline';
+const DB_VER    = 1;
+let   offlineDB = null;
+let   IS_ONLINE = navigator.onLine;
+let   SYNC_RUNNING = false;
+
+// ── IndexedDB init ──
+function initOfflineDB(){
+  return new Promise((res,rej)=>{
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = e=>{
+      const db = e.target.result;
+      // Store rejected donors for offline check
+      if(!db.objectStoreNames.contains('rejected_cache')){
+        const rs = db.createObjectStore('rejected_cache',{keyPath:'id'});
+        rs.createIndex('name','full_name',{unique:false});
+        rs.createIndex('nid','national_id',{unique:false});
+        rs.createIndex('mobile','mobile',{unique:false});
+      }
+      // Store offline operation queue
+      if(!db.objectStoreNames.contains('op_queue')){
+        const qs = db.createObjectStore('op_queue',{keyPath:'id',autoIncrement:true});
+        qs.createIndex('status','status',{unique:false});
+      }
+    };
+    req.onsuccess = e=>{ offlineDB=e.target.result; res(offlineDB); };
+    req.onerror   = e=>rej(e.target.error);
+  });
+}
+
+// ── Cache rejected donors locally ──
+async function cacheRejectedDonors(){
+  if(!IS_ONLINE || !offlineDB) return;
+  try{
+    const{data}=await db.from('rejected_donors')
+      .select('id,full_name,national_id,mobile,rejection_reason,rejection_type,rejection_date')
+      .eq('is_deleted',false).limit(5000);
+    if(!data) return;
+    const tx  = offlineDB.transaction('rejected_cache','readwrite');
+    const st  = tx.objectStore('rejected_cache');
+    st.clear();
+    data.forEach(r=>st.put(r));
+    await new Promise((res,rej)=>{tx.oncomplete=res;tx.onerror=rej;});
+    console.log('[Offline] Cached',data.length,'rejected donors');
+  }catch(e){console.log('[Offline] Cache error:',e);}
+}
+
+// ── Check name/NID/mobile against local cache ──
+async function checkRejectedOffline(name, nid, mobile){
+  if(!offlineDB) return null;
+  return new Promise(res=>{
+    const tx  = offlineDB.transaction('rejected_cache','readonly');
+    const st  = tx.objectStore('rejected_cache');
+    const all = st.getAll();
+    all.onsuccess = e=>{
+      const rows = e.target.result||[];
+      const nm   = (name||'').trim().toLowerCase();
+      const n    = (nid||'').trim();
+      const mob  = (mobile||'').trim();
+      const hit  = rows.find(r=>{
+        if(nm.length>2 && r.full_name && r.full_name.toLowerCase().includes(nm)) return true;
+        if(n.length>5  && r.national_id && r.national_id===n) return true;
+        if(mob.length>6 && r.mobile && r.mobile===mob) return true;
+        return false;
+      });
+      res(hit||null);
+    };
+    all.onerror = ()=>res(null);
+  });
+}
+
+// ── Enqueue an offline operation ──
+async function enqueueOp(type, data){
+  if(!offlineDB) return null;
+  return new Promise((res,rej)=>{
+    const tx  = offlineDB.transaction('op_queue','readwrite');
+    const st  = tx.objectStore('op_queue');
+    const req = st.add({
+      type,                         // 'reception'|'draw'|'lab'|'supply'
+      data,                         // payload
+      status:'pending',
+      created_at: new Date().toISOString(),
+      attempts:0
+    });
+    req.onsuccess = e=>res(e.target.result);
+    req.onerror   = e=>rej(e.target.error);
+  });
+}
+
+// ── Get pending queue ──
+async function getPendingQueue(){
+  if(!offlineDB) return [];
+  return new Promise(res=>{
+    const tx  = offlineDB.transaction('op_queue','readonly');
+    const st  = tx.objectStore('op_queue').index('status');
+    const req = st.getAll('pending');
+    req.onsuccess = e=>res(e.target.result||[]);
+    req.onerror   = ()=>res([]);
+  });
+}
+
+// ── Mark op as done/failed ──
+async function updateOpStatus(id, status){
+  if(!offlineDB) return;
+  const tx = offlineDB.transaction('op_queue','readwrite');
+  const st = tx.objectStore('op_queue');
+  const r  = st.get(id);
+  r.onsuccess = e=>{
+    const op = e.target.result;
+    if(op){ op.status=status; st.put(op); }
+  };
+}
+
+// ── Sync queue when online ──
+async function syncQueue(){
+  if(!IS_ONLINE || SYNC_RUNNING) return;
+  const queue = await getPendingQueue();
+  if(queue.length===0) return;
+
+  SYNC_RUNNING = true;
+  updateOfflineBar('syncing', `جاري المزامنة... (${queue.length} عملية)`);
+
+  let done=0;
+  for(const op of queue){
+    try{
+      await processQueuedOp(op);
+      await updateOpStatus(op.id,'done');
+      done++;
+    }catch(e){
+      console.log('[Sync] Op failed:',op.type,e);
+      await updateOpStatus(op.id,'failed');
+    }
+  }
+
+  SYNC_RUNNING = false;
+  toast(`✅ تمت المزامنة — ${done}/${queue.length} عملية ناجحة`,'success',4000);
+  updateOfflineBar('online','');
+  // Refresh current screen
+  try{ await loadDash(); }catch(e){}
+}
+
+// ── Process a single queued op ──
+async function processQueuedOp(op){
+  const d = op.data;
+  if(op.type==='reception'){
+    // Create donor + donation
+    const{data:dn,error:de}=await db.from('donors').insert({
+      full_name:d.full_name,birth_year:d.birth_year,gender:d.gender,
+      mother_name:d.mother_name,national_id:d.national_id,mobile:d.mobile,
+      address:d.address,occupation:d.occupation,created_by:d.created_by
+    }).select().single();
+    if(de) throw de;
+    const{error:doe}=await db.from('blood_donations').insert({
+      donor_id:dn.id,bottle_type:'مفلتر',donation_type:d.donation_type,
+      patient_name:d.patient_name,hospital_name:d.hospital_name,
+      donation_date:d.donation_date,donation_time:d.donation_time,
+      status:'pending_draw',created_by:d.created_by
+    });
+    if(doe) throw doe;
+  } else if(op.type==='draw'){
+    const{error}=await db.from('blood_donations').update({
+      blood_type:d.blood_type,bottle_type:d.bottle_type,
+      bottle_number:d.bottle_number,draw_date:d.draw_date,
+      expiry_date:d.expiry_date,status:'pending_lab'
+    }).eq('id',d.donation_id);
+    if(error) throw error;
+  } else if(op.type==='lab'){
+    const{error}=await db.from('blood_donations').update({
+      hemoglobin:d.hemoglobin,blood_pressure:d.blood_pressure,
+      weight:d.weight,pulse:d.pulse,serology_result:d.serology_result,
+      serology_type:d.serology_type,status:d.status
+    }).eq('id',d.donation_id);
+    if(error) throw error;
+    if(d.status==='rejected_positive' && d.donor_name){
+      await db.from('rejected_donors').insert({
+        full_name:d.donor_name,rejection_reason:'إصابة: '+d.serology_type,
+        rejection_date:d.donation_date,rejection_type:'دائم',created_by:d.created_by
+      });
+    }
+  } else if(op.type==='supply'){
+    const{error}=await db.from('blood_donations').update({
+      status:'dispatched',hospital_name:d.hospital_name
+    }).eq('id',d.donation_id);
+    if(error) throw error;
+  }
+}
+
+// ── Online/Offline events ──
+function updateOfflineBar(state, msg){
+  const bar  = document.getElementById('offlineBar');
+  const dot  = document.getElementById('obDot');
+  const msgEl= document.getElementById('obMsg');
+  const bdg  = document.getElementById('obBadge');
+  if(!bar) return;
+
+  bar.classList.remove('show','syncing');
+  if(state==='offline'){
+    bar.classList.add('show');
+    dot.classList.remove('sync');
+    msgEl.textContent = msg||'لا يوجد اتصال — البيانات ستُحفظ وتُرسل عند العودة';
+  } else if(state==='syncing'){
+    bar.classList.add('show','syncing');
+    dot.classList.add('sync');
+    msgEl.textContent = msg||'جاري المزامنة...';
+    if(bdg) bdg.textContent='';
+  } else {
+    // online — hide bar
+  }
+}
+
+async function onOnline(){
+  IS_ONLINE = true;
+  updateOfflineBar('online','');
+  await cacheRejectedDonors();
+  await syncQueue();
+  // Update queue badge
+  const q = await getPendingQueue();
+  if(q.length>0){
+    const bdg=document.getElementById('obBadge');
+    if(bdg) bdg.textContent=q.length+' معلّقة';
+  }
+}
+
+async function onOffline(){
+  IS_ONLINE = false;
+  const q = await getPendingQueue();
+  updateOfflineBar('offline', q.length>0?`${q.length} عملية معلّقة`:'');
+}
+
+window.addEventListener('online',  onOnline);
+window.addEventListener('offline', onOffline);
+
 async function appInit(){
+  await initOfflineDB();
+  if(IS_ONLINE) cacheRejectedDonors();
+  else onOffline();
   G('tbDate').textContent = new Date().toLocaleDateString('ar-IQ',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   setDefaults();
   try{
@@ -1400,6 +1669,28 @@ function printForm(){
   .page-title-bar{display:flex}
 }
 
+
+/* ═══════ OFFLINE SYSTEM ═══════ */
+.offline-bar{
+  position:fixed;top:0;left:0;right:0;z-index:9999;
+  background:#92400E;color:#fff;
+  padding:9px 16px;font-size:13px;font-weight:600;
+  display:none;align-items:center;justify-content:space-between;
+  gap:10px;box-shadow:0 2px 12px rgba(0,0,0,.2);
+}
+.offline-bar.show{display:flex}
+.offline-bar.syncing{background:#0F766E}
+.ob-left{display:flex;align-items:center;gap:8px}
+.ob-dot{width:8px;height:8px;border-radius:50%;background:#FCD34D;flex-shrink:0}
+.ob-dot.sync{background:#6EE7B7;animation:blink .8s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.ob-badge{background:rgba(255,255,255,.25);border-radius:20px;padding:2px 10px;font-size:11px}
+
+.offline-btn-disabled{opacity:.45;cursor:not-allowed !important;pointer-events:none}
+.offline-queue-card{background:#FEF3C7;border:1px solid #FCD34D;border-radius:12px;padding:12px 14px;margin-bottom:8px}
+.oqc-title{font-size:13px;font-weight:700;color:#92400E}
+.oqc-sub{font-size:11px;color:#B45309;margin-top:3px}
+.oqc-count{background:#92400E;color:#fff;border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700}
 @media print{@page{margin:10mm}}</style></head><body>
   <div class="hdr">
     <div class="en">Ministry of Health<br>Wasit Health Directorate<br>Technical Affairs Dept.<br><strong>Blood Donor Questionnaire</strong></div>
@@ -1695,6 +1986,28 @@ function printBC(type){
   .page-title-bar{display:flex}
 }
 
+
+/* ═══════ OFFLINE SYSTEM ═══════ */
+.offline-bar{
+  position:fixed;top:0;left:0;right:0;z-index:9999;
+  background:#92400E;color:#fff;
+  padding:9px 16px;font-size:13px;font-weight:600;
+  display:none;align-items:center;justify-content:space-between;
+  gap:10px;box-shadow:0 2px 12px rgba(0,0,0,.2);
+}
+.offline-bar.show{display:flex}
+.offline-bar.syncing{background:#0F766E}
+.ob-left{display:flex;align-items:center;gap:8px}
+.ob-dot{width:8px;height:8px;border-radius:50%;background:#FCD34D;flex-shrink:0}
+.ob-dot.sync{background:#6EE7B7;animation:blink .8s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.ob-badge{background:rgba(255,255,255,.25);border-radius:20px;padding:2px 10px;font-size:11px}
+
+.offline-btn-disabled{opacity:.45;cursor:not-allowed !important;pointer-events:none}
+.offline-queue-card{background:#FEF3C7;border:1px solid #FCD34D;border-radius:12px;padding:12px 14px;margin-bottom:8px}
+.oqc-title{font-size:13px;font-weight:700;color:#92400E}
+.oqc-sub{font-size:11px;color:#B45309;margin-top:3px}
+.oqc-count{background:#92400E;color:#fff;border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700}
 @media print{@page{margin:6mm}}</style></head><body>
   <div class="card">
     <div class="hd"><div class="hd-ico">🩸</div>
@@ -1955,6 +2268,28 @@ function printStats(){
   .page-title-bar{display:flex}
 }
 
+
+/* ═══════ OFFLINE SYSTEM ═══════ */
+.offline-bar{
+  position:fixed;top:0;left:0;right:0;z-index:9999;
+  background:#92400E;color:#fff;
+  padding:9px 16px;font-size:13px;font-weight:600;
+  display:none;align-items:center;justify-content:space-between;
+  gap:10px;box-shadow:0 2px 12px rgba(0,0,0,.2);
+}
+.offline-bar.show{display:flex}
+.offline-bar.syncing{background:#0F766E}
+.ob-left{display:flex;align-items:center;gap:8px}
+.ob-dot{width:8px;height:8px;border-radius:50%;background:#FCD34D;flex-shrink:0}
+.ob-dot.sync{background:#6EE7B7;animation:blink .8s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.ob-badge{background:rgba(255,255,255,.25);border-radius:20px;padding:2px 10px;font-size:11px}
+
+.offline-btn-disabled{opacity:.45;cursor:not-allowed !important;pointer-events:none}
+.offline-queue-card{background:#FEF3C7;border:1px solid #FCD34D;border-radius:12px;padding:12px 14px;margin-bottom:8px}
+.oqc-title{font-size:13px;font-weight:700;color:#92400E}
+.oqc-sub{font-size:11px;color:#B45309;margin-top:3px}
+.oqc-count{background:#92400E;color:#fff;border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700}
 @media print{@page{margin:10mm}}</style></head>
   <body>${c}<script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
   w.document.close();
@@ -2037,15 +2372,32 @@ function calcRcAge(){
 }
 
 async function checkRejectedName(){
-  const nm=G('rc-name').value.trim();
-  const w=G('rejWarn');
-  if(nm.length<3){ w.classList.remove('show'); return; }
-  const{data}=await db.from('rejected_donors')
-    .select('full_name,rejection_reason,rejection_type')
-    .ilike('full_name','%'+nm+'%').eq('is_deleted',false).limit(1);
-  if(data&&data.length){
-    G('rejWarnTitle').textContent='⛔ '+data[0].full_name+' — '+data[0].rejection_type;
-    G('rejWarnReason').textContent='السبب: '+data[0].rejection_reason;
+  const nm  = G('rc-name').value.trim();
+  const nid = G('rc-nid')?.value.trim()||'';
+  const mob = G('rc-mob')?.value.trim()||'';
+  const w   = G('rejWarn');
+  if(nm.length<3 && nid.length<5 && mob.length<7){ w.classList.remove('show'); return; }
+
+  let hit = null;
+  if(IS_ONLINE){
+    // Online: check from Supabase
+    const filters = [];
+    if(nm.length>2)   filters.push(`full_name.ilike.%${nm}%`);
+    if(nid.length>5)  filters.push(`national_id.eq.${nid}`);
+    if(mob.length>6)  filters.push(`mobile.eq.${mob}`);
+    const{data}=await db.from('rejected_donors')
+      .select('full_name,rejection_reason,rejection_type,national_id,mobile')
+      .or(filters.join(','))
+      .eq('is_deleted',false).limit(1);
+    hit = data&&data.length ? data[0] : null;
+  } else {
+    // Offline: check from IndexedDB cache
+    hit = await checkRejectedOffline(nm, nid, mob);
+  }
+
+  if(hit){
+    G('rejWarnTitle').textContent='⛔ '+hit.full_name+' — '+(hit.rejection_type||'مرفوض');
+    G('rejWarnReason').textContent='السبب: '+hit.rejection_reason;
     w.classList.add('show');
   } else {
     w.classList.remove('show');
@@ -2060,33 +2412,48 @@ async function saveReception(){
   if(!nm||!by){ toast('يرجى تعبئة الاسم وسنة التولد','error'); return; }
   load(true);
   try{
-    const{data:dn,error:de}=await db.from('donors').insert({
+    const payload = {
       full_name:nm, birth_year:by, gender:G('rc-gen').value,
       mother_name:G('rc-mom').value.trim()||null,
       national_id:G('rc-nid').value.trim()||null,
       mobile:G('rc-mob').value.trim()||null,
       address:G('rc-addr').value.trim()||null,
       occupation:G('rc-job').value.trim()||null,
-      created_by:SES?.user?.id
-    }).select().single();
-    if(de) throw de;
-
-    const{data:don,error:doe}=await db.from('blood_donations').insert({
-      donor_id:dn.id,
-      bottle_type:'مفلتر',
       donation_type:G('rc-dtype').value,
       patient_name:G('rc-pat').value.trim()||null,
       hospital_name:G('rc-hosp').value.trim()||null,
       donation_date:new Date().toISOString().split('T')[0],
       donation_time:new Date().toTimeString().substring(0,5),
-      status:'pending_draw',
       created_by:SES?.user?.id
-    }).select().single();
-    if(doe) throw doe;
+    };
 
-    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'INSERT',table_name:'blood_donations',record_id:don.id,new_values:{donor:nm,status:'pending_draw'}});
-    toast('✅ تم قبول '+nm+' — أُرسل لوحدة السحب','success',4000);
-    resetReception();
+    if(!IS_ONLINE){
+      // Offline: save to queue
+      await enqueueOp('reception', payload);
+      const q = await getPendingQueue();
+      updateOfflineBar('offline', q.length+' عملية معلّقة');
+      toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً عند عودة الإنترنت','warning',5000);
+      resetReception();
+    } else {
+      // Online: send directly
+      const{data:dn,error:de}=await db.from('donors').insert({
+        full_name:payload.full_name, birth_year:payload.birth_year, gender:payload.gender,
+        mother_name:payload.mother_name, national_id:payload.national_id,
+        mobile:payload.mobile, address:payload.address, occupation:payload.occupation,
+        created_by:payload.created_by
+      }).select().single();
+      if(de) throw de;
+      const{data:don,error:doe}=await db.from('blood_donations').insert({
+        donor_id:dn.id, bottle_type:'مفلتر', donation_type:payload.donation_type,
+        patient_name:payload.patient_name, hospital_name:payload.hospital_name,
+        donation_date:payload.donation_date, donation_time:payload.donation_time,
+        status:'pending_draw', created_by:payload.created_by
+      }).select().single();
+      if(doe) throw doe;
+      await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'INSERT',table_name:'blood_donations',record_id:don.id,new_values:{donor:nm,status:'pending_draw'}});
+      toast('✅ تم قبول '+nm+' — أُرسل لوحدة السحب','success',4000);
+      resetReception();
+    }
   }catch(e){toast('خطأ: '+e.message,'error');}
   finally{load(false);}
 }
@@ -2174,12 +2541,33 @@ async function saveDraw(){
     }).eq('id',id);
     if(error) throw error;
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'pending_lab',bottle:bn,blood_type:bt}});
-    toast('✅ تم حفظ بيانات القنينة — أُرسل للمختبر','success',4000);
-    G('drawModal').classList.remove('on');
-    // Print barcode
-    const{data:don}=await db.from('blood_donations').select('*,donors(full_name,donor_number)').eq('id',id).single();
-    if(don){ BCDATA=don; setTimeout(()=>printBC('full'),300); }
-    await loadDraw();
+    const drawPayload={
+      donation_id:id, blood_type:bt, bottle_type:G('dm-btyp').value,
+      bottle_number:parseInt(bn), draw_date:G('dm-draw').value,
+      expiry_date:G('dm-exp').value
+    };
+
+    if(!IS_ONLINE){
+      await enqueueOp('draw', drawPayload);
+      const q=await getPendingQueue();
+      updateOfflineBar('offline',q.length+' عملية معلّقة');
+      toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً','warning',5000);
+      G('drawModal').classList.remove('on');
+      await loadDraw();
+    } else {
+      const{error}=await db.from('blood_donations').update({
+        blood_type:bt,bottle_type:G('dm-btyp').value,
+        bottle_number:parseInt(bn),draw_date:G('dm-draw').value,
+        expiry_date:G('dm-exp').value,status:'pending_lab',created_by:SES?.user?.id
+      }).eq('id',id);
+      if(error) throw error;
+      await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'pending_lab',bottle:bn,blood_type:bt}});
+      toast('✅ تم حفظ بيانات القنينة — أُرسل للمختبر','success',4000);
+      G('drawModal').classList.remove('on');
+      const{data:don}=await db.from('blood_donations').select('*,donors(full_name,donor_number)').eq('id',id).single();
+      if(don){ BCDATA=don; setTimeout(()=>printBC('full'),300); }
+      await loadDraw();
+    }
   }catch(e){toast('خطأ: '+e.message,'error');}
   finally{load(false);}
 }
@@ -2239,21 +2627,44 @@ async function saveLab(){
     }).eq('id',id);
     if(error) throw error;
 
-    if(ser==='Positive'){
-      // Add to rejected donors
-      const{data:don}=await db.from('blood_donations').select('donors(full_name)').eq('id',id).single();
-      if(don?.donors?.full_name){
-        await db.from('rejected_donors').insert({
-          full_name:don.donors.full_name, rejection_reason:'إصابة: '+G('lm-inf').value,
-          rejection_date:new Date().toISOString().split('T')[0], rejection_type:'دائم',
-          created_by:SES?.user?.id
-        });
-      }
-      toast('⚠️ نتيجة موجبة — تم نقل المتبرع للمرفوضين دائماً','warning',5000);
+    const labPayload={
+      donation_id:id, hemoglobin:parseFloat(G('lm-hgb').value)||null,
+      blood_pressure:G('lm-bp').value.trim()||null, weight:parseFloat(G('lm-wt').value)||null,
+      pulse:parseInt(G('lm-pulse').value)||null, serology_result:ser,
+      serology_type:ser==='Positive'?G('lm-inf').value:null,
+      status:newStatus, donation_date:new Date().toISOString().split('T')[0],
+      created_by:SES?.user?.id
+    };
+
+    if(!IS_ONLINE){
+      await enqueueOp('lab', labPayload);
+      const q=await getPendingQueue();
+      updateOfflineBar('offline',q.length+' عملية معلّقة');
+      toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً','warning',5000);
     } else {
-      toast('✅ نتيجة سالبة — القنينة أُضيفت للخزين','success',4000);
+      const{error}=await db.from('blood_donations').update({
+        hemoglobin:labPayload.hemoglobin, blood_pressure:labPayload.blood_pressure,
+        weight:labPayload.weight, pulse:labPayload.pulse,
+        serology_result:ser, serology_type:labPayload.serology_type, status:newStatus
+      }).eq('id',id);
+      if(error) throw error;
+      if(ser==='Positive'){
+        const{data:don}=await db.from('blood_donations').select('donors(full_name)').eq('id',id).single();
+        if(don?.donors?.full_name){
+          await db.from('rejected_donors').insert({
+            full_name:don.donors.full_name, rejection_reason:'إصابة: '+G('lm-inf').value,
+            rejection_date:new Date().toISOString().split('T')[0], rejection_type:'دائم',
+            created_by:SES?.user?.id
+          });
+          // Update local cache
+          await cacheRejectedDonors();
+        }
+        toast('⚠️ نتيجة موجبة — تم نقل المتبرع للمرفوضين دائماً','warning',5000);
+      } else {
+        toast('✅ نتيجة سالبة — القنينة أُضيفت للخزين','success',4000);
+      }
+      await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:newStatus,serology:ser}});
     }
-    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:newStatus,serology:ser}});
     G('labModal').classList.remove('on');
     await loadLab();
   }catch(e){toast('خطأ: '+e.message,'error');}
@@ -2310,11 +2721,19 @@ async function saveDispatch(){
   const id=G('disp-id').value, hosp=G('disp-hosp').value.trim();
   if(!hosp){ toast('يرجى إدخال اسم المستشفى','error'); return; }
   load(true);
-  const{error}=await db.from('blood_donations').update({status:'dispatched',hospital_name:hosp}).eq('id',id);
-  load(false);
-  if(error){ toast('خطأ: '+error.message,'error'); return; }
-  await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'dispatched',hospital:hosp}});
-  toast('✅ تم صرف القنينة لـ'+hosp,'success');
+  if(!IS_ONLINE){
+    await enqueueOp('supply',{donation_id:id,hospital_name:hosp});
+    const q=await getPendingQueue();
+    updateOfflineBar('offline',q.length+' عملية معلّقة');
+    load(false);
+    toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً','warning',5000);
+  } else {
+    const{error}=await db.from('blood_donations').update({status:'dispatched',hospital_name:hosp}).eq('id',id);
+    load(false);
+    if(error){ toast('خطأ: '+error.message,'error'); return; }
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'dispatched',hospital:hosp}});
+    toast('✅ تم صرف القنينة لـ'+hosp,'success');
+  }
   G('dispModal').classList.remove('on');
   await loadSupply();
 }
@@ -2579,7 +2998,7 @@ function updateHeaderDept(){
   const deptMap = {admin:'الإدارة',reception:'الاستقبال',tech:'السحب',lab:'المختبر',supply:'التجهيز',viewer:'عرض'};
   const dept = deptMap[role] || '—';
   const el = G('ahDept'); if(el) el.textContent = dept;
-  const el2 = G('sfAv'); if(el2) el2.textContent = (UPROF?.full_name||'م').charAt(0);
+  // Also update account screen role in buildAccountScreen (called later)
 }
 
 // ================================================================
@@ -2625,7 +3044,12 @@ function applyMobileLayout(){
 window.addEventListener('resize', applyMobileLayout);
 window.addEventListener('load', ()=>{ appInit(); setTimeout(applyMobileLayout,100); });
 
-// Service Worker removed - app requires internet for Supabase
+// Service Worker — PWA offline support
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./service-worker.js')
+    .then(()=>console.log('[SW] Registered'))
+    .catch(e=>console.log('[SW] Error:',e.message));
+}
 </script>
 
 <!-- ADD USER MODAL -->

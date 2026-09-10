@@ -1,38 +1,69 @@
-// مصرف الدم الرئيسي — واسط | Service Worker v1
-const CACHE = 'wasit-blood-v1';
-const SHELL = [
-  '/WasitBloodbank/',
-  '/WasitBloodbank/index.html'
+// مصرف الدم الرئيسي — واسط | Service Worker v2
+const CACHE = 'bloodbank-wasit-v2';
+
+const CRITICAL = [
+  './',
+  './index.html'
 ];
 
-self.addEventListener('install', e => {
+const OPTIONAL = [
+  './icon.png',
+  './manifest.json'
+];
+
+self.addEventListener('install', e=>{
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())
+    caches.open(CACHE).then(async cache=>{
+      await Promise.all(CRITICAL.map(u=>
+        cache.add(new Request(u, {cache:'reload'}))
+      ));
+      await Promise.all(OPTIONAL.map(u=>
+        cache.add(new Request(u, {cache:'reload'}))
+          .catch(()=>console.log('Optional skipped:', u))
+      ));
+    })
   );
+  self.skipWaiting();
 });
 
-self.addEventListener('activate', e => {
+self.addEventListener('activate', e=>{
   e.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
-      .then(() => self.clients.claim())
+    caches.open(CACHE).then(async newCache=>{
+      const valid = await newCache.match('./index.html');
+      if(valid){
+        const keys = await caches.keys();
+        await Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)));
+      }
+    })
   );
+  self.clients.claim();
 });
 
-self.addEventListener('fetch', e => {
-  // Supabase API — دائماً من الشبكة (لا كاش للبيانات)
-  if (e.request.url.includes('supabase.co') || e.request.url.includes('supabase.io')) {
-    e.respondWith(fetch(e.request));
-    return;
-  }
-  // بقية الطلبات — كاش أولاً ثم شبكة
+self.addEventListener('fetch', e=>{
+  const url = e.request.url;
+
+  // Supabase: always from network
+  if(url.includes('supabase.co') || url.includes('supabase.io')) return;
+
+  // Non-GET: pass through
+  if(e.request.method !== 'GET') return;
+
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request)
-      .then(res => {
-        const clone = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
+    caches.match(e.request).then(cached=>{
+      if(cached) return cached;
+      return fetch(e.request).then(res=>{
+        if(res.ok){
+          const clone = res.clone();
+          caches.open(CACHE).then(c=>c.put(e.request, clone));
+        }
         return res;
-      })
-    )
+      }).catch(async ()=>{
+        if(e.request.mode === 'navigate'){
+          const fallback = await caches.match('./index.html');
+          if(fallback) return fallback;
+        }
+        return new Response('', {status:504, statusText:'Offline'});
+      });
+    })
   );
 });
