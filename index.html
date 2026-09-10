@@ -1451,6 +1451,11 @@ async function nav(name, el){
   if(el) el.classList.add('on');
   G('pgTitle').textContent=TITLES[name]||name;
   closeSb();
+  // Back button: show on all screens except main ones
+  const _noBack=['dashboard','workhome','account'];
+  const _showBack = !_noBack.includes(name);
+  const _bb=G('backBtn'); if(_bb) _bb.classList.toggle('show',_showBack);
+  const _bbm=G('backBtnMob'); if(_bbm) _bbm.classList.toggle('show',_showBack);
   const sbEl=document.querySelector('.sb');
   const pageEl=document.querySelector('.page');
   switch(name){
