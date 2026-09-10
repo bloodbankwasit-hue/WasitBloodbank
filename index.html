@@ -14,6 +14,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
@@ -277,7 +278,7 @@ tbody tr:hover td{background:#fafafa}
   .tb-online span:last-child{display:none}
   
   /* Page padding */
-  .page{padding:10px 12px 150px !important}
+  .page{padding:10px 12px 80px !important}
   
   /* Stats: 2 columns */
   .sg{grid-template-columns:repeat(2,1fr);gap:10px}
@@ -337,17 +338,18 @@ tbody tr:hover td{background:#fafafa}
   display:none;
   position:fixed;bottom:0;left:0;right:0;
   background:#ffffff;
-  border-top:1.5px solid #f0f0f0;
+  border-top:1.5px solid #EEF2F6;
   z-index:4000;
-  padding:8px 4px env(safe-area-inset-bottom,10px);
-  box-shadow:0 -4px 20px rgba(0,0,0,.10);
+  padding:3px 4px env(safe-area-inset-bottom,4px);
+  box-shadow:0 -2px 10px rgba(0,0,0,.07);
   gap:0;
   align-items:center;
+  height:52px;
 }
 .bn-item{
-  flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;
   cursor:pointer;color:#bdbdbd;
-  padding:4px 2px;border:none;background:none;font-family:inherit;
+  padding:2px 2px;border:none;background:none;font-family:inherit;
   -webkit-tap-highlight-color:transparent;
   transition:all .15s;min-width:0;position:relative;
 }
@@ -419,7 +421,7 @@ tbody tr:hover td{background:#fafafa}
 .ptb-title{font-size:13.5px;font-weight:700;color:#1E293B}
 
 /* 3-TAB BOTTOM NAV */
-.bn-icon{font-size:26px;display:block;line-height:1.1}
+.bn-icon{font-size:22px;display:block;line-height:1.1}
 .bn-lbl{font-size:10px;display:block;margin-top:3px;font-weight:600}
 
 /* WORK HOME GRID */
@@ -461,7 +463,7 @@ tbody tr:hover td{background:#fafafa}
   .page-title-bar{display:none}
   .ah-top{padding:11px 14px 8px}
   .ah-user{margin:0 12px 10px}
-  .page{padding:12px 12px 130px !important}
+  .page{padding:12px 12px 80px !important}
 }
 @media(min-width:769px){
   .app-header{display:none}
@@ -1235,20 +1237,221 @@ document.addEventListener('click',e=>{
 // ================================================================
 let _lastDonation = null; // Store last saved donation for printing
 
-function printViaIframe(html){
-  let frame = document.getElementById('printFrame');
-  if(frame) frame.remove();
-  frame = document.createElement('iframe');
-  frame.id = 'printFrame';
-  frame.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;border:0';
-  document.body.appendChild(frame);
-  const doc = frame.contentWindow.document;
-  doc.open(); doc.write(html); doc.close();
-  setTimeout(()=>{
-    try{ frame.contentWindow.focus(); frame.contentWindow.print(); }
-    catch(e){ toast('تعذرت الطباعة','error'); }
-  }, 400);
+// ================================================================
+// FILE SHARE / DOWNLOAD (same as electricity app)
+// ================================================================
+async function shareOrDownloadFile(blob, filename, mimeType){
+  try{
+    const file = new File([blob], filename, {type: mimeType});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:filename});
+      return;
+    }
+  }catch(err){
+    if(err && err.name==='AbortError') return;
+  }
+  // Fallback: direct download
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
+
+// ================================================================
+// PDF GENERATION — jsPDF (same approach as electricity app)
+// ================================================================
+function buildDonorFormCanvas(d){
+  return new Promise(resolve=>{
+    const W=595, H=842; // A4 in points
+    const canvas = document.createElement('canvas');
+    canvas.width=W*2; canvas.height=H*2;
+    const ctx = canvas.getContext('2d');
+    const sc=2;
+    ctx.scale(sc,sc);
+    ctx.fillStyle='#fff';
+    ctx.fillRect(0,0,W,H);
+
+    // Border
+    ctx.strokeStyle='#000'; ctx.lineWidth=1.5;
+    ctx.strokeRect(10,10,W-20,H-20);
+
+    // Header
+    ctx.fillStyle='#000';
+    ctx.font='bold 14px Arial';
+    ctx.textAlign='center';
+    ctx.fillText('شعبة مصرف الدم الرئيسي — واسط',W/2,35);
+    ctx.font='11px Arial';
+    ctx.fillStyle='#444';
+    ctx.fillText('وزارة الصحة / دائرة صحة واسط / قسم الأمور الفنية',W/2,52);
+    ctx.font='bold 11px Arial';
+    ctx.fillText('Blood Donor Questionnaire',W/2,68);
+
+    // Divider
+    ctx.strokeStyle='#000'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(15,78); ctx.lineTo(W-15,78); ctx.stroke();
+
+    // Barcode area (right side)
+    ctx.strokeStyle='#000'; ctx.lineWidth=1;
+    ctx.strokeRect(W-120,15,100,70);
+    // Draw simple barcode lines
+    const bn = String(d.bottle_number||'0').padStart(8,'0');
+    let bx = W-115;
+    for(let i=0;i<bn.length;i++){
+      const digit=parseInt(bn[i]);
+      const bw=2+(digit%3);
+      ctx.fillStyle='#000';
+      ctx.fillRect(bx,22,bw,45);
+      bx+=bw+(1+digit%2);
+    }
+    ctx.font='bold 10px monospace';
+    ctx.textAlign='center';
+    ctx.fillStyle='#000';
+    ctx.fillText(bn,W-70,72);
+
+    // Info rows
+    const rows=[
+      ['الاسم الكامل', d.donor_name||'—', 'رقم القنينة', d.bottle_number||'—'],
+      ['التاريخ', d.donation_date||'—', 'الوقت', d.donation_time||'—'],
+      ['سنة الميلاد', d.birth_year||'—', 'العمر', d.birth_year?new Date().getFullYear()-d.birth_year+'':'—'],
+      ['الجنس', d.gender||'—', 'نوع التبرع', d.donation_type||'—'],
+      ['رقم الهاتف', d.mobile||'—', 'رقم البطاقة', d.national_id||'—'],
+      ['نوع القنينة', d.bottle_type||'—', 'العنوان', d.address||'—'],
+    ];
+
+    let ry=90;
+    const colW=W/2-15;
+    rows.forEach(row=>{
+      // Left cell
+      ctx.strokeStyle='#ccc'; ctx.lineWidth=0.7;
+      ctx.strokeRect(15,ry,colW,22);
+      ctx.strokeRect(15+colW,ry,colW,22);
+      ctx.font='bold 9px Arial'; ctx.textAlign='right'; ctx.fillStyle='#555';
+      ctx.fillText(row[0]+':', 15+colW-5, ry+14);
+      ctx.font='10px Arial'; ctx.textAlign='left'; ctx.fillStyle='#000';
+      ctx.fillText(row[1], 22, ry+14);
+      ctx.font='bold 9px Arial'; ctx.textAlign='right'; ctx.fillStyle='#555';
+      ctx.fillText(row[2]+':', W-20, ry+14);
+      ctx.font='10px Arial'; ctx.textAlign='left'; ctx.fillStyle='#000';
+      ctx.fillText(row[3], 15+colW+5, ry+14);
+      ry+=22;
+    });
+
+    // Questionnaire section
+    ry+=8;
+    ctx.fillStyle='#f0f0f0';
+    ctx.fillRect(15,ry,W-30,18);
+    ctx.font='bold 10px Arial'; ctx.textAlign='center'; ctx.fillStyle='#000';
+    ctx.fillText('استبيان ما قبل التبرع — Pre-Donation Questionnaire',W/2,ry+12);
+    ry+=22;
+
+    const qs=[
+      'هل أنت بصحة جيدة اليوم؟','هل نمت جيداً الليلة الماضية؟',
+      'هل تناولت وجبة قبل التبرع؟','هل تعاني من مرض مزمن؟',
+      'هل تناولت أدوية خلال الأسبوع الماضي؟','هل سبق لك التبرع بالدم؟',
+      'هل تبرعت خلال الثلاثة أشهر الماضية؟','هل لديك أي أعراض حالية؟',
+    ];
+    qs.forEach((q,i)=>{
+      const qy=ry+(i*22);
+      ctx.strokeStyle='#ddd'; ctx.lineWidth=0.5;
+      ctx.strokeRect(15,qy,W-30,20);
+      ctx.font='10px Arial'; ctx.textAlign='right'; ctx.fillStyle='#000';
+      ctx.fillText(q, W-25, qy+13);
+      // Yes/No boxes
+      ctx.strokeStyle='#000'; ctx.lineWidth=1;
+      ctx.strokeRect(50,qy+4,12,12);
+      ctx.font='9px Arial'; ctx.textAlign='right'; ctx.fillStyle='#000';
+      ctx.fillText('نعم',80,qy+13);
+      ctx.strokeRect(90,qy+4,12,12);
+      ctx.fillText('لا',115,qy+13);
+    });
+
+    // Signatures
+    const sigY=H-70;
+    ctx.strokeStyle='#000'; ctx.lineWidth=0.8;
+    ctx.beginPath(); ctx.moveTo(15,sigY); ctx.lineTo(W-15,sigY); ctx.stroke();
+    ctx.font='9px Arial'; ctx.fillStyle='#333';
+    const sigs=['توقيع المتبرع','توقيع الموظف','الختم الرسمي'];
+    sigs.forEach((s,i)=>{
+      const sx=15+i*(W/3);
+      ctx.textAlign='right';
+      ctx.fillText(s,sx+(W/3)-10,sigY+15);
+      ctx.strokeRect(sx+10,sigY+20,W/3-20,30);
+    });
+
+    resolve({
+      dataUrl: canvas.toDataURL('image/jpeg',0.92),
+      w:W, h:H
+    });
+  });
+}
+
+async function printDonorForm(){
+  const d=_lastDonation;
+  if(!d){toast('لا توجد بيانات للطباعة','error');return;}
+  toast('⏳ جاري تجهيز الاستمارة...','warning',2000);
+  try{
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'pt',format:'a4',compress:true});
+    const card=await buildDonorFormCanvas(d);
+    doc.addImage(card.dataUrl,'JPEG',0,0,595,842);
+    const blob=doc.output('blob');
+    const fname='استمارة_متبرع_'+d.donor_name+'_'+d.donation_date+'.pdf';
+    await shareOrDownloadFile(blob,fname,'application/pdf');
+    toast('✅ تم تجهيز الاستمارة','success');
+  }catch(e){
+    console.error(e);
+    toast('تعذر تجهيز PDF: '+e.message,'error');
+  }
+}
+
+async function printBottleSticker(){
+  const d=_lastDonation;
+  if(!d){toast('لا توجد بيانات للطباعة','error');return;}
+  toast('⏳ جاري تجهيز الملصق...','warning',2000);
+  try{
+    const {jsPDF}=window.jspdf;
+    // Label size: 100x60mm = ~283x170 pt
+    const doc=new jsPDF({orientation:'landscape',unit:'mm',format:[60,100],compress:true});
+    const W=100,H=60;
+    const canvas=document.createElement('canvas');
+    canvas.width=W*4; canvas.height=H*4;
+    const ctx=canvas.getContext('2d');
+    ctx.scale(4,4);
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle='#000'; ctx.lineWidth=0.8;
+    ctx.strokeRect(1,1,W-2,H-2);
+    // Name
+    ctx.font='bold 8px Arial'; ctx.textAlign='center'; ctx.fillStyle='#000';
+    ctx.fillText(d.donor_name||'—',W/2,12);
+    ctx.beginPath(); ctx.moveTo(3,15); ctx.lineTo(W-3,15); ctx.stroke();
+    // Bottle number
+    ctx.font='bold 20px monospace'; ctx.textAlign='center';
+    ctx.fillText(String(d.bottle_number||'—'),W/2,36);
+    // Dates
+    ctx.strokeRect(3,40,46,16);
+    ctx.strokeRect(51,40,46,16);
+    ctx.font='bold 6px Arial'; ctx.textAlign='center'; ctx.fillStyle='#555';
+    ctx.fillText('تاريخ السحب',26,47);
+    ctx.fillText('تاريخ النفاد',74,47);
+    ctx.font='bold 7px Arial'; ctx.fillStyle='#000';
+    ctx.fillText(d.donation_date||'—',26,54);
+    ctx.fillText(d.expiry_date||'—',74,54);
+
+    const img=canvas.toDataURL('image/jpeg',0.95);
+    doc.addImage(img,'JPEG',0,0,W,H);
+    const blob=doc.output('blob');
+    const fname='ملصق_'+d.bottle_number+'_'+d.donor_name+'.pdf';
+    await shareOrDownloadFile(blob,fname,'application/pdf');
+    toast('✅ تم تجهيز الملصق','success');
+  }catch(e){
+    console.error(e);
+    toast('تعذر تجهيز الملصق: '+e.message,'error');
+  }
+}
+
+
 
 function printDonorForm(){
   const d = _lastDonation;
@@ -1901,7 +2104,7 @@ async function loadDash(){
         <td>${N(r.blood_type)}</td>
         <td><span class="pill ${r.donation_type==='طوعي'?'pg':'py'}">${r.donation_type}</span></td>
         <td>${ft(r.donation_time)}</td>
-        <td><span class="pill ${r.serology_result==='Negative'?'pg':'pr'}">${r.serology_result==='Negative'?'سالبة':'موجبة'}</span></td>
+        <td><span class="pill ${r.r.serology_result==='Negative'?'pg':r.serology_result==='Positive'?'pr':'py'}">${r.serology_result==='Negative'?'سالبة ✅':r.serology_result==='Positive'?'موجبة ⚠️':'لم يُفحص'}</span></td>
       </tr>`).join('')}</tbody></table></div>`;
     } else {
       G('recentTbl').innerHTML='<div class="empty"><i class="ti ti-clock"></i><p>لا توجد تبرعات اليوم حتى الآن</p></div>';
@@ -2046,7 +2249,7 @@ function printForm(){
 .ptb-title{font-size:13.5px;font-weight:700;color:#1E293B}
 
 /* 3-TAB BOTTOM NAV */
-.bn-icon{font-size:26px;display:block;line-height:1.1}
+.bn-icon{font-size:22px;display:block;line-height:1.1}
 .bn-lbl{font-size:10px;display:block;margin-top:3px;font-weight:600}
 
 /* WORK HOME GRID */
@@ -2088,7 +2291,7 @@ function printForm(){
   .page-title-bar{display:none}
   .ah-top{padding:11px 14px 8px}
   .ah-user{margin:0 12px 10px}
-  .page{padding:12px 12px 130px !important}
+  .page{padding:12px 12px 80px !important}
 }
 @media(min-width:769px){
   .app-header{display:none}
@@ -2248,7 +2451,7 @@ async function loadDonors(page=1){
           <td><span class="pill ${r.donation_type==='طوعي'?'pg':'py'}">${r.donation_type}</span></td>
           <td>${fd(r.donation_date)}</td>
           <td style="color:${exp?'#BE123C':'inherit'}">${fd(r.expiry_date)}${exp?' ⚠':''}</td>
-          <td><span class="pill ${r.serology_result==='Negative'?'pg':'pr'}">${r.serology_result==='Negative'?'سالبة':'موجبة'}</span></td>
+          <td><span class="pill ${r.r.serology_result==='Negative'?'pg':r.serology_result==='Positive'?'pr':'py'}">${r.serology_result==='Negative'?'سالبة ✅':r.serology_result==='Positive'?'موجبة ⚠️':'لم يُفحص'}</span></td>
           <td><button class="ibtn" onclick="openBC(${r.bottle_number})" title="باركود"><i class="ti ti-barcode"></i></button></td>
         </tr>`;}).join('')}</tbody></table></div>`;
       const tp=Math.ceil(count/PS);
@@ -2319,7 +2522,7 @@ async function doSearch(){
         <td style="font-weight:700;color:#BE123C">${r.bottle_number}</td>
         <td><span class="pill ${r.donation_type==='طوعي'?'pg':'py'}">${r.donation_type}</span></td>
         <td>${fd(r.donation_date)}</td><td>${fd(r.expiry_date)}</td>
-        <td><span class="pill ${r.serology_result==='Negative'?'pg':'pr'}">${r.serology_result==='Negative'?'سالبة':'موجبة'}</span></td>
+        <td><span class="pill ${r.r.serology_result==='Negative'?'pg':r.serology_result==='Positive'?'pr':'py'}">${r.serology_result==='Negative'?'سالبة ✅':r.serology_result==='Positive'?'موجبة ⚠️':'لم يُفحص'}</span></td>
         <td><button class="ibtn" onclick="openBC(${r.bottle_number})"><i class="ti ti-barcode"></i></button></td>
       </tr>`).join('')}</tbody></table></div>`;
     } else {
@@ -2418,7 +2621,7 @@ function printBC(type){
 .ptb-title{font-size:13.5px;font-weight:700;color:#1E293B}
 
 /* 3-TAB BOTTOM NAV */
-.bn-icon{font-size:26px;display:block;line-height:1.1}
+.bn-icon{font-size:22px;display:block;line-height:1.1}
 .bn-lbl{font-size:10px;display:block;margin-top:3px;font-weight:600}
 
 /* WORK HOME GRID */
@@ -2460,7 +2663,7 @@ function printBC(type){
   .page-title-bar{display:none}
   .ah-top{padding:11px 14px 8px}
   .ah-user{margin:0 12px 10px}
-  .page{padding:12px 12px 130px !important}
+  .page{padding:12px 12px 80px !important}
 }
 @media(min-width:769px){
   .app-header{display:none}
@@ -2755,7 +2958,7 @@ function printStats(){
 .ptb-title{font-size:13.5px;font-weight:700;color:#1E293B}
 
 /* 3-TAB BOTTOM NAV */
-.bn-icon{font-size:26px;display:block;line-height:1.1}
+.bn-icon{font-size:22px;display:block;line-height:1.1}
 .bn-lbl{font-size:10px;display:block;margin-top:3px;font-weight:600}
 
 /* WORK HOME GRID */
@@ -2797,7 +3000,7 @@ function printStats(){
   .page-title-bar{display:none}
   .ah-top{padding:11px 14px 8px}
   .ah-user{margin:0 12px 10px}
-  .page{padding:12px 12px 130px !important}
+  .page{padding:12px 12px 80px !important}
 }
 @media(min-width:769px){
   .app-header{display:none}
