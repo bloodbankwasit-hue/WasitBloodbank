@@ -1390,65 +1390,98 @@ function buildDonorFormCanvas(d){
 async function printDonorForm(){
   const d=_lastDonation;
   if(!d){toast('لا توجد بيانات للطباعة','error');return;}
-  toast('⏳ جاري تجهيز الاستمارة...','warning',2000);
-  try{
-    const {jsPDF}=window.jspdf;
-    const doc=new jsPDF({orientation:'portrait',unit:'pt',format:'a4',compress:true});
-    const card=await buildDonorFormCanvas(d);
-    doc.addImage(card.dataUrl,'JPEG',0,0,595,842);
-    const blob=doc.output('blob');
-    const fname='استمارة_متبرع_'+d.donor_name+'_'+d.donation_date+'.pdf';
-    await shareOrDownloadFile(blob,fname,'application/pdf');
-    toast('✅ تم تجهيز الاستمارة','success');
-  }catch(e){
-    console.error(e);
-    toast('تعذر تجهيز PDF: '+e.message,'error');
-  }
+  const html=`<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>استمارة متبرع</title>
+<style>
+@page{size:A4;margin:12mm}
+*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
+body{color:#000;background:#fff;font-size:11pt}
+.wrap{border:2px solid #000;padding:10px;min-height:260mm}
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:10px}
+.hdr-t h2{font-size:13pt;font-weight:bold;margin-bottom:3px}
+.hdr-t p{font-size:9pt;color:#444}
+.hdr-t .en{font-size:10pt;font-weight:bold;margin-top:2px}
+.bc-box{border:1.5px solid #000;padding:8px 12px;text-align:center;border-radius:4px}
+.bc-num{font-size:18pt;font-weight:bold;letter-spacing:2px}
+.grid{display:grid;grid-template-columns:1fr 1fr;border:1.5px solid #000;margin-bottom:8px}
+.cell{padding:5px 8px;border-bottom:1px solid #ccc;border-right:1px solid #ccc}
+.cell:nth-child(odd){border-right:none}
+.lbl{font-size:8.5pt;font-weight:bold;color:#555;margin-bottom:2px}
+.val{font-size:10.5pt;font-weight:bold}
+.q-hdr{background:#f0f0f0;padding:5px 8px;font-weight:bold;font-size:10pt;border:1.5px solid #000;border-bottom:none;margin-top:8px}
+.q-wrap{border:1.5px solid #000;padding:4px}
+.q{display:flex;align-items:center;justify-content:space-between;padding:4px 6px;border-bottom:1px dotted #ddd;font-size:9.5pt}
+.q:last-child{border-bottom:none}
+.boxes{display:flex;gap:12px;flex-shrink:0}
+.box{width:13px;height:13px;border:1.5px solid #000;display:inline-block}
+.sigs{display:flex;justify-content:space-between;margin-top:10px;border-top:1.5px solid #000;padding-top:6px;font-size:9pt}
+.sig-line{border-bottom:1px solid #000;width:110px;height:28px}
+</style></head><body>
+<div class="wrap">
+<div class="hdr">
+  <div class="hdr-t">
+    <h2>شعبة مصرف الدم الرئيسي — واسط</h2>
+    <p>وزارة الصحة / دائرة صحة واسط / قسم الأمور الفنية</p>
+    <div class="en">Blood Donor Questionnaire</div>
+  </div>
+  <div class="bc-box">
+    <div class="bc-num">${d.bottle_number||'—'}</div>
+    <div style="font-size:8pt;margin-top:3px">رقم القنينة</div>
+  </div>
+</div>
+<div class="grid">
+  <div class="cell"><div class="lbl">الاسم الكامل</div><div class="val">${d.donor_name||'—'}</div></div>
+  <div class="cell"><div class="lbl">نوع القنينة</div><div class="val">${d.bottle_type||'—'}</div></div>
+  <div class="cell"><div class="lbl">تاريخ التبرع</div><div class="val">${d.donation_date||'—'}</div></div>
+  <div class="cell"><div class="lbl">الوقت</div><div class="val">${d.donation_time||'—'}</div></div>
+  <div class="cell"><div class="lbl">سنة الميلاد</div><div class="val">${d.birth_year||'—'}</div></div>
+  <div class="cell"><div class="lbl">العمر</div><div class="val">${d.birth_year?new Date().getFullYear()-d.birth_year:'—'} سنة</div></div>
+  <div class="cell"><div class="lbl">الجنس</div><div class="val">${d.gender||'—'}</div></div>
+  <div class="cell"><div class="lbl">نوع التبرع</div><div class="val">${d.donation_type||'—'}</div></div>
+  <div class="cell"><div class="lbl">رقم الهاتف</div><div class="val">${d.mobile||'—'}</div></div>
+  <div class="cell"><div class="lbl">رقم البطاقة الوطنية</div><div class="val">${d.national_id||'—'}</div></div>
+  <div class="cell"><div class="lbl">فصيلة الدم</div><div class="val">${d.blood_type||'—'}</div></div>
+  <div class="cell"><div class="lbl">العنوان</div><div class="val">${d.address||'—'}</div></div>
+</div>
+<div class="q-hdr">استبيان ما قبل التبرع — Pre-Donation Questionnaire</div>
+<div class="q-wrap">
+${['هل أنت بصحة جيدة اليوم؟','هل نمت جيداً الليلة الماضية؟','هل تناولت وجبة قبل التبرع؟','هل تعاني من مرض مزمن؟','هل تناولت أدوية خلال الأسبوع الماضي؟','هل سبق لك التبرع بالدم؟','هل تبرعت خلال الثلاثة أشهر الماضية؟','هل لديك أعراض حالية (حمى، سعال...)?'].map(q=>`<div class="q"><span>${q}</span><div class="boxes"><span class="box"></span>نعم &nbsp;<span class="box"></span>لا</div></div>`).join('')}
+</div>
+<div class="sigs">
+  <div>توقيع المتبرع<div class="sig-line"></div></div>
+  <div>توقيع الموظف<div class="sig-line"></div></div>
+  <div>الختم الرسمي<div class="sig-line"></div></div>
+</div>
+</div></body></html>`;
+  printViaIframe(html);
 }
 
 async function printBottleSticker(){
   const d=_lastDonation;
   if(!d){toast('لا توجد بيانات للطباعة','error');return;}
-  toast('⏳ جاري تجهيز الملصق...','warning',2000);
-  try{
-    const {jsPDF}=window.jspdf;
-    // Label size: 100x60mm = ~283x170 pt
-    const doc=new jsPDF({orientation:'landscape',unit:'mm',format:[60,100],compress:true});
-    const W=100,H=60;
-    const canvas=document.createElement('canvas');
-    canvas.width=W*4; canvas.height=H*4;
-    const ctx=canvas.getContext('2d');
-    ctx.scale(4,4);
-    ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
-    ctx.strokeStyle='#000'; ctx.lineWidth=0.8;
-    ctx.strokeRect(1,1,W-2,H-2);
-    // Name
-    ctx.font='bold 8px Arial'; ctx.textAlign='center'; ctx.fillStyle='#000';
-    ctx.fillText(d.donor_name||'—',W/2,12);
-    ctx.beginPath(); ctx.moveTo(3,15); ctx.lineTo(W-3,15); ctx.stroke();
-    // Bottle number
-    ctx.font='bold 20px monospace'; ctx.textAlign='center';
-    ctx.fillText(String(d.bottle_number||'—'),W/2,36);
-    // Dates
-    ctx.strokeRect(3,40,46,16);
-    ctx.strokeRect(51,40,46,16);
-    ctx.font='bold 6px Arial'; ctx.textAlign='center'; ctx.fillStyle='#555';
-    ctx.fillText('تاريخ السحب',26,47);
-    ctx.fillText('تاريخ النفاد',74,47);
-    ctx.font='bold 7px Arial'; ctx.fillStyle='#000';
-    ctx.fillText(d.donation_date||'—',26,54);
-    ctx.fillText(d.expiry_date||'—',74,54);
-
-    const img=canvas.toDataURL('image/jpeg',0.95);
-    doc.addImage(img,'JPEG',0,0,W,H);
-    const blob=doc.output('blob');
-    const fname='ملصق_'+d.bottle_number+'_'+d.donor_name+'.pdf';
-    await shareOrDownloadFile(blob,fname,'application/pdf');
-    toast('✅ تم تجهيز الملصق','success');
-  }catch(e){
-    console.error(e);
-    toast('تعذر تجهيز الملصق: '+e.message,'error');
-  }
+  const html=`<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>ملصق قنينة</title>
+<style>
+@page{size:100mm 60mm;margin:2mm}
+*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
+body{width:96mm;height:56mm;background:#fff}
+.sticker{border:2px solid #000;padding:6px 8px;width:100%;height:100%;display:flex;flex-direction:column;justify-content:space-between}
+.name{font-size:11pt;font-weight:bold;text-align:center;border-bottom:1px solid #000;padding-bottom:4px}
+.num{font-size:26pt;font-weight:bold;text-align:center;letter-spacing:3px;padding:4px 0}
+.dates{display:flex;gap:4px}
+.date-box{flex:1;border:1px solid #000;padding:3px 5px;border-radius:3px}
+.date-lbl{font-size:7pt;color:#555}
+.date-val{font-size:9.5pt;font-weight:bold}
+</style></head><body>
+<div class="sticker">
+  <div class="name">${d.donor_name||'—'}</div>
+  <div class="num">${d.bottle_number||'—'}</div>
+  <div class="dates">
+    <div class="date-box"><div class="date-lbl">تاريخ السحب</div><div class="date-val">${d.donation_date||'—'}</div></div>
+    <div class="date-box"><div class="date-lbl">تاريخ النفاد</div><div class="date-val">${d.expiry_date||'—'}</div></div>
+  </div>
+</div></body></html>`;
+  printViaIframe(html);
 }
 
 
