@@ -1299,17 +1299,27 @@ async function loadProf(){
     setTimeout(()=>toast('هذا الحساب معطّل أو غير مسجّل. تواصل مع مدير النظام.','error'),400);
     return;
   }
-  G('sfName').textContent=data.full_name;
-  G('sfAv').textContent=data.full_name.charAt(0);
-  const rl={admin:'مدير النظام',tech:'فني مختبر',reception:'موظف استقبال',viewer:'عرض فقط'};
-  G('sfRole').textContent=rl[data.role]||data.role;
-  G('navUsers').style.display=data.role==='admin'?'flex':'none';
+  const _nm = data.full_name || 'مستخدم';
+  const _av = _nm.charAt(0);
+  const _rl = {admin:'مدير النظام',tech:'فني سحب',reception:'موظف استقبال',lab:'فني مختبر',supply:'موظف تجهيز',viewer:'عرض فقط'};
+  const _dept = {admin:'الإدارة',reception:'الاستقبال',tech:'السحب',lab:'المختبر',supply:'التجهيز',viewer:'عرض'}[data.role]||'—';
+  // Sidebar
+  G('sfName').textContent = _nm;
+  G('sfAv').textContent   = _av;
+  G('sfRole').textContent = _nm;
+  G('navUsers').style.display = data.role==='admin'?'flex':'none';
+  // New header
+  if(G('ahName')) G('ahName').textContent = _nm;
+  if(G('ahAv'))   G('ahAv').textContent   = _av;
+  if(G('ahRole')) G('ahRole').textContent = _rl[data.role]||data.role;
+  if(G('ahDept')) G('ahDept').textContent = _dept;
   configureRoleUI(data.role);
 }
 
 // Map: permission key → nav element id
 const PERM_NAV = {
   dashboard:  'navDashboard',
+  add:        'navAdd',
   reception:  'navReception',
   draw:       'navDraw',
   lab:        'navLab',
@@ -1358,7 +1368,7 @@ function setupNavVisibility(isAdmin, perms){
     }
     // For admin: ensure all items explicitly shown
     if(actualAdmin){
-      ['navDashboard','navReception','navDraw','navLab','navSupply',
+      ['navDashboard','navAdd','navReception','navDraw','navLab','navSupply',
        'navDonors','navSearch','navBarcode','navInfected','navRejected',
        'navRare','navStats','navAudit','navSettings','navUsers'].forEach(id=>{
         const el=G(id); if(el) el.style.display='flex';
@@ -2997,8 +3007,7 @@ function updateHeaderDept(){
   const role = UPROF?.role;
   const deptMap = {admin:'الإدارة',reception:'الاستقبال',tech:'السحب',lab:'المختبر',supply:'التجهيز',viewer:'عرض'};
   const dept = deptMap[role] || '—';
-  const el = G('ahDept'); if(el) el.textContent = dept;
-  // Also update account screen role in buildAccountScreen (called later)
+  if(G('ahDept')) G('ahDept').textContent = dept;
 }
 
 // ================================================================
