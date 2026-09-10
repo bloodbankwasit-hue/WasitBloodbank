@@ -501,6 +501,21 @@ tbody tr:hover td{background:#fafafa}
 }
 .back-btn.show{display:flex}
 .back-btn-icon{font-size:18px}
+
+/* ═══ BOTTLE SEQUENCES ═══ */
+.seq-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.seq-card{background:#fff;border-radius:14px;padding:14px;border:1.5px solid #EEF2F6;position:relative}
+.seq-card.active{border-color:#BE123C}
+.seq-type{font-size:12px;font-weight:700;color:#1E293B;margin-bottom:6px}
+.seq-num{font-size:22px;font-weight:800;color:#BE123C;line-height:1}
+.seq-range{font-size:10px;color:#94A3B8;margin-top:3px}
+.seq-remain{font-size:10px;font-weight:600;margin-top:4px}
+.seq-remain.ok{color:#16A34A}
+.seq-remain.warn{color:#D97706}
+.seq-remain.danger{color:#DC2626}
+.seq-edit{position:absolute;top:8px;left:8px;background:#FFF1F2;border:none;border-radius:8px;padding:4px 8px;font-size:11px;color:#BE123C;cursor:pointer;font-family:inherit;font-weight:600}
+.seq-add-btn{width:100%;padding:12px;background:#BE123C;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px}
+.seq-add-btn:active{background:#9F1239}
 @media print{
   .sidebar,.topbar,.abar,.pag,#loader,#toastBox,.overlay{display:none!important}
   .content{overflow:visible}
@@ -827,6 +842,14 @@ tbody tr:hover td{background:#fafafa}
 
       <!-- SETTINGS -->
       <div class="sc" id="s-settings">
+        <!-- BOTTLE SEQUENCES MANAGEMENT -->
+        <div class="sh"><div class="sh-t">💉 تسلسلات القناني</div></div>
+        <button class="seq-add-btn" onclick="openAddSeqModal()">➕ إضافة تسلسل جديد</button>
+        <div class="seq-grid" id="seqGrid">
+          <div class="empty"><p>جاري التحميل...</p></div>
+        </div>
+        <div style="height:1px;background:#EEF2F6;margin:16px 0"></div>
+        <div class="sh"><div class="sh-t">⚙️ إعدادات النظام</div></div>
         <div class="setg">
           <div class="setc" onclick="nav('audit',document.querySelector('.ni'))">
             <div class="setc-ico"><i class="ti ti-shield-lock"></i></div>
@@ -903,11 +926,26 @@ tbody tr:hover td{background:#fafafa}
           </div>
         </div>
         <div class="fsec">
-          <div class="fst"><i class="ti ti-droplet"></i> نوع التبرع</div>
+          <div class="fst"><i class="ti ti-droplet"></i> بيانات القنينة والتبرع</div>
           <div class="fgrid">
+            <div class="fgrp"><label>نوع القنينة *</label>
+              <select id="rc-btype" onchange="fetchNextBN()">
+                <option value="">اختر نوع القنينة</option>
+                <option value="مفلتر">مفلتر</option>
+                <option value="ريفيوس">ريفيوس</option>
+                <option value="رباعي SAG">رباعي SAG</option>
+                <option value="رباعي">رباعي</option>
+                <option value="TREMA صفائح">TREMA صفائح</option>
+                <option value="TREMA دم">TREMA دم</option>
+                <option value="أحادي">أحادي</option>
+              </select>
+            </div>
+            <div class="fgrp"><label>رقم القنينة (تلقائي)</label>
+              <input type="text" id="rc-bnum" class="ro" readonly placeholder="اختر النوع أولاً" style="background:#f0f9ff;color:#0F766E;font-weight:700;font-size:16px">
+            </div>
             <div class="fgrp"><label>نوع التبرع *</label><select id="rc-dtype" onchange="toggleRcPat()"><option value="تعويضي">تعويضي</option><option value="طوعي">طوعي</option></select></div>
             <div class="fgrp" id="rc-pat-grp"><label>اسم المريض</label><input type="text" id="rc-pat" placeholder="اسم المريض"></div>
-            <div class="fgrp" id="rc-hosp-grp"><label>اسم المستشفى</label><input type="text" id="rc-hosp" placeholder="المستشفى"></div>
+            <div class="fgrp s2" id="rc-hosp-grp"><label>اسم المستشفى</label><input type="text" id="rc-hosp" placeholder="المستشفى"></div>
           </div>
         </div>
         <button class="btn-action" onclick="saveReception()">✅ تأكيد القبول وإرسال للسحب</button>
@@ -1467,7 +1505,8 @@ async function nav(name, el){
     case 'rejected':await loadRejected(); break;
     case 'rare':    await loadRareGrid(); break;
     case 'add':     await loadNextBN(); break;
-    case 'audit':   await loadAudit(); break;
+    case 'audit':    await loadAudit(); break;
+    case 'settings':  await loadSeqGrid(); break;
     case 'users':      await loadUsers(); break;
     case 'reception':  setupReception(); break;
     case 'draw':       await loadDraw(); break;
@@ -1742,6 +1781,21 @@ function printForm(){
 }
 .back-btn.show{display:flex}
 .back-btn-icon{font-size:18px}
+
+/* ═══ BOTTLE SEQUENCES ═══ */
+.seq-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.seq-card{background:#fff;border-radius:14px;padding:14px;border:1.5px solid #EEF2F6;position:relative}
+.seq-card.active{border-color:#BE123C}
+.seq-type{font-size:12px;font-weight:700;color:#1E293B;margin-bottom:6px}
+.seq-num{font-size:22px;font-weight:800;color:#BE123C;line-height:1}
+.seq-range{font-size:10px;color:#94A3B8;margin-top:3px}
+.seq-remain{font-size:10px;font-weight:600;margin-top:4px}
+.seq-remain.ok{color:#16A34A}
+.seq-remain.warn{color:#D97706}
+.seq-remain.danger{color:#DC2626}
+.seq-edit{position:absolute;top:8px;left:8px;background:#FFF1F2;border:none;border-radius:8px;padding:4px 8px;font-size:11px;color:#BE123C;cursor:pointer;font-family:inherit;font-weight:600}
+.seq-add-btn{width:100%;padding:12px;background:#BE123C;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px}
+.seq-add-btn:active{background:#9F1239}
 @media print{@page{margin:10mm}}</style></head><body>
   <div class="hdr">
     <div class="en">Ministry of Health<br>Wasit Health Directorate<br>Technical Affairs Dept.<br><strong>Blood Donor Questionnaire</strong></div>
@@ -2070,6 +2124,21 @@ function printBC(type){
 }
 .back-btn.show{display:flex}
 .back-btn-icon{font-size:18px}
+
+/* ═══ BOTTLE SEQUENCES ═══ */
+.seq-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.seq-card{background:#fff;border-radius:14px;padding:14px;border:1.5px solid #EEF2F6;position:relative}
+.seq-card.active{border-color:#BE123C}
+.seq-type{font-size:12px;font-weight:700;color:#1E293B;margin-bottom:6px}
+.seq-num{font-size:22px;font-weight:800;color:#BE123C;line-height:1}
+.seq-range{font-size:10px;color:#94A3B8;margin-top:3px}
+.seq-remain{font-size:10px;font-weight:600;margin-top:4px}
+.seq-remain.ok{color:#16A34A}
+.seq-remain.warn{color:#D97706}
+.seq-remain.danger{color:#DC2626}
+.seq-edit{position:absolute;top:8px;left:8px;background:#FFF1F2;border:none;border-radius:8px;padding:4px 8px;font-size:11px;color:#BE123C;cursor:pointer;font-family:inherit;font-weight:600}
+.seq-add-btn{width:100%;padding:12px;background:#BE123C;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px}
+.seq-add-btn:active{background:#9F1239}
 @media print{@page{margin:6mm}}</style></head><body>
   <div class="card">
     <div class="hd"><div class="hd-ico">🩸</div>
@@ -2363,6 +2432,21 @@ function printStats(){
 }
 .back-btn.show{display:flex}
 .back-btn-icon{font-size:18px}
+
+/* ═══ BOTTLE SEQUENCES ═══ */
+.seq-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.seq-card{background:#fff;border-radius:14px;padding:14px;border:1.5px solid #EEF2F6;position:relative}
+.seq-card.active{border-color:#BE123C}
+.seq-type{font-size:12px;font-weight:700;color:#1E293B;margin-bottom:6px}
+.seq-num{font-size:22px;font-weight:800;color:#BE123C;line-height:1}
+.seq-range{font-size:10px;color:#94A3B8;margin-top:3px}
+.seq-remain{font-size:10px;font-weight:600;margin-top:4px}
+.seq-remain.ok{color:#16A34A}
+.seq-remain.warn{color:#D97706}
+.seq-remain.danger{color:#DC2626}
+.seq-edit{position:absolute;top:8px;left:8px;background:#FFF1F2;border:none;border-radius:8px;padding:4px 8px;font-size:11px;color:#BE123C;cursor:pointer;font-family:inherit;font-weight:600}
+.seq-add-btn{width:100%;padding:12px;background:#BE123C;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px}
+.seq-add-btn:active{background:#9F1239}
 @media print{@page{margin:10mm}}</style></head>
   <body>${c}<script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
   w.document.close();
@@ -2485,6 +2569,12 @@ async function saveReception(){
   if(!nm||!by){ toast('يرجى تعبئة الاسم وسنة التولد','error'); return; }
   load(true);
   try{
+    const btype = G('rc-btype')?.value;
+    const bnum  = parseInt(G('rc-bnum')?.value)||null;
+    const seqId = G('rc-bnum')?.dataset?.seqId;
+    if(!btype){ toast('يرجى اختيار نوع القنينة','error'); load(false); return; }
+    if(!bnum){  toast('يرجى اختيار نوع القنينة للحصول على الرقم','error'); load(false); return; }
+
     const payload = {
       full_name:nm, birth_year:by, gender:G('rc-gen').value,
       mother_name:G('rc-mom').value.trim()||null,
@@ -2497,6 +2587,9 @@ async function saveReception(){
       hospital_name:G('rc-hosp').value.trim()||null,
       donation_date:new Date().toISOString().split('T')[0],
       donation_time:new Date().toTimeString().substring(0,5),
+      bottle_type:btype,
+      bottle_number:bnum,
+      seq_id:seqId,
       created_by:SES?.user?.id
     };
 
@@ -2524,7 +2617,13 @@ async function saveReception(){
       }).select().single();
       if(doe) throw doe;
       await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'INSERT',table_name:'blood_donations',record_id:don.id,new_values:{donor:nm,status:'pending_draw'}});
-      toast('✅ تم قبول '+nm+' — أُرسل لوحدة السحب','success',4000);
+      // Increment sequence number
+      if(payload.seq_id){
+        await db.from('bottle_sequences')
+          .update({current_number: bnum+1})
+          .eq('id', payload.seq_id);
+      }
+      toast('✅ تم قبول '+nm+' — رقم القنينة: '+bnum,'success',4000);
       resetReception();
     }
   }catch(e){toast('خطأ: '+e.message,'error');}
@@ -2533,6 +2632,8 @@ async function saveReception(){
 
 function resetReception(){
   ['rc-name','rc-by','rc-age','rc-mom','rc-nid','rc-mob','rc-addr','rc-job','rc-pat','rc-hosp'].forEach(id=>{const e=G(id);if(e)e.value='';});
+  if(G('rc-btype')) G('rc-btype').value='';
+  if(G('rc-bnum'))  { G('rc-bnum').value=''; G('rc-bnum').dataset.seqId=''; }
   G('rc-dtype').value='تعويضي';
   G('rejWarn').classList.remove('show');
   toggleRcPat();
@@ -2812,6 +2913,78 @@ async function saveDispatch(){
 }
 
 // ================================================================
+// BOTTLE SEQUENCES MANAGEMENT
+// ================================================================
+async function loadSeqGrid(){
+  const grid = G('seqGrid');
+  if(!grid) return;
+  const{data,error}=await db.from('bottle_sequences').select('*').order('bottle_type');
+  if(error||!data){ grid.innerHTML='<div class="empty"><p>تعذّر التحميل</p></div>'; return; }
+  if(!data.length){ grid.innerHTML='<div class="empty"><p>لا توجد تسلسلات</p></div>'; return; }
+
+  grid.innerHTML = data.map(s=>{
+    const remain = s.end_number - s.current_number;
+    const pct = ((s.current_number - s.start_number)/(s.end_number - s.start_number)*100).toFixed(0);
+    const cls = remain > 500 ? 'ok' : remain > 100 ? 'warn' : 'danger';
+    return `<div class="seq-card ${s.is_active?'active':''}">
+      <button class="seq-edit" onclick="openEditSeq('${s.id}','${s.bottle_type}',${s.current_number},${s.end_number})">تعديل</button>
+      <div class="seq-type">${s.bottle_type}</div>
+      <div class="seq-num">${s.current_number}</div>
+      <div class="seq-range">${s.start_number} ← ${s.end_number}</div>
+      <div class="seq-remain ${cls}">متبقي: ${remain} قنينة (${pct}%)</div>
+    </div>`;
+  }).join('');
+}
+
+function openAddSeqModal(){
+  ['sq-from','sq-to','sq-notes'].forEach(id=>{const e=G(id);if(e)e.value='';});
+  G('sq-type').value='مفلتر';
+  G('addSeqModal').classList.add('on');
+}
+
+async function saveNewSeq(){
+  const type=G('sq-type').value;
+  const from=parseInt(G('sq-from').value);
+  const to=parseInt(G('sq-to').value);
+  const notes=G('sq-notes').value.trim();
+  if(!type||!from||!to||from>=to){toast('تحقق من البيانات','error');return;}
+  load(true);
+  const{error}=await db.from('bottle_sequences').insert({
+    bottle_type:type,start_number:from,end_number:to,current_number:from,
+    is_active:true,notes:notes||null
+  });
+  load(false);
+  if(error){toast('خطأ: '+error.message,'error');return;}
+  toast('✅ تم إضافة تسلسل '+type,'success');
+  G('addSeqModal').classList.remove('on');
+  await loadSeqGrid();
+}
+
+function openEditSeq(id,type,current,end){
+  G('esq-id').value=id;
+  G('esq-type-lbl').textContent=type;
+  G('esq-current-lbl').textContent='الرقم الحالي: '+current+' | النهاية: '+end;
+  G('esq-current').value=current;
+  G('esq-to').value=end;
+  G('editSeqModal').classList.add('on');
+}
+
+async function saveEditSeq(){
+  const id=G('esq-id').value;
+  const current=parseInt(G('esq-current').value);
+  const to=parseInt(G('esq-to').value);
+  if(!current||!to||current>to){toast('تحقق من الأرقام','error');return;}
+  load(true);
+  const{error}=await db.from('bottle_sequences').update({current_number:current,end_number:to}).eq('id',id);
+  load(false);
+  if(error){toast('خطأ: '+error.message,'error');return;}
+  toast('✅ تم تحديث التسلسل','success');
+  G('editSeqModal').classList.remove('on');
+  await loadSeqGrid();
+}
+
+// Load sequences when navigating to settings
+// ================================================================
 // PERMISSIONS HELPERS
 // ================================================================
 const ALL_PERMS = [
@@ -3065,6 +3238,29 @@ function setAccTab(){
   G('tab-acc-btn')?.classList.add('on');
 }
 
+// ── Fetch next bottle number for selected type ──
+async function fetchNextBN(){
+  const btype = G('rc-btype')?.value;
+  const inp   = G('rc-bnum');
+  if(!btype || !inp){ if(inp) inp.value=''; return; }
+  inp.value = 'جاري...';
+  const{data,error}=await db.from('bottle_sequences')
+    .select('id,current_number,end_number')
+    .eq('bottle_type', btype)
+    .eq('is_active', true)
+    .order('created_at',{ascending:false})
+    .limit(1);
+  if(error||!data||!data.length){
+    inp.value=''; toast('لا يوجد تسلسل لهذا النوع — أضفه من الإعدادات','warning'); return;
+  }
+  const seq = data[0];
+  if(seq.current_number > seq.end_number){
+    inp.value=''; toast('انتهى تسلسل '+btype+' — أضف تسلسلاً جديداً','error'); return;
+  }
+  inp.value = seq.current_number;
+  inp.dataset.seqId = seq.id;
+}
+
 // Update dept badge in header
 function updateHeaderDept(){
   const role = UPROF?.role;
@@ -3139,6 +3335,58 @@ if('serviceWorker' in navigator){
 }
 </script>
 
+
+<!-- ADD SEQUENCE MODAL -->
+<div class="overlay" id="addSeqModal">
+  <div class="modal">
+    <div class="modal-title">💉 إضافة تسلسل قناني</div>
+    <div class="modal-body">
+      <div class="fgrid">
+        <div class="fgrp s2">
+          <label>نوع القنينة *</label>
+          <select id="sq-type">
+            <option value="مفلتر">مفلتر</option>
+            <option value="ريفيوس">ريفيوس</option>
+            <option value="رباعي SAG">رباعي SAG</option>
+            <option value="رباعي">رباعي</option>
+            <option value="TREMA صفائح">TREMA صفائح</option>
+            <option value="TREMA دم">TREMA دم</option>
+            <option value="أحادي">أحادي</option>
+          </select>
+        </div>
+        <div class="fgrp"><label>من رقم *</label><input type="number" id="sq-from" placeholder="21928"></div>
+        <div class="fgrp"><label>إلى رقم *</label><input type="number" id="sq-to" placeholder="25000"></div>
+        <div class="fgrp s2"><label>ملاحظات</label><input type="text" id="sq-notes" placeholder="اختياري"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="G('addSeqModal').classList.remove('on')">إلغاء</button>
+      <button class="btn btn-p" onclick="saveNewSeq()">💾 حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT SEQUENCE MODAL -->
+<div class="overlay" id="editSeqModal">
+  <div class="modal">
+    <div class="modal-title">✏️ تعديل التسلسل</div>
+    <div class="modal-body">
+      <input type="hidden" id="esq-id">
+      <div style="background:#F8FAFC;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px">
+        <strong id="esq-type-lbl"></strong>
+        <div style="color:#94A3B8;font-size:11px;margin-top:3px" id="esq-current-lbl"></div>
+      </div>
+      <div class="fgrid">
+        <div class="fgrp"><label>الرقم الحالي</label><input type="number" id="esq-current"></div>
+        <div class="fgrp"><label>إلى رقم (النهاية)</label><input type="number" id="esq-to"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="G('editSeqModal').classList.remove('on')">إلغاء</button>
+      <button class="btn btn-p" onclick="saveEditSeq()">💾 حفظ التعديل</button>
+    </div>
+  </div>
+</div>
 <!-- ADD USER MODAL -->
 <div class="overlay" id="addUserModal">
   <div class="modal">
