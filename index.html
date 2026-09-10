@@ -1017,6 +1017,7 @@ const DB_VER    = 1;
 let   offlineDB = null;
 let   IS_ONLINE = navigator.onLine;
 let   SYNC_RUNNING = false;
+let   IS_FRESH_LOGIN = false;
 
 // ── IndexedDB init ──
 function initOfflineDB(){
@@ -1281,6 +1282,7 @@ async function doLogin(){
   if(!email||!pw){G('lerrMsg').textContent='يرجى إدخال الإيميل وكلمة المرور'; eb.classList.add('on'); return;}
   G('lbtn').innerHTML='<i class="ti ti-loader"></i> جاري التحقق...';
   G('lbtn').disabled=true;
+  IS_FRESH_LOGIN = true;
   const {error}=await db.auth.signInWithPassword({email,password:pw});
   if(error){
     G('lerrMsg').textContent='البيانات غير صحيحة. تحقق من الإيميل وكلمة المرور.';
@@ -1388,37 +1390,28 @@ function showLogin(){
   G('lbtn').innerHTML='<i class="ti ti-login"></i> دخول آمن'; G('lbtn').disabled=false;
 }
 async function showApp(){
-  // 1. Hide login, show app
   G('loginPage').style.display='none';
   G('app').classList.add('on');
-
-  // 2. Handle mobile layout
   applyMobileLayout();
 
-  // 3. Decide first screen based on role
-  const isAdmin = UPROF?.isAdmin;
-  const perms   = UPROF?.permissions;
+  // Fresh login → dashboard. Returning user → last page
+  const targetPage = IS_FRESH_LOGIN
+    ? 'dashboard'
+    : (sessionStorage.getItem('lastPage') || 'dashboard');
+  IS_FRESH_LOGIN = false;
 
-  // Re-read role directly — don't trust cached isAdmin flag
-  const userRole = UPROF?.role;
-  const isActualAdmin = (userRole === 'admin');
-
-  if(isActualAdmin){
-    await nav('dashboard', G('navDashboard'));
-  } else if(Array.isArray(perms) && perms.length > 0){
-    const order=['reception','draw','lab','supply','donors','search','stats','dashboard'];
-    const first=order.find(p=>perms.includes(p))||'dashboard';
-    await nav(first, G(PERM_NAV[first]));
-  } else {
-    await nav('dashboard', G('navDashboard'));
+  const isMob = window.innerWidth <= 768;
+  if(isMob){
+    document.querySelectorAll('.bn-item').forEach(b=>b.classList.remove('on'));
+    G('tab-home-btn')?.classList.add('on');
   }
+  await nav(targetPage, G(PERM_NAV[targetPage]) || G('navDashboard'));
 }
 
 
-// ================================================================
-// NAVIGATION
-// ================================================================
 async function nav(name, el){
+  if(name && name!=='workhome' && name!=='account')
+    sessionStorage.setItem('lastPage', name);
   document.querySelectorAll('.sc').forEach(s=>s.classList.remove('on'));
   const sc=G('s-'+name);
   if(sc) sc.classList.add('on');
