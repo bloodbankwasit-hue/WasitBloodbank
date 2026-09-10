@@ -2104,7 +2104,7 @@ async function loadDash(){
         <td>${N(r.blood_type)}</td>
         <td><span class="pill ${r.donation_type==='طوعي'?'pg':'py'}">${r.donation_type}</span></td>
         <td>${ft(r.donation_time)}</td>
-        <td><span class="pill ${r.r.serology_result==='Negative'?'pg':r.serology_result==='Positive'?'pr':'py'}">${r.serology_result==='Negative'?'سالبة ✅':r.serology_result==='Positive'?'موجبة ⚠️':'لم يُفحص'}</span></td>
+        <td><span class="pill ${r.serology_result==='Negative'?'pg':r.serology_result==='Positive'?'pr':'py'}">${r.serology_result==='Negative'?'سالبة ✅':r.serology_result==='Positive'?'موجبة ⚠️':'لم يُفحص'}</span></td>
       </tr>`).join('')}</tbody></table></div>`;
     } else {
       G('recentTbl').innerHTML='<div class="empty"><i class="ti ti-clock"></i><p>لا توجد تبرعات اليوم حتى الآن</p></div>';
@@ -2451,7 +2451,7 @@ async function loadDonors(page=1){
           <td><span class="pill ${r.donation_type==='طوعي'?'pg':'py'}">${r.donation_type}</span></td>
           <td>${fd(r.donation_date)}</td>
           <td style="color:${exp?'#BE123C':'inherit'}">${fd(r.expiry_date)}${exp?' ⚠':''}</td>
-          <td><span class="pill ${r.r.serology_result==='Negative'?'pg':r.serology_result==='Positive'?'pr':'py'}">${r.serology_result==='Negative'?'سالبة ✅':r.serology_result==='Positive'?'موجبة ⚠️':'لم يُفحص'}</span></td>
+          <td><span class="pill ${r.serology_result==='Negative'?'pg':r.serology_result==='Positive'?'pr':'py'}">${r.serology_result==='Negative'?'سالبة ✅':r.serology_result==='Positive'?'موجبة ⚠️':'لم يُفحص'}</span></td>
           <td><button class="ibtn" onclick="openBC(${r.bottle_number})" title="باركود"><i class="ti ti-barcode"></i></button></td>
         </tr>`;}).join('')}</tbody></table></div>`;
       const tp=Math.ceil(count/PS);
@@ -2522,7 +2522,7 @@ async function doSearch(){
         <td style="font-weight:700;color:#BE123C">${r.bottle_number}</td>
         <td><span class="pill ${r.donation_type==='طوعي'?'pg':'py'}">${r.donation_type}</span></td>
         <td>${fd(r.donation_date)}</td><td>${fd(r.expiry_date)}</td>
-        <td><span class="pill ${r.r.serology_result==='Negative'?'pg':r.serology_result==='Positive'?'pr':'py'}">${r.serology_result==='Negative'?'سالبة ✅':r.serology_result==='Positive'?'موجبة ⚠️':'لم يُفحص'}</span></td>
+        <td><span class="pill ${r.serology_result==='Negative'?'pg':r.serology_result==='Positive'?'pr':'py'}">${r.serology_result==='Negative'?'سالبة ✅':r.serology_result==='Positive'?'موجبة ⚠️':'لم يُفحص'}</span></td>
         <td><button class="ibtn" onclick="openBC(${r.bottle_number})"><i class="ti ti-barcode"></i></button></td>
       </tr>`).join('')}</tbody></table></div>`;
     } else {
