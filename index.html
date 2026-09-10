@@ -1008,7 +1008,23 @@ tbody tr:hover td{background:#fafafa}
             <div class="fgrp s2" id="rc-hosp-grp"><label>اسم المستشفى</label><input type="text" id="rc-hosp" placeholder="المستشفى"></div>
           </div>
         </div>
-        <button class="btn-action" onclick="saveReception()">✅ تأكيد القبول وإرسال للسحب</button>
+        <div id="rcPrintArea" style="display:none;margin-bottom:10px">
+          <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:12px;padding:12px 14px;margin-bottom:10px">
+            <div style="font-size:13px;font-weight:700;color:#166534;margin-bottom:10px">✅ تم الحفظ بنجاح — اختر ما تريد طباعته:</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-p" onclick="printDonorForm()" style="flex:1;justify-content:center">
+                🖨️ طباعة استمارة المتبرع
+              </button>
+              <button class="btn" onclick="printBottleSticker()" style="flex:1;justify-content:center;border-color:#BE123C;color:#BE123C">
+                🏷️ طباعة ملصق القنينة
+              </button>
+            </div>
+            <button class="btn" onclick="newDonor()" style="width:100%;justify-content:center;margin-top:8px">
+              ➕ متبرع جديد
+            </button>
+          </div>
+        </div>
+        <button class="btn-action" id="rcSaveBtn" onclick="saveReception()">✅ تأكيد القبول وإرسال للسحب</button>
         <button class="btn" onclick="resetReception()" style="width:100%;justify-content:center;margin-top:8px"><i class="ti ti-refresh"></i> مسح النموذج</button>
       </div>
 
@@ -1213,6 +1229,188 @@ document.addEventListener('click',e=>{
   if(!e.target.closest('.ac-wrap'))
     ['ac-name','ac-nid','ac-mob'].forEach(id=>{ const e2=G(id); if(e2) e2.classList.remove('show'); });
 });
+
+// ================================================================
+// PRINT FUNCTIONS — Donor Form & Bottle Sticker
+// ================================================================
+let _lastDonation = null; // Store last saved donation for printing
+
+function printViaIframe(html){
+  let frame = document.getElementById('printFrame');
+  if(frame) frame.remove();
+  frame = document.createElement('iframe');
+  frame.id = 'printFrame';
+  frame.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;border:0';
+  document.body.appendChild(frame);
+  const doc = frame.contentWindow.document;
+  doc.open(); doc.write(html); doc.close();
+  setTimeout(()=>{
+    try{ frame.contentWindow.focus(); frame.contentWindow.print(); }
+    catch(e){ toast('تعذرت الطباعة','error'); }
+  }, 400);
+}
+
+function printDonorForm(){
+  const d = _lastDonation;
+  if(!d){ toast('لا توجد بيانات للطباعة','error'); return; }
+
+  const html = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>استمارة المتبرع</title>
+<style>
+  @page{size:A4;margin:10mm}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;font-size:11pt;color:#000;background:#fff}
+  .form-wrap{border:2px solid #000;padding:10px;min-height:270mm}
+  .header{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:10px}
+  .header-title{text-align:center;flex:1}
+  .header-title h2{font-size:14pt;font-weight:bold;margin-bottom:3px}
+  .header-title p{font-size:9pt;color:#444}
+  .header-en{font-size:10pt;font-weight:bold;color:#555}
+  .barcode-area{text-align:center;border:1.5px solid #000;padding:8px 14px;border-radius:4px}
+  .barcode-num{font-size:16pt;font-weight:bold;letter-spacing:2px}
+  .section{margin-bottom:8px}
+  .row{display:flex;border-bottom:1px solid #ccc;padding:5px 0;align-items:center}
+  .row:last-child{border-bottom:none}
+  .lbl{font-weight:bold;font-size:10pt;min-width:130px;color:#333}
+  .val{font-size:11pt;flex:1;padding-right:8px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1.5px solid #000;margin-bottom:8px}
+  .cell{padding:5px 8px;border-bottom:1px solid #ccc;border-left:1px solid #ccc}
+  .cell:nth-child(odd){border-right:none}
+  .cell:last-child,.cell:nth-last-child(2){border-bottom:none}
+  .cell-lbl{font-size:9pt;font-weight:bold;color:#666;margin-bottom:2px}
+  .cell-val{font-size:11pt;font-weight:bold}
+  .q-section{border:1.5px solid #000;padding:8px;margin-top:8px}
+  .q-title{font-size:10pt;font-weight:bold;background:#f0f0f0;padding:4px 6px;margin-bottom:6px;border-bottom:1px solid #ccc}
+  .q-row{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:9.5pt;border-bottom:1px dotted #ddd}
+  .q-row:last-child{border-bottom:none}
+  .q-box{width:14px;height:14px;border:1.5px solid #000;display:inline-block;flex-shrink:0}
+  .footer{margin-top:10px;border-top:1.5px solid #000;padding-top:6px;display:flex;justify-content:space-between;font-size:9pt}
+  .sig-box{border-bottom:1px solid #000;width:120px;height:30px}
+  svg text{font-family:Arial,monospace}
+</style>
+</head>
+<body>
+<div class="form-wrap">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-title">
+      <h2>شعبة مصرف الدم الرئيسي — واسط</h2>
+      <p>وزارة الصحة / دائرة صحة واسط / قسم الأمور الفنية</p>
+      <div class="header-en">Blood Donor Questionnaire</div>
+    </div>
+    <div class="barcode-area">
+      <svg width="120" height="50" viewBox="0 0 120 50">
+        ${generateBarcodeSVG(d.bottle_number||d.donor_number||'0')}
+      </svg>
+      <div class="barcode-num">${d.bottle_number||d.donor_number||'—'}</div>
+    </div>
+  </div>
+
+  <!-- DONOR INFO GRID -->
+  <div class="grid2">
+    <div class="cell"><div class="cell-lbl">الاسم الكامل</div><div class="cell-val">${d.donor_name||'—'}</div></div>
+    <div class="cell"><div class="cell-lbl">رقم القنينة</div><div class="cell-val">${d.bottle_number||'—'}</div></div>
+    <div class="cell"><div class="cell-lbl">التاريخ</div><div class="cell-val">${d.donation_date||'—'}</div></div>
+    <div class="cell"><div class="cell-lbl">الوقت</div><div class="cell-val">${d.donation_time||'—'}</div></div>
+    <div class="cell"><div class="cell-lbl">سنة الميلاد</div><div class="cell-val">${d.birth_year||'—'}</div></div>
+    <div class="cell"><div class="cell-lbl">العمر</div><div class="cell-val">${d.birth_year ? new Date().getFullYear()-d.birth_year : '—'} سنة</div></div>
+    <div class="cell"><div class="cell-lbl">الجنس</div><div class="cell-val">${d.gender||'—'}</div></div>
+    <div class="cell"><div class="cell-lbl">نوع التبرع</div><div class="cell-val">${d.donation_type||'—'}</div></div>
+    <div class="cell"><div class="cell-lbl">رقم الهاتف</div><div class="cell-val">${d.mobile||'—'}</div></div>
+    <div class="cell"><div class="cell-lbl">رقم البطاقة الوطنية</div><div class="cell-val">${d.national_id||'—'}</div></div>
+    <div class="cell"><div class="cell-lbl">نوع القنينة</div><div class="cell-val">${d.bottle_type||'—'}</div></div>
+    <div class="cell"><div class="cell-lbl">العنوان</div><div class="cell-val">${d.address||'—'}</div></div>
+  </div>
+
+  <!-- MEDICAL QUESTIONNAIRE -->
+  <div class="q-section">
+    <div class="q-title">استبيان ما قبل التبرع — Pre-Donation Questionnaire</div>
+    ${['هل أنت بصحة جيدة اليوم؟','هل نمت جيداً الليلة الماضية؟','هل تناولت وجبة قبل التبرع؟','هل تعاني من أي مرض مزمن؟','هل تناولت أي أدوية خلال الأسبوع الماضي؟','هل سبق لك التبرع بالدم؟','هل تبرعت خلال الثلاثة أشهر الماضية؟','هل لديك أي أعراض حالية (حمى، سعال...)?']
+    .map(q=>`<div class="q-row"><span class="q-box"></span><span>${q}</span><span style="margin-right:auto;margin-left:16px"><span class="q-box"></span> نعم &nbsp;&nbsp; <span class="q-box"></span> لا</span></div>`).join('')}
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div>توقيع المتبرع: <div class="sig-box"></div></div>
+    <div>توقيع الموظف: <div class="sig-box"></div></div>
+    <div>الختم الرسمي: <div class="sig-box"></div></div>
+  </div>
+
+</div>
+</body>
+</html>`;
+
+  printViaIframe(html);
+}
+
+function printBottleSticker(){
+  const d = _lastDonation;
+  if(!d){ toast('لا توجد بيانات للطباعة','error'); return; }
+
+  const html = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>ملصق القنينة</title>
+<style>
+  @page{size:100mm 60mm;margin:3mm}
+  body{font-family:Arial,sans-serif;margin:0;padding:0}
+  .sticker{border:2px solid #000;padding:5px 8px;width:94mm;height:54mm;display:flex;flex-direction:column;justify-content:space-between}
+  .s-name{font-size:11pt;font-weight:bold;text-align:center;border-bottom:1px solid #000;padding-bottom:4px;margin-bottom:4px}
+  .s-num{font-size:22pt;font-weight:bold;text-align:center;letter-spacing:3px}
+  .s-dates{display:flex;justify-content:space-between;font-size:9pt;margin-top:4px}
+  .s-date-box{border:1px solid #000;padding:2px 6px;border-radius:3px}
+  .s-date-lbl{font-size:7.5pt;color:#555;margin-bottom:1px}
+  .s-date-val{font-weight:bold;font-size:10pt}
+</style>
+</head>
+<body>
+<div class="sticker">
+  <div class="s-name">${d.donor_name||'—'}</div>
+  <div class="s-num">${d.bottle_number||'—'}</div>
+  <div class="s-dates">
+    <div class="s-date-box">
+      <div class="s-date-lbl">تاريخ السحب</div>
+      <div class="s-date-val">${d.donation_date||'—'}</div>
+    </div>
+    <div class="s-date-box">
+      <div class="s-date-lbl">تاريخ النفاد</div>
+      <div class="s-date-val">${d.expiry_date||'—'}</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>`;
+
+  printViaIframe(html);
+}
+
+function generateBarcodeSVG(num){
+  // Simple barcode-like SVG representation
+  const s = String(num).padStart(8,'0');
+  let bars = '';
+  const startX = 5;
+  let x = startX;
+  for(let i=0;i<s.length;i++){
+    const d = parseInt(s[i]);
+    const w = 2 + (d%3);
+    const gap = 1 + (d%2);
+    bars += `<rect x="${x}" y="2" width="${w}" height="38" fill="#000"/>`;
+    x += w + gap;
+  }
+  return bars;
+}
+
+function newDonor(){
+  G('rcPrintArea').style.display='none';
+  G('rcSaveBtn').style.display='flex';
+  resetReception();
+  _lastDonation = null;
+}
 
 // ================================================================
 // OFFLINE ENGINE
@@ -2868,8 +3066,24 @@ async function saveReception(){
           .update({current_number: bnum+1})
           .eq('id', payload.seq_id);
       }
-      toast('✅ تم قبول '+nm+' — رقم القنينة: '+bnum,'success',4000);
-      resetReception();
+      // Store for printing
+      _lastDonation = {
+        donor_name:nm, bottle_number:bnum,
+        bottle_type:btype,
+        donation_date:payload.donation_date,
+        donation_time:payload.donation_time,
+        birth_year:by,
+        gender:G('rc-gen').value,
+        mobile:G('rc-mob').value.trim(),
+        national_id:G('rc-nid').value.trim(),
+        address:G('rc-addr').value.trim(),
+        donation_type:G('rc-dtype').value,
+        expiry_date:'', // will calculate from bottle type
+      };
+      // Show print options instead of reset
+      G('rcPrintArea').style.display='block';
+      G('rcSaveBtn').style.display='none';
+      toast('✅ تم الحفظ — رقم القنينة: '+bnum,'success',4000);
     }
   }catch(e){toast('خطأ: '+e.message,'error');}
   finally{load(false);}
