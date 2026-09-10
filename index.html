@@ -516,6 +516,35 @@ tbody tr:hover td{background:#fafafa}
 .seq-edit{position:absolute;top:8px;left:8px;background:#FFF1F2;border:none;border-radius:8px;padding:4px 8px;font-size:11px;color:#BE123C;cursor:pointer;font-family:inherit;font-weight:600}
 .seq-add-btn{width:100%;padding:12px;background:#BE123C;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px}
 .seq-add-btn:active{background:#9F1239}
+
+/* ═══ DONOR AUTOCOMPLETE ═══ */
+.ac-wrap{position:relative}
+.ac-list{
+  position:absolute;top:calc(100% + 2px);right:0;left:0;z-index:500;
+  background:#fff;border:1px solid #FECDD3;border-radius:10px;
+  box-shadow:0 4px 16px rgba(0,0,0,.10);max-height:180px;
+  overflow-y:auto;display:none;
+}
+.ac-list.show{display:block}
+.ac-item{
+  padding:10px 12px;cursor:pointer;border-bottom:1px solid #F8FAFC;
+  display:flex;align-items:center;gap:10px;
+}
+.ac-item:last-child{border-bottom:none;border-radius:0 0 10px 10px}
+.ac-item:active{background:#FFF1F2}
+.ac-av{width:32px;height:32px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#BE123C;flex-shrink:0}
+.ac-info .ac-name{font-size:13px;font-weight:700;color:#1E293B}
+.ac-info .ac-sub{font-size:10.5px;color:#94A3B8;margin-top:1px}
+
+/* Auto-filled indicator */
+.rc-filled-banner{
+  background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;
+  padding:9px 12px;margin-bottom:12px;display:none;
+  align-items:center;justify-content:space-between;gap:10px;
+}
+.rc-filled-banner.show{display:flex}
+.rc-filled-text{font-size:12.5px;color:#166534;font-weight:600}
+.rc-filled-clear{background:none;border:none;color:#DC2626;font-size:12px;cursor:pointer;font-weight:600;padding:2px 6px;font-family:inherit}
 @media print{
   .sidebar,.topbar,.abar,.pag,#loader,#toastBox,.overlay{display:none!important}
   .content{overflow:visible}
@@ -907,6 +936,12 @@ tbody tr:hover td{background:#fafafa}
 
       <!-- ========== RECEPTION ========== -->
       <div class="sc" id="s-reception">
+        <!-- Auto-filled banner -->
+        <div class="rc-filled-banner" id="rcFilledBanner">
+          <span class="rc-filled-text" id="rcFilledText">✅ تم التعرف على المتبرع</span>
+          <button class="rc-filled-clear" onclick="clearDonorFill()">✕ مسح</button>
+        </div>
+
         <div class="rej-warn" id="rejWarn">
           <div style="font-size:28px">🚫</div>
           <div><div class="rej-warn-t" id="rejWarnTitle">مرفوض من التبرع</div><div class="rej-warn-r" id="rejWarnReason"></div></div>
@@ -914,13 +949,38 @@ tbody tr:hover td{background:#fafafa}
         <div class="fsec">
           <div class="fst"><i class="ti ti-user"></i> بيانات المتبرع</div>
           <div class="fgrid">
-            <div class="fgrp s2"><label>الاسم الرباعي واللقب *</label><input type="text" id="rc-name" placeholder="ابدأ بكتابة الاسم..." onblur="checkRejectedName()"></div>
+            <div class="fgrp s2">
+              <label>الاسم الرباعي واللقب *</label>
+              <div class="ac-wrap">
+                <input type="text" id="rc-name" placeholder="ابدأ بكتابة الاسم..."
+                  oninput="donorSearch('name',this.value)"
+                  onblur="checkRejectedName()"
+                  autocomplete="off">
+                <div class="ac-list" id="ac-name"></div>
+              </div>
+            </div>
             <div class="fgrp"><label>سنة التولد *</label><input type="number" id="rc-by" placeholder="1995" min="1920" max="2007" oninput="calcRcAge()"></div>
             <div class="fgrp"><label>العمر</label><input type="text" id="rc-age" class="ro" readonly placeholder="تلقائي"></div>
             <div class="fgrp"><label>الجنس *</label><select id="rc-gen"><option value="ذكر">ذكر</option><option value="أنثى">أنثى</option></select></div>
             <div class="fgrp"><label>اسم الأم</label><input type="text" id="rc-mom" placeholder="اسم الأم الثلاثي"></div>
-            <div class="fgrp"><label>رقم البطاقة الوطنية</label><input type="text" id="rc-nid" placeholder="19XXXXXXXXXX"></div>
-            <div class="fgrp"><label>رقم الموبايل</label><input type="tel" id="rc-mob" placeholder="07XXXXXXXXX"></div>
+            <div class="fgrp">
+              <label>رقم البطاقة الوطنية</label>
+              <div class="ac-wrap">
+                <input type="text" id="rc-nid" placeholder="19XXXXXXXXXX"
+                  oninput="donorSearch('nid',this.value)"
+                  autocomplete="off">
+                <div class="ac-list" id="ac-nid"></div>
+              </div>
+            </div>
+            <div class="fgrp">
+              <label>رقم الموبايل</label>
+              <div class="ac-wrap">
+                <input type="tel" id="rc-mob" placeholder="07XXXXXXXXX"
+                  oninput="donorSearch('mob',this.value)"
+                  autocomplete="off">
+                <div class="ac-list" id="ac-mob"></div>
+              </div>
+            </div>
             <div class="fgrp s2"><label>عنوان السكن</label><input type="text" id="rc-addr" placeholder="المحلة / الحي / المدينة"></div>
             <div class="fgrp"><label>المهنة</label><input type="text" id="rc-job" placeholder="المهنة"></div>
           </div>
@@ -1065,6 +1125,95 @@ function fnum(n){ return n!=null ? Number(n).toLocaleString('ar-IQ') : '—'; }
 // ================================================================
 // AUTH
 // ================================================================
+// ================================================================
+// DONOR AUTOCOMPLETE — Smooth & Auto-fill
+// ================================================================
+let _acTimer = null;
+
+async function donorSearch(field, val){
+  const listId = 'ac-'+field;
+  const list   = G(listId);
+  if(!list) return;
+  // Hide other lists
+  ['ac-name','ac-nid','ac-mob'].filter(id=>id!==listId)
+    .forEach(id=>{ const e=G(id); if(e) e.classList.remove('show'); });
+
+  const minLen = {name:3, nid:6, mob:7}[field]||3;
+  if(!val||val.trim().length<minLen){ list.classList.remove('show'); return; }
+
+  clearTimeout(_acTimer);
+  _acTimer = setTimeout(async()=>{
+    try{
+      let q = db.from('donors')
+        .select('id,full_name,birth_year,gender,mother_name,national_id,mobile,address,occupation')
+        .eq('is_deleted',false).limit(6);
+      if(field==='name') q=q.ilike('full_name','%'+val.trim()+'%');
+      if(field==='nid')  q=q.eq('national_id',val.trim());
+      if(field==='mob')  q=q.eq('mobile',val.trim());
+
+      const{data}=await q;
+      if(!data||!data.length){ list.classList.remove('show'); return; }
+
+      // Auto-fill immediately if single match (NID or mobile)
+      if(data.length===1 && (field==='nid'||field==='mob')){
+        fillDonor(data[0]); return;
+      }
+
+      // Show compact list for multiple matches or name search
+      list.innerHTML = data.map(d=>`
+        <div class="ac-item" onmousedown="fillDonor(${JSON.stringify(d).replace(/"/g,'&quot;')})">
+          <div class="ac-av">${d.full_name.charAt(0)}</div>
+          <div class="ac-info">
+            <div class="ac-name">${d.full_name}</div>
+            <div class="ac-sub">${d.mobile||'—'} | ${d.national_id||'—'}</div>
+          </div>
+        </div>`).join('');
+      list.classList.add('show');
+    }catch(e){ list.classList.remove('show'); }
+  }, 250);
+}
+
+function fillDonor(d){
+  if(G('rc-name'))  G('rc-name').value = d.full_name||'';
+  if(G('rc-by'))    G('rc-by').value   = d.birth_year||'';
+  if(G('rc-gen'))   G('rc-gen').value  = d.gender||'ذكر';
+  if(G('rc-mom'))   G('rc-mom').value  = d.mother_name||'';
+  if(G('rc-nid'))   G('rc-nid').value  = d.national_id||'';
+  if(G('rc-mob'))   G('rc-mob').value  = d.mobile||'';
+  if(G('rc-addr'))  G('rc-addr').value = d.address||'';
+  if(G('rc-job'))   G('rc-job').value  = d.occupation||'';
+  calcRcAge();
+
+  // Mark as returning donor
+  const form=G('s-reception');
+  if(form) form.dataset.existingDonorId=d.id;
+
+  // Show filled banner
+  const banner=G('rcFilledBanner');
+  const txt=G('rcFilledText');
+  if(banner&&txt){
+    txt.textContent='✅ متبرع معروف: '+d.full_name;
+    banner.classList.add('show');
+  }
+
+  // Close all lists
+  ['ac-name','ac-nid','ac-mob'].forEach(id=>{ const e=G(id); if(e) e.classList.remove('show'); });
+  setTimeout(()=>checkRejectedName(),100);
+}
+
+function clearDonorFill(){
+  const form=G('s-reception');
+  if(form) delete form.dataset.existingDonorId;
+  const banner=G('rcFilledBanner');
+  if(banner) banner.classList.remove('show');
+  ['ac-name','ac-nid','ac-mob'].forEach(id=>{ const e=G(id); if(e) e.classList.remove('show'); });
+}
+
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.ac-wrap'))
+    ['ac-name','ac-nid','ac-mob'].forEach(id=>{ const e2=G(id); if(e2) e2.classList.remove('show'); });
+});
+
 // ================================================================
 // OFFLINE ENGINE
 // ================================================================
@@ -1796,6 +1945,35 @@ function printForm(){
 .seq-edit{position:absolute;top:8px;left:8px;background:#FFF1F2;border:none;border-radius:8px;padding:4px 8px;font-size:11px;color:#BE123C;cursor:pointer;font-family:inherit;font-weight:600}
 .seq-add-btn{width:100%;padding:12px;background:#BE123C;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px}
 .seq-add-btn:active{background:#9F1239}
+
+/* ═══ DONOR AUTOCOMPLETE ═══ */
+.ac-wrap{position:relative}
+.ac-list{
+  position:absolute;top:calc(100% + 2px);right:0;left:0;z-index:500;
+  background:#fff;border:1px solid #FECDD3;border-radius:10px;
+  box-shadow:0 4px 16px rgba(0,0,0,.10);max-height:180px;
+  overflow-y:auto;display:none;
+}
+.ac-list.show{display:block}
+.ac-item{
+  padding:10px 12px;cursor:pointer;border-bottom:1px solid #F8FAFC;
+  display:flex;align-items:center;gap:10px;
+}
+.ac-item:last-child{border-bottom:none;border-radius:0 0 10px 10px}
+.ac-item:active{background:#FFF1F2}
+.ac-av{width:32px;height:32px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#BE123C;flex-shrink:0}
+.ac-info .ac-name{font-size:13px;font-weight:700;color:#1E293B}
+.ac-info .ac-sub{font-size:10.5px;color:#94A3B8;margin-top:1px}
+
+/* Auto-filled indicator */
+.rc-filled-banner{
+  background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;
+  padding:9px 12px;margin-bottom:12px;display:none;
+  align-items:center;justify-content:space-between;gap:10px;
+}
+.rc-filled-banner.show{display:flex}
+.rc-filled-text{font-size:12.5px;color:#166534;font-weight:600}
+.rc-filled-clear{background:none;border:none;color:#DC2626;font-size:12px;cursor:pointer;font-weight:600;padding:2px 6px;font-family:inherit}
 @media print{@page{margin:10mm}}</style></head><body>
   <div class="hdr">
     <div class="en">Ministry of Health<br>Wasit Health Directorate<br>Technical Affairs Dept.<br><strong>Blood Donor Questionnaire</strong></div>
@@ -2139,6 +2317,35 @@ function printBC(type){
 .seq-edit{position:absolute;top:8px;left:8px;background:#FFF1F2;border:none;border-radius:8px;padding:4px 8px;font-size:11px;color:#BE123C;cursor:pointer;font-family:inherit;font-weight:600}
 .seq-add-btn{width:100%;padding:12px;background:#BE123C;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px}
 .seq-add-btn:active{background:#9F1239}
+
+/* ═══ DONOR AUTOCOMPLETE ═══ */
+.ac-wrap{position:relative}
+.ac-list{
+  position:absolute;top:calc(100% + 2px);right:0;left:0;z-index:500;
+  background:#fff;border:1px solid #FECDD3;border-radius:10px;
+  box-shadow:0 4px 16px rgba(0,0,0,.10);max-height:180px;
+  overflow-y:auto;display:none;
+}
+.ac-list.show{display:block}
+.ac-item{
+  padding:10px 12px;cursor:pointer;border-bottom:1px solid #F8FAFC;
+  display:flex;align-items:center;gap:10px;
+}
+.ac-item:last-child{border-bottom:none;border-radius:0 0 10px 10px}
+.ac-item:active{background:#FFF1F2}
+.ac-av{width:32px;height:32px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#BE123C;flex-shrink:0}
+.ac-info .ac-name{font-size:13px;font-weight:700;color:#1E293B}
+.ac-info .ac-sub{font-size:10.5px;color:#94A3B8;margin-top:1px}
+
+/* Auto-filled indicator */
+.rc-filled-banner{
+  background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;
+  padding:9px 12px;margin-bottom:12px;display:none;
+  align-items:center;justify-content:space-between;gap:10px;
+}
+.rc-filled-banner.show{display:flex}
+.rc-filled-text{font-size:12.5px;color:#166534;font-weight:600}
+.rc-filled-clear{background:none;border:none;color:#DC2626;font-size:12px;cursor:pointer;font-weight:600;padding:2px 6px;font-family:inherit}
 @media print{@page{margin:6mm}}</style></head><body>
   <div class="card">
     <div class="hd"><div class="hd-ico">🩸</div>
@@ -2447,6 +2654,35 @@ function printStats(){
 .seq-edit{position:absolute;top:8px;left:8px;background:#FFF1F2;border:none;border-radius:8px;padding:4px 8px;font-size:11px;color:#BE123C;cursor:pointer;font-family:inherit;font-weight:600}
 .seq-add-btn{width:100%;padding:12px;background:#BE123C;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px}
 .seq-add-btn:active{background:#9F1239}
+
+/* ═══ DONOR AUTOCOMPLETE ═══ */
+.ac-wrap{position:relative}
+.ac-list{
+  position:absolute;top:calc(100% + 2px);right:0;left:0;z-index:500;
+  background:#fff;border:1px solid #FECDD3;border-radius:10px;
+  box-shadow:0 4px 16px rgba(0,0,0,.10);max-height:180px;
+  overflow-y:auto;display:none;
+}
+.ac-list.show{display:block}
+.ac-item{
+  padding:10px 12px;cursor:pointer;border-bottom:1px solid #F8FAFC;
+  display:flex;align-items:center;gap:10px;
+}
+.ac-item:last-child{border-bottom:none;border-radius:0 0 10px 10px}
+.ac-item:active{background:#FFF1F2}
+.ac-av{width:32px;height:32px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#BE123C;flex-shrink:0}
+.ac-info .ac-name{font-size:13px;font-weight:700;color:#1E293B}
+.ac-info .ac-sub{font-size:10.5px;color:#94A3B8;margin-top:1px}
+
+/* Auto-filled indicator */
+.rc-filled-banner{
+  background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;
+  padding:9px 12px;margin-bottom:12px;display:none;
+  align-items:center;justify-content:space-between;gap:10px;
+}
+.rc-filled-banner.show{display:flex}
+.rc-filled-text{font-size:12.5px;color:#166534;font-weight:600}
+.rc-filled-clear{background:none;border:none;color:#DC2626;font-size:12px;cursor:pointer;font-weight:600;padding:2px 6px;font-family:inherit}
 @media print{@page{margin:10mm}}</style></head>
   <body>${c}<script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
   w.document.close();
@@ -2602,13 +2838,22 @@ async function saveReception(){
       resetReception();
     } else {
       // Online: send directly
-      const{data:dn,error:de}=await db.from('donors').insert({
-        full_name:payload.full_name, birth_year:payload.birth_year, gender:payload.gender,
-        mother_name:payload.mother_name, national_id:payload.national_id,
-        mobile:payload.mobile, address:payload.address, occupation:payload.occupation,
-        created_by:payload.created_by
-      }).select().single();
-      if(de) throw de;
+      // Check if existing donor selected via autocomplete
+      const existingId = G('s-reception')?.dataset?.existingDonorId;
+      let dn;
+      if(existingId){
+        const{data:ed}=await db.from('donors').select('id').eq('id',existingId).single();
+        dn = ed;
+      } else {
+        const{data:nd,error:de}=await db.from('donors').insert({
+          full_name:payload.full_name, birth_year:payload.birth_year, gender:payload.gender,
+          mother_name:payload.mother_name, national_id:payload.national_id,
+          mobile:payload.mobile, address:payload.address, occupation:payload.occupation,
+          created_by:payload.created_by
+        }).select().single();
+        if(de) throw de;
+        dn = nd;
+      }
       const{data:don,error:doe}=await db.from('blood_donations').insert({
         donor_id:dn.id, bottle_type:'مفلتر', donation_type:payload.donation_type,
         patient_name:payload.patient_name, hospital_name:payload.hospital_name,
