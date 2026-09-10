@@ -352,7 +352,6 @@ tbody tr:hover td{background:#fafafa}
   transition:all .15s;min-width:0;position:relative;
 }
 .bn-item>*:first-child{font-size:34px;line-height:1;display:block}
-.bn-item>span{display:none}
 .bn-item::after{
   content:'';width:6px;height:6px;border-radius:50%;
   background:transparent;display:block;transition:all .15s;
@@ -491,6 +490,17 @@ tbody tr:hover td{background:#fafafa}
 .oqc-title{font-size:13px;font-weight:700;color:#92400E}
 .oqc-sub{font-size:11px;color:#B45309;margin-top:3px}
 .oqc-count{background:#92400E;color:#fff;border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700}
+
+/* BACK BUTTON */
+.back-btn{
+  display:none;align-items:center;gap:6px;
+  background:none;border:none;cursor:pointer;
+  color:#BE123C;font-size:13px;font-weight:600;
+  padding:8px 16px 4px;font-family:inherit;
+  -webkit-tap-highlight-color:transparent;
+}
+.back-btn.show{display:flex}
+.back-btn-icon{font-size:18px}
 @media print{
   .sidebar,.topbar,.abar,.pag,#loader,#toastBox,.overlay{display:none!important}
   .content{overflow:visible}
@@ -616,12 +626,20 @@ tbody tr:hover td{background:#fafafa}
             <div class="ah-urole" id="ahRole">...</div>
           </div>
         </div>
-        <div class="ah-dept" id="ahDept">—</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="back-btn" id="backBtnMob" onclick="goBack()" style="padding:4px 8px;font-size:12px">
+            <span class="back-btn-icon">‹</span> رجوع
+          </button>
+          <div class="ah-dept" id="ahDept">—</div>
+        </div>
       </div>
     </div>
 
     <!-- PAGE TITLE BAR (desktop sidebar label) -->
     <div class="page-title-bar">
+      <button class="back-btn" id="backBtn" onclick="goBack()">
+        <span class="back-btn-icon">‹</span> رجوع
+      </button>
       <div class="ptb-title" id="pgTitle">لوحة التحكم</div>
       <span class="tb-date" id="tbDate"></span>
     </div>
@@ -1708,6 +1726,17 @@ function printForm(){
 .oqc-title{font-size:13px;font-weight:700;color:#92400E}
 .oqc-sub{font-size:11px;color:#B45309;margin-top:3px}
 .oqc-count{background:#92400E;color:#fff;border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700}
+
+/* BACK BUTTON */
+.back-btn{
+  display:none;align-items:center;gap:6px;
+  background:none;border:none;cursor:pointer;
+  color:#BE123C;font-size:13px;font-weight:600;
+  padding:8px 16px 4px;font-family:inherit;
+  -webkit-tap-highlight-color:transparent;
+}
+.back-btn.show{display:flex}
+.back-btn-icon{font-size:18px}
 @media print{@page{margin:10mm}}</style></head><body>
   <div class="hdr">
     <div class="en">Ministry of Health<br>Wasit Health Directorate<br>Technical Affairs Dept.<br><strong>Blood Donor Questionnaire</strong></div>
@@ -2025,6 +2054,17 @@ function printBC(type){
 .oqc-title{font-size:13px;font-weight:700;color:#92400E}
 .oqc-sub{font-size:11px;color:#B45309;margin-top:3px}
 .oqc-count{background:#92400E;color:#fff;border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700}
+
+/* BACK BUTTON */
+.back-btn{
+  display:none;align-items:center;gap:6px;
+  background:none;border:none;cursor:pointer;
+  color:#BE123C;font-size:13px;font-weight:600;
+  padding:8px 16px 4px;font-family:inherit;
+  -webkit-tap-highlight-color:transparent;
+}
+.back-btn.show{display:flex}
+.back-btn-icon{font-size:18px}
 @media print{@page{margin:6mm}}</style></head><body>
   <div class="card">
     <div class="hd"><div class="hd-ico">🩸</div>
@@ -2307,6 +2347,17 @@ function printStats(){
 .oqc-title{font-size:13px;font-weight:700;color:#92400E}
 .oqc-sub{font-size:11px;color:#B45309;margin-top:3px}
 .oqc-count{background:#92400E;color:#fff;border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700}
+
+/* BACK BUTTON */
+.back-btn{
+  display:none;align-items:center;gap:6px;
+  background:none;border:none;cursor:pointer;
+  color:#BE123C;font-size:13px;font-weight:600;
+  padding:8px 16px 4px;font-family:inherit;
+  -webkit-tap-highlight-color:transparent;
+}
+.back-btn.show{display:flex}
+.back-btn-icon{font-size:18px}
 @media print{@page{margin:10mm}}</style></head>
   <body>${c}<script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
   w.document.close();
@@ -3015,6 +3066,21 @@ function updateHeaderDept(){
   const deptMap = {admin:'الإدارة',reception:'الاستقبال',tech:'السحب',lab:'المختبر',supply:'التجهيز',viewer:'عرض'};
   const dept = deptMap[role] || '—';
   if(G('ahDept')) G('ahDept').textContent = dept;
+}
+
+// ================================================================
+// BACK BUTTON
+// ================================================================
+function goBack(){
+  const isMob = window.innerWidth <= 768;
+  if(isMob){
+    // On mobile: go to work tab grid
+    const btn = document.getElementById('tab-work-btn');
+    switchMainTab('work', btn);
+  } else {
+    // On desktop: go to dashboard
+    nav('dashboard', document.getElementById('navDashboard'));
+  }
 }
 
 // ================================================================
