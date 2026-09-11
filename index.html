@@ -15,6 +15,7 @@
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js" async></script>
 
 <style>
@@ -1014,10 +1015,10 @@ tbody tr:hover td{background:#fafafa}
             <div style="font-size:13px;font-weight:700;color:#166534;margin-bottom:10px">✅ تم الحفظ بنجاح — اختر ما تريد طباعته:</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               <button class="btn btn-p" onclick="printDonorForm()" style="flex:1;justify-content:center">
-                🖨️ طباعة استمارة المتبرع
+                📄 تصدير استمارة المتبرع
               </button>
               <button class="btn" onclick="printBottleSticker()" style="flex:1;justify-content:center;border-color:#BE123C;color:#BE123C">
-                🏷️ طباعة ملصق القنينة
+                🏷️ تصدير ملصق القنينة
               </button>
             </div>
             <button class="btn" onclick="newDonor()" style="width:100%;justify-content:center;margin-top:8px">
@@ -1514,28 +1515,169 @@ function newDonor(){
   _lastDonation = null;
 }
 
-function printViaIframe(html){
-  // Add close button to the print HTML
-  const closeBtn = `<div style="position:fixed;top:10px;left:10px;z-index:9999">
-    <button onclick="window.close()" style="background:#BE123C;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;cursor:pointer;font-family:Arial">✕ إغلاق</button>
-    <button onclick="window.print()" style="background:#1E293B;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;cursor:pointer;font-family:Arial;margin-right:8px">🖨️ طباعة</button>
-  </div>`;
-  html = html.replace('<body>', '<body>' + closeBtn);
-  const win=window.open('','_blank');
-  if(!win){
-    let fr=document.getElementById('bbPrintFr');
-    if(fr) fr.remove();
-    fr=document.createElement('iframe');
-    fr.id='bbPrintFr';
-    fr.style.cssText='position:fixed;left:-9999px;top:-9999px;width:0;height:0;border:0';
-    document.body.appendChild(fr);
-    const dd=fr.contentWindow.document;
-    dd.open();dd.write(html);dd.close();
-    setTimeout(()=>{try{fr.contentWindow.focus();fr.contentWindow.print();}catch(e){}},300);
-    return;
+// ================================================================
+// EXPORT PDF — Canvas + jsPDF (same as electricity app)
+// ================================================================
+async function shareOrDownloadFile(blob, filename, mimeType){
+  try{
+    const file = new File([blob], filename, {type: mimeType});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:filename});
+      return;
+    }
+  }catch(err){
+    if(err && err.name==='AbortError') return;
   }
-  win.document.open();win.document.write(html);win.document.close();
-  setTimeout(()=>{try{win.focus();win.print();}catch(e){toast('تعذرت الطباعة','error');}},400);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function exportDonorFormPDF(){
+  const d = _lastDonation;
+  if(!d){ toast('لا توجد بيانات','error'); return; }
+  toast('⏳ جاري تجهيز الملف...','warning',3000);
+  try{
+    const {jsPDF} = window.jspdf;
+    const W=595, H=842, sc=2;
+    const cv = document.createElement('canvas');
+    cv.width=W*sc; cv.height=H*sc;
+    const x = cv.getContext('2d');
+    x.scale(sc,sc);
+
+    // Background
+    x.fillStyle='#fff'; x.fillRect(0,0,W,H);
+    // Border
+    x.strokeStyle='#000'; x.lineWidth=1.5; x.strokeRect(10,10,W-20,H-20);
+
+    // Header
+    x.fillStyle='#BE123C'; x.fillRect(10,10,W-20,40);
+    x.fillStyle='#fff'; x.font='bold 14px Arial'; x.textAlign='center';
+    x.fillText('شعبة مصرف الدم الرئيسي — واسط',W/2,35);
+    x.font='10px Arial';
+    x.fillText('وزارة الصحة / دائرة صحة واسط / قسم الأمور الفنية',W/2,50);
+
+    // Subtitle
+    x.fillStyle='#000'; x.font='bold 11px Arial';
+    x.fillText('Blood Donor Questionnaire — استمارة المتبرع',W/2,70);
+
+    // Bottle number box
+    x.strokeStyle='#BE123C'; x.lineWidth=2; x.strokeRect(W-120,15,105,45);
+    x.fillStyle='#BE123C'; x.font='bold 18px monospace'; x.textAlign='center';
+    x.fillText(String(d.bottle_number||'—'),W-67,42);
+    x.fillStyle='#555'; x.font='8px Arial'; x.fillText('رقم القنينة',W-67,55);
+
+    // Info grid
+    const fields = [
+      ['الاسم الكامل', d.donor_name||'—', 'نوع القنينة', d.bottle_type||'—'],
+      ['تاريخ التبرع', d.donation_date||'—', 'الوقت', d.donation_time||'—'],
+      ['سنة الميلاد', String(d.birth_year||'—'), 'العمر', d.birth_year?String(new Date().getFullYear()-d.birth_year)+' سنة':'—'],
+      ['الجنس', d.gender||'—', 'نوع التبرع', d.donation_type||'—'],
+      ['رقم الهاتف', d.mobile||'—', 'رقم البطاقة', d.national_id||'—'],
+      ['فصيلة الدم', d.blood_type||'—', 'العنوان', d.address||'—'],
+    ];
+    let ry=85; const cw=(W-20)/2;
+    x.textAlign='right';
+    fields.forEach(row=>{
+      // Left col
+      x.strokeStyle='#e2e8f0'; x.lineWidth=0.5;
+      x.strokeRect(10,ry,cw,22); x.strokeRect(10+cw,ry,cw,22);
+      x.fillStyle='#94A3B8'; x.font='bold 8px Arial';
+      x.fillText(row[0]+':',10+cw-5,ry+8);
+      x.fillStyle='#1E293B'; x.font='10px Arial';
+      x.fillText(row[1],10+cw-60,ry+17);
+      x.fillStyle='#94A3B8'; x.font='bold 8px Arial';
+      x.fillText(row[2]+':',W-15,ry+8);
+      x.fillStyle='#1E293B'; x.font='10px Arial';
+      x.fillText(row[3],W-60,ry+17);
+      ry+=22;
+    });
+
+    // Questionnaire
+    ry+=6;
+    x.fillStyle='#f1f5f9'; x.fillRect(10,ry,W-20,16);
+    x.fillStyle='#1E293B'; x.font='bold 9px Arial'; x.textAlign='center';
+    x.fillText('استبيان ما قبل التبرع — Pre-Donation Questionnaire',W/2,ry+11);
+    ry+=18;
+    const qs=['هل أنت بصحة جيدة اليوم؟','هل نمت جيداً الليلة الماضية؟','هل تناولت وجبة قبل التبرع؟','هل تعاني من مرض مزمن؟','هل تناولت أدوية خلال الأسبوع الماضي؟','هل سبق لك التبرع بالدم؟','هل تبرعت خلال الثلاثة أشهر الماضية؟','هل لديك أعراض حالية؟'];
+    qs.forEach((q,i)=>{
+      x.strokeStyle='#e2e8f0'; x.lineWidth=0.5;
+      x.strokeRect(10,ry,W-20,18);
+      x.fillStyle='#1E293B'; x.font='9px Arial'; x.textAlign='right';
+      x.fillText(q,W-18,ry+12);
+      // Checkboxes
+      x.strokeStyle='#000'; x.lineWidth=0.8;
+      x.strokeRect(50,ry+3,11,11); x.fillStyle='#333'; x.font='8px Arial'; x.textAlign='right';
+      x.fillText('نعم',80,ry+12);
+      x.strokeRect(90,ry+3,11,11);
+      x.fillText('لا',115,ry+12);
+      ry+=18;
+    });
+
+    // Signatures
+    ry+=8;
+    x.strokeStyle='#000'; x.lineWidth=0.8;
+    x.beginPath(); x.moveTo(10,ry); x.lineTo(W-10,ry); x.stroke();
+    ['توقيع المتبرع','توقيع الموظف','الختم الرسمي'].forEach((s,i)=>{
+      const sx=10+i*(W/3);
+      x.fillStyle='#555'; x.font='8px Arial'; x.textAlign='right';
+      x.fillText(s,sx+(W/3)-5,ry+12);
+      x.strokeRect(sx+5,ry+16,W/3-10,28);
+    });
+
+    const img = cv.toDataURL('image/jpeg',0.92);
+    const doc = new jsPDF({orientation:'portrait',unit:'pt',format:'a4',compress:true});
+    doc.addImage(img,'JPEG',0,0,595,842);
+    const blob = doc.output('blob');
+    await shareOrDownloadFile(blob,'استمارة_'+( d.donor_name||'متبرع')+'_'+( d.donation_date||'')+'.pdf','application/pdf');
+    toast('✅ تم تصدير الاستمارة','success');
+  }catch(e){
+    console.error(e);
+    toast('خطأ: '+e.message,'error');
+  }
+}
+
+async function exportBottleStickerPDF(){
+  const d = _lastDonation;
+  if(!d){ toast('لا توجد بيانات','error'); return; }
+  toast('⏳ جاري تجهيز الملصق...','warning',2000);
+  try{
+    const {jsPDF} = window.jspdf;
+    const W=100,H=60,sc=4;
+    const cv=document.createElement('canvas');
+    cv.width=W*sc; cv.height=H*sc;
+    const x=cv.getContext('2d');
+    x.scale(sc,sc);
+    x.fillStyle='#fff'; x.fillRect(0,0,W,H);
+    x.strokeStyle='#000'; x.lineWidth=0.8; x.strokeRect(1,1,W-2,H-2);
+    // Name
+    x.fillStyle='#000'; x.font='bold 7px Arial'; x.textAlign='center';
+    x.fillText(d.donor_name||'—',W/2,10);
+    x.beginPath(); x.moveTo(3,13); x.lineTo(W-3,13); x.stroke();
+    // Number
+    x.font='bold 18px monospace';
+    x.fillText(String(d.bottle_number||'—'),W/2,34);
+    // Dates
+    x.strokeRect(3,38,46,18); x.strokeRect(51,38,46,18);
+    x.fillStyle='#555'; x.font='5.5px Arial';
+    x.fillText('تاريخ السحب',26,45);
+    x.fillText('تاريخ النفاد',74,45);
+    x.fillStyle='#000'; x.font='bold 6.5px Arial';
+    x.fillText(d.donation_date||'—',26,54);
+    x.fillText(d.expiry_date||'—',74,54);
+    const img=cv.toDataURL('image/jpeg',0.95);
+    const doc=new jsPDF({orientation:'landscape',unit:'mm',format:[H,W],compress:true});
+    doc.addImage(img,'JPEG',0,0,W,H);
+    const blob=doc.output('blob');
+    await shareOrDownloadFile(blob,'ملصق_'+d.bottle_number+'.pdf','application/pdf');
+    toast('✅ تم تصدير الملصق','success');
+  }catch(e){
+    console.error(e);
+    toast('خطأ: '+e.message,'error');
+  }
 }
 
 
@@ -4010,13 +4152,13 @@ if('serviceWorker' in navigator){
 <!-- PRINT CHOICE MODAL -->
 <div class="overlay" id="printChoiceModal">
   <div class="modal" style="max-width:320px">
-    <div class="modal-title">🖨️ اختر نوع الطباعة</div>
+    <div class="modal-title">📤 اختر نوع التصدير</div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:10px;padding:16px">
-      <button class="btn-action" onclick="printDonorForm();G('printChoiceModal').classList.remove('on')">
-        📄 طباعة استمارة المتبرع
+      <button class="btn-action" onclick="exportDonorFormPDF();G('printChoiceModal').classList.remove('on')">
+        📄 تصدير استمارة المتبرع
       </button>
-      <button class="btn-action" onclick="printBottleSticker();G('printChoiceModal').classList.remove('on')" style="background:#0F766E">
-        🏷️ طباعة ملصق القنينة
+      <button class="btn-action" onclick="exportBottleStickerPDF();G('printChoiceModal').classList.remove('on')" style="background:#0F766E">
+        🏷️ تصدير ملصق القنينة
       </button>
       <button class="btn" onclick="G('printChoiceModal').classList.remove('on')" style="width:100%;justify-content:center">
         إلغاء
