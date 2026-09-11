@@ -555,12 +555,6 @@ tbody tr:hover td{background:#fafafa}
 </style>
 </head>
 <body>
-<!-- DIAGNOSTIC OVERLAY - shows what's happening during load -->
-<div id="diagBox" style="position:fixed;top:0;left:0;right:0;background:#1a1a2e;color:#00ff88;font-family:monospace;font-size:12px;padding:10px;z-index:99999;max-height:40vh;overflow-y:auto;direction:ltr">
-  <div style="color:#fff;font-size:14px;margin-bottom:6px">🔍 Diagnostic Mode</div>
-  <div id="diagLog"></div>
-</div>
-<div id="diagClose" style="position:fixed;top:4px;right:4px;z-index:999999;background:#BE123C;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer" onclick="document.getElementById('diagBox').remove();document.getElementById('diagClose').remove()">✕ إخفاء</div>
 
 <div id="toastBox"></div>
 <div id="loader"><div class="spin"></div><span style="font-size:12px;color:#9e9e9e">جاري التحميل...</span></div>
@@ -1109,17 +1103,6 @@ tbody tr:hover td{background:#fafafa}
 </div>
 
 <script>
-// Catch ALL JS errors
-window.onerror = function(msg, src, line, col, err){
-  alert('JS Error at line '+line+':\n'+msg);
-  return true;
-};
-// FIRST LINE TEST
-try{
-  var dl = document.getElementById("diagLog");
-  if(dl) dl.innerHTML += '<div style="color:#0ff">✅ JS STARTED</div>';
-  else alert("diagLog not found!");
-} catch(e){ alert("First line error: "+e.message); }
 // ================================================================
 // ⚠ CONFIG — غيّر هاتين القيمتين بعد إنشاء مشروعك في Supabase
 //   Dashboard → Settings → API → Project URL + anon/public key
@@ -1135,10 +1118,8 @@ if(typeof supabase === 'undefined'){
   document.body.innerHTML = '<div style="font-family:Arial;direction:rtl;text-align:center;padding:40px;background:#fff;min-height:100vh"><div style="font-size:60px;margin-bottom:20px">⚠️</div><h2 style="color:#BE123C;margin-bottom:12px">تعذّر تحميل التطبيق</h2><p style="color:#64748B;font-size:15px;margin-bottom:20px">تعذّر الاتصال بخادم Supabase.<br>تأكد من الاتصال بالإنترنت وأعد تحميل الصفحة.</p><button onclick="location.reload()" style="background:#BE123C;color:#fff;border:none;padding:14px 32px;border-radius:12px;font-size:16px;cursor:pointer;font-family:inherit">🔄 إعادة التحميل</button></div>';
   throw new Error('Supabase CDN not loaded');
 }
-document.getElementById("diagLog").innerHTML += '<div style="color:#0ff">✅ Supabase loaded</div>';
 const { createClient } = supabase;
 const db = createClient(SURL, SKEY);
-document.getElementById("diagLog").innerHTML += '<div style="color:#0ff">✅ DB client created</div>';
 let SES = null, UPROF = null, DPAGE = 1, SRDATA = [], BCDATA = null;
 const PS = 20;
 
@@ -1534,6 +1515,12 @@ function newDonor(){
 }
 
 function printViaIframe(html){
+  // Add close button to the print HTML
+  const closeBtn = `<div style="position:fixed;top:10px;left:10px;z-index:9999">
+    <button onclick="window.close()" style="background:#BE123C;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;cursor:pointer;font-family:Arial">✕ إغلاق</button>
+    <button onclick="window.print()" style="background:#1E293B;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;cursor:pointer;font-family:Arial;margin-right:8px">🖨️ طباعة</button>
+  </div>`;
+  html = html.replace('<body>', '<body>' + closeBtn);
   const win=window.open('','_blank');
   if(!win){
     let fr=document.getElementById('bbPrintFr');
