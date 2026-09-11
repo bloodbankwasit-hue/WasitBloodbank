@@ -808,6 +808,10 @@ tbody tr:hover td{background:#fafafa}
               </select>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div class="fgrp" style="margin:0"><label style="font-size:11px;color:#757575;display:block;margin-bottom:4px">من تاريخ</label><input type="date" id="dDateFrom" onchange="loadDonors(1)" style="width:100%;padding:9px 10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:13px"></div>
+              <div class="fgrp" style="margin:0"><label style="font-size:11px;color:#757575;display:block;margin-bottom:4px">إلى تاريخ</label><input type="date" id="dDateTo" onchange="loadDonors(1)" style="width:100%;padding:9px 10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:13px"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
               <button class="btn btn-p" onclick="loadDonors(1)" style="justify-content:center">
                 <i class="ti ti-search"></i> بحث
               </button>
@@ -2562,21 +2566,47 @@ async function loadDonors(page=1){
   const s     = G('dSrch')?.value.trim()||'';
   const bgF   = G('dBGFilter')?.value.trim()||'';
   const typeF = G('dTypeFilter')?.value.trim()||'';
+  const dFrom = G('dDateFrom')?.value||'';
+  const dTo   = G('dDateTo')?.value||'';
   load(true);
   try{
-    let q=db.from('blood_donations')
-      .select('bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,status,id,donors!inner(donor_number,full_name,birth_year,national_id)',{count:'exact'})
-      .eq('is_deleted',false).order('created_at',{ascending:false})
-      .range((page-1)*PS, page*PS-1);
+    const SEL='bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,status,id,donors!inner(donor_number,full_name,birth_year,national_id)';
+    let q;
+    if(s){
+      // PostgREST's or()/and() only accepts columns on the table being queried — it cannot
+      // reference an embedded/joined table's columns (e.g. "donors.full_name") inside or().
+      // So donor identity fields (name/mobile/national id/donor number) are matched first,
+      // against the donors table directly, then we filter blood_donations by donor_id.
+      const clean=s.replace(/[,()%*:]/g,'').trim();
+      const isNum=!isNaN(clean)&&clean!=='';
+      let donorIds=[];
+      if(clean){
+        let dq=db.from('donors').select('id').eq('is_deleted',false)
+          .or(`national_id.ilike.*${clean}*,full_name.ilike.*${clean}*,mobile.ilike.*${clean}*`+(isNum?`,donor_number.eq.${clean}`:''))
+          .limit(500);
+        const{data:matched}=await dq;
+        donorIds=(matched||[]).map(x=>x.id);
+      }
+      const orParts=[];
+      if(isNum) orParts.push(`bottle_number.eq.${clean}`);
+      if(donorIds.length) orParts.push(`donor_id.in.(${donorIds.join(',')})`);
+      if(!orParts.length){
+        G('dTbl').innerHTML='<div class="empty"><i class="ti ti-users"></i><p>لا توجد نتائج</p></div>';
+        G('dPag').innerHTML='';
+        load(false);
+        return;
+      }
+      q=db.from('blood_donations').select(SEL,{count:'exact'})
+        .eq('is_deleted',false)
+        .or(orParts.join(','));
+    } else {
+      q=db.from('blood_donations').select(SEL,{count:'exact'}).eq('is_deleted',false);
+    }
     if(bgF)   q=q.eq('blood_type',bgF);
     if(typeF) q=q.eq('donation_type',typeF);
-    if(s){ const clean=s.replace(/[,()%*:]/g,'').trim(); const isNum=!isNaN(clean)&&clean!=='';
-      q=db.from('blood_donations')
-      .select('bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,status,id,donors!inner(donor_number,full_name,birth_year,national_id)',{count:'exact'})
-      .eq('is_deleted',false)
-      .or(`bottle_number.eq.${isNum?clean:0},donors.national_id.ilike.*${clean}*,donors.donor_number.eq.${isNum?clean:0},donors.full_name.ilike.*${clean}*,donors.mobile.ilike.*${clean}*`)
-      .order('created_at',{ascending:false}).range((page-1)*PS,page*PS-1);
-    }
+    if(dFrom) q=q.gte('donation_date',dFrom);
+    if(dTo)   q=q.lte('donation_date',dTo);
+    q=q.order('created_at',{ascending:false}).range((page-1)*PS,page*PS-1);
     const {data,count,error}=await q; if(error) throw error;
     const now=new Date();
     if(data&&data.length){
