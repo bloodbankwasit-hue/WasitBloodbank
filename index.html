@@ -2659,13 +2659,17 @@ function printForm(){
 // DONORS LIST
 // ================================================================
 async function loadDonors(page=1){
-  DPAGE=page; const s=G('dSrch').value.trim(); load(true);
+  DPAGE=page;
+  const s     = G('dSrch')?.value.trim()||'';
+  const bgF   = G('dBGFilter')?.value.trim()||'';
+  const typeF = G('dTypeFilter')?.value.trim()||'';
+  load(true);
   try{
     let q=db.from('blood_donations')
       .select('bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,status,id,donors!inner(donor_number,full_name,birth_year,national_id)',{count:'exact'})
       .eq('is_deleted',false).order('created_at',{ascending:false})
       .range((page-1)*PS, page*PS-1);
-    if(bgF) q=q.eq('blood_type',bgF);
+    if(bgF)   q=q.eq('blood_type',bgF);
     if(typeF) q=q.eq('donation_type',typeF);
     if(s){ q=db.from('blood_donations')
       .select('bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,status,id,donors!inner(donor_number,full_name,birth_year,national_id)',{count:'exact'})
