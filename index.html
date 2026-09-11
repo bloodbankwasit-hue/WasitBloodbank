@@ -1005,6 +1005,9 @@ tbody tr:hover td{background:#fafafa}
             <div class="fgrp"><label>رقم القنينة (تلقائي)</label>
               <input type="text" id="rc-bnum" class="ro" readonly placeholder="اختر النوع أولاً" style="background:#f0f9ff;color:#0F766E;font-weight:700;font-size:16px">
             </div>
+            <div class="fgrp"><label>تاريخ التبرع</label>
+              <input type="date" id="rc-date" class="ro" readonly style="background:#f0f9ff;color:#0F766E;font-weight:600">
+            </div>
             <div class="fgrp"><label>نوع التبرع *</label><select id="rc-dtype" onchange="toggleRcPat()"><option value="تعويضي">تعويضي</option><option value="طوعي">طوعي</option></select></div>
             <div class="fgrp" id="rc-pat-grp"><label>اسم المريض</label><input type="text" id="rc-pat" placeholder="اسم المريض"></div>
             <div class="fgrp s2" id="rc-hosp-grp"><label>اسم المستشفى</label><input type="text" id="rc-hosp" placeholder="المستشفى"></div>
@@ -3416,6 +3419,7 @@ async function saveReception(){
 
 function resetReception(){
   ['rc-name','rc-by','rc-age','rc-mom','rc-nid','rc-mob','rc-addr','rc-job','rc-pat','rc-hosp'].forEach(id=>{const e=G(id);if(e)e.value='';});
+  if(G('rc-date')){ const t=new Date().toISOString().split('T')[0]; G('rc-date').value=t; }
   if(G('rc-btype')) G('rc-btype').value='';
   if(G('rc-bnum'))  { G('rc-bnum').value=''; G('rc-bnum').dataset.seqId=''; }
   const iw2=G('intervalWarn'); if(iw2){ iw2.style.display='none'; iw2.dataset.blocked=''; }
@@ -4026,16 +4030,21 @@ function setAccTab(){
 async function checkDonationInterval(donorId){
   if(!donorId) return null;
   const{data}=await db.from('blood_donations')
-    .select('donation_date')
+    .select('created_at, donation_date, draw_date')
     .eq('donor_id', donorId)
     .not('status','eq','rejected_positive')
-    .order('donation_date',{ascending:false})
+    .order('created_at',{ascending:false})
     .limit(1);
-  if(!data||!data.length) return null; // no previous donation
-  const lastDate = new Date(data[0].donation_date);
+  if(!data||!data.length) return null;
+  // Use whichever date is available
+  const raw = data[0].donation_date || data[0].draw_date || data[0].created_at;
+  if(!raw) return null;
+  const lastDate = new Date(raw);
   const today = new Date();
+  today.setHours(0,0,0,0); lastDate.setHours(0,0,0,0);
   const diffDays = Math.floor((today - lastDate)/(1000*60*60*24));
-  return {lastDate: data[0].donation_date, diffDays, allowed: diffDays >= 77};
+  const displayDate = raw.split('T')[0];
+  return {lastDate: displayDate, diffDays, allowed: diffDays >= 77};
 }
 
 // ── Fetch next bottle number for selected type ──
