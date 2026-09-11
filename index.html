@@ -1113,10 +1113,10 @@ tbody tr:hover td{background:#fafafa}
           <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:12px;padding:12px 14px;margin-bottom:10px">
             <div style="font-size:13px;font-weight:700;color:#166534;margin-bottom:10px">✅ تم الحفظ بنجاح — اختر ما تريد طباعته:</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button class="btn btn-p" onclick="printDonorForm()" style="flex:1;justify-content:center">
+              <button class="btn btn-p" onclick="exportDonorFormPDF()" style="flex:1;justify-content:center">
                 📄 تصدير استمارة المتبرع
               </button>
-              <button class="btn" onclick="printBottleSticker()" style="flex:1;justify-content:center;border-color:#BE123C;color:#BE123C">
+              <button class="btn" onclick="exportBottleStickerPDF()" style="flex:1;justify-content:center;border-color:#BE123C;color:#BE123C">
                 🏷️ تصدير ملصق القنينة
               </button>
             </div>
@@ -1244,6 +1244,13 @@ function load(v){ G('loader').classList.toggle('on',v); }
 function fd(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('ar-IQ',{year:'numeric',month:'2-digit',day:'2-digit'}); }
 function ft(t){ return t ? t.substring(0,5) : '—'; }
 function fnum(n){ return n!=null ? Number(n).toLocaleString('ar-IQ') : '—'; }
+// HTML-escape any user-supplied text before inserting into innerHTML (prevents stored XSS
+// from donor/employee names, addresses, notes, etc. containing HTML/script characters)
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+// Sanitizes a value for safe embedding as a single-quoted JS string literal inside an
+// onclick="..." (double-quoted) HTML attribute — strips characters that could break out
+// of either the attribute or the string literal.
+function sq(s){ return String(s??'').replace(/['"<>\\]/g,''); }
 
 // ================================================================
 // AUTH
@@ -1285,10 +1292,10 @@ async function donorSearch(field, val){
       // Show compact list for multiple matches or name search
       list.innerHTML = data.map(d=>`
         <div class="ac-item" onmousedown="fillDonor(${JSON.stringify(d).replace(/"/g,'&quot;')})">
-          <div class="ac-av">${d.full_name.charAt(0)}</div>
+          <div class="ac-av">${esc(d.full_name.charAt(0))}</div>
           <div class="ac-info">
-            <div class="ac-name">${d.full_name}</div>
-            <div class="ac-sub">${d.mobile||'—'} | ${d.national_id||'—'}</div>
+            <div class="ac-name">${esc(d.full_name)}</div>
+            <div class="ac-sub">${esc(d.mobile||'—')} | ${esc(d.national_id||'—')}</div>
           </div>
         </div>`).join('');
       list.classList.add('show');
@@ -1507,121 +1514,6 @@ function buildDonorFormCanvas(d){
       w:W, h:H
     });
   });
-}
-
-async function printDonorForm(){
-  const d=_lastDonation;
-  if(!d){toast('لا توجد بيانات للطباعة','error');return;}
-  const html=`<!DOCTYPE html>
-<html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>استمارة متبرع</title>
-<style>
-@page{size:A4;margin:12mm}
-*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
-body{color:#000;background:#fff;font-size:11pt}
-.wrap{border:2px solid #000;padding:10px;min-height:260mm}
-.hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:10px}
-.hdr-t h2{font-size:13pt;font-weight:bold;margin-bottom:3px}
-.hdr-t p{font-size:9pt;color:#444}
-.hdr-t .en{font-size:10pt;font-weight:bold;margin-top:2px}
-.bc-box{border:1.5px solid #000;padding:8px 12px;text-align:center;border-radius:4px}
-.bc-num{font-size:18pt;font-weight:bold;letter-spacing:2px}
-.grid{display:grid;grid-template-columns:1fr 1fr;border:1.5px solid #000;margin-bottom:8px}
-.cell{padding:5px 8px;border-bottom:1px solid #ccc;border-right:1px solid #ccc}
-.cell:nth-child(odd){border-right:none}
-.lbl{font-size:8.5pt;font-weight:bold;color:#555;margin-bottom:2px}
-.val{font-size:10.5pt;font-weight:bold}
-.q-hdr{background:#f0f0f0;padding:5px 8px;font-weight:bold;font-size:10pt;border:1.5px solid #000;border-bottom:none;margin-top:8px}
-.q-wrap{border:1.5px solid #000;padding:4px}
-.q{display:flex;align-items:center;justify-content:space-between;padding:4px 6px;border-bottom:1px dotted #ddd;font-size:9.5pt}
-.q:last-child{border-bottom:none}
-.boxes{display:flex;gap:12px;flex-shrink:0}
-.box{width:13px;height:13px;border:1.5px solid #000;display:inline-block}
-.sigs{display:flex;justify-content:space-between;margin-top:10px;border-top:1.5px solid #000;padding-top:6px;font-size:9pt}
-.sig-line{border-bottom:1px solid #000;width:110px;height:28px}
-</style></head><body>
-<div class="wrap">
-<div class="hdr">
-  <div class="hdr-t">
-    <h2>شعبة مصرف الدم الرئيسي — واسط</h2>
-    <p>وزارة الصحة / دائرة صحة واسط / قسم الأمور الفنية</p>
-    <div class="en">Blood Donor Questionnaire</div>
-  </div>
-  <div class="bc-box">
-    <div class="bc-num">${d.bottle_number||'—'}</div>
-    <div style="font-size:8pt;margin-top:3px">رقم القنينة</div>
-  </div>
-</div>
-<div class="grid">
-  <div class="cell"><div class="lbl">الاسم الكامل</div><div class="val">${d.donor_name||'—'}</div></div>
-  <div class="cell"><div class="lbl">نوع القنينة</div><div class="val">${d.bottle_type||'—'}</div></div>
-  <div class="cell"><div class="lbl">تاريخ التبرع</div><div class="val">${d.donation_date||'—'}</div></div>
-  <div class="cell"><div class="lbl">الوقت</div><div class="val">${d.donation_time||'—'}</div></div>
-  <div class="cell"><div class="lbl">سنة الميلاد</div><div class="val">${d.birth_year||'—'}</div></div>
-  <div class="cell"><div class="lbl">العمر</div><div class="val">${d.birth_year?new Date().getFullYear()-d.birth_year:'—'} سنة</div></div>
-  <div class="cell"><div class="lbl">الجنس</div><div class="val">${d.gender||'—'}</div></div>
-  <div class="cell"><div class="lbl">نوع التبرع</div><div class="val">${d.donation_type||'—'}</div></div>
-  <div class="cell"><div class="lbl">رقم الهاتف</div><div class="val">${d.mobile||'—'}</div></div>
-  <div class="cell"><div class="lbl">رقم البطاقة الوطنية</div><div class="val">${d.national_id||'—'}</div></div>
-  <div class="cell"><div class="lbl">فصيلة الدم</div><div class="val">${d.blood_type||'—'}</div></div>
-  <div class="cell"><div class="lbl">العنوان</div><div class="val">${d.address||'—'}</div></div>
-</div>
-<div class="q-hdr">استبيان ما قبل التبرع — Pre-Donation Questionnaire</div>
-<div class="q-wrap">
-${['هل أنت بصحة جيدة اليوم؟','هل نمت جيداً الليلة الماضية؟','هل تناولت وجبة قبل التبرع؟','هل تعاني من مرض مزمن؟','هل تناولت أدوية خلال الأسبوع الماضي؟','هل سبق لك التبرع بالدم؟','هل تبرعت خلال الثلاثة أشهر الماضية؟','هل لديك أعراض حالية (حمى، سعال...)?'].map(q=>`<div class="q"><span>${q}</span><div class="boxes"><span class="box"></span>نعم &nbsp;<span class="box"></span>لا</div></div>`).join('')}
-</div>
-<div class="sigs">
-  <div>توقيع المتبرع<div class="sig-line"></div></div>
-  <div>توقيع الموظف<div class="sig-line"></div></div>
-  <div>الختم الرسمي<div class="sig-line"></div></div>
-</div>
-</div></body></html>`;
-  printViaIframe(html);
-}
-
-async function printBottleSticker(){
-  const d=_lastDonation;
-  if(!d){toast('لا توجد بيانات للطباعة','error');return;}
-  const html=`<!DOCTYPE html>
-<html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>ملصق قنينة</title>
-<style>
-@page{size:100mm 60mm;margin:2mm}
-*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
-body{width:96mm;height:56mm;background:#fff}
-.sticker{border:2px solid #000;padding:6px 8px;width:100%;height:100%;display:flex;flex-direction:column;justify-content:space-between}
-.name{font-size:11pt;font-weight:bold;text-align:center;border-bottom:1px solid #000;padding-bottom:4px}
-.num{font-size:26pt;font-weight:bold;text-align:center;letter-spacing:3px;padding:4px 0}
-.dates{display:flex;gap:4px}
-.date-box{flex:1;border:1px solid #000;padding:3px 5px;border-radius:3px}
-.date-lbl{font-size:7pt;color:#555}
-.date-val{font-size:9.5pt;font-weight:bold}
-</style></head><body>
-<div class="sticker">
-  <div class="name">${d.donor_name||'—'}</div>
-  <div class="num">${d.bottle_number||'—'}</div>
-  <div class="dates">
-    <div class="date-box"><div class="date-lbl">تاريخ السحب</div><div class="date-val">${d.donation_date||'—'}</div></div>
-    <div class="date-box"><div class="date-lbl">تاريخ النفاد</div><div class="date-val">${d.expiry_date||'—'}</div></div>
-  </div>
-</div></body></html>`;
-  printViaIframe(html);
-}
-
-
-
-function generateBarcodeSVG(num){
-  // Simple barcode-like SVG representation
-  const s = String(num).padStart(8,'0');
-  let bars = '';
-  const startX = 5;
-  let x = startX;
-  for(let i=0;i<s.length;i++){
-    const d = parseInt(s[i]);
-    const w = 2 + (d%3);
-    const gap = 1 + (d%2);
-    bars += `<rect x="${x}" y="2" width="${w}" height="38" fill="#000"/>`;
-    x += w + gap;
-  }
-  return bars;
 }
 
 function newDonor(){
@@ -2266,7 +2158,7 @@ async function nav(name, el){
     case 'dashboard':  await loadDash(); break;
     case 'workhome':   break; // grid already built
     case 'account':    break; // already built
-    case 'donors':    await loadDonors(1); break;
+    case 'donors':    showDonorsPlaceholder(); break;
     case 'infected':await loadInfected('', document.querySelector('.tab')); break;
     case 'rejected':await loadRejected(); break;
     case 'rare':    await loadRareGrid(); break;
@@ -2315,7 +2207,7 @@ async function loadDash(){
         <th>نوع التبرع</th><th>وقت التبرع</th><th>الفحوصات</th>
       </tr></thead><tbody>${rec.map(r=>`<tr>
         <td>${N(r.donors?.donor_number)}</td>
-        <td>${N(r.donors?.full_name)}</td>
+        <td>${esc(N(r.donors?.full_name))}</td>
         <td>${r.bottle_type}</td>
         <td>${N(r.blood_type)}</td>
         <td><span class="pill ${r.donation_type==='طوعي'?'pg':'py'}">${r.donation_type}</span></td>
@@ -2381,6 +2273,8 @@ async function saveDonor(printAfter=false){
   const nm=G('f-name').value.trim(), by=parseInt(G('f-by').value), dd=G('f-ddate').value;
   if(!nm||!by||!dd){toast('يرجى تعبئة: الاسم، سنة التولد، تاريخ التبرع','error'); return;}
   load(true);
+  const intervalBlock = await checkIntervalBeforeSave(G('f-nid').value, G('f-mob').value);
+  if(intervalBlock){ load(false); toast(intervalBlock.message,'error',6000); return; }
   try{
     const {data:dn,error:de}=await db.from('donors').insert({
       full_name:nm, birth_year:by, gender:G('f-gen').value,
@@ -2658,6 +2552,11 @@ function printForm(){
 // ================================================================
 // DONORS LIST
 // ================================================================
+function showDonorsPlaceholder(){
+  G('dTbl').innerHTML='<div class="empty"><i class="ti ti-search"></i><p>استخدم البحث أو الفلاتر أعلاه لعرض المتبرعين</p></div>';
+  G('dPag').innerHTML='';
+}
+
 async function loadDonors(page=1){
   DPAGE=page;
   const s     = G('dSrch')?.value.trim()||'';
@@ -2671,10 +2570,11 @@ async function loadDonors(page=1){
       .range((page-1)*PS, page*PS-1);
     if(bgF)   q=q.eq('blood_type',bgF);
     if(typeF) q=q.eq('donation_type',typeF);
-    if(s){ q=db.from('blood_donations')
+    if(s){ const clean=s.replace(/[,()]/g,'').trim(); const isNum=!isNaN(clean)&&clean!=='';
+      q=db.from('blood_donations')
       .select('bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,status,id,donors!inner(donor_number,full_name,birth_year,national_id)',{count:'exact'})
       .eq('is_deleted',false)
-      .or(`bottle_number.eq.${isNaN(s)?0:s},donors.national_id.ilike.%${s}%,donors.donor_number.eq.${isNaN(s)?0:s}`)
+      .or(`bottle_number.eq.${isNum?clean:0},donors.national_id.ilike.%${clean}%,donors.donor_number.eq.${isNum?clean:0},donors.full_name.ilike.%${clean}%,donors.mobile.ilike.%${clean}%`)
       .order('created_at',{ascending:false}).range((page-1)*PS,page*PS-1);
     }
     const {data,count,error}=await q; if(error) throw error;
@@ -2689,7 +2589,7 @@ async function loadDonors(page=1){
         const exp=r.expiry_date&&new Date(r.expiry_date)<now;
         return`<tr>
           <td>${N(r.donors?.donor_number)}</td>
-          <td>${N(r.donors?.full_name)}</td>
+          <td>${esc(N(r.donors?.full_name))}</td>
           <td>${age}</td>
           <td>${N(r.blood_type)}</td>
           <td>${r.bottle_type}</td>
@@ -2698,7 +2598,11 @@ async function loadDonors(page=1){
           <td>${fd(r.donation_date)}</td>
           <td style="color:${exp?'#BE123C':'inherit'}">${fd(r.expiry_date)}${exp?' ⚠':''}</td>
           <td><span class="pill ${(['in_stock','dispatched','rejected_positive'].includes(r.status)&&r.serology_result)?r.serology_result==='Negative'?'pg':'pr':'py'}">${(['in_stock','dispatched','rejected_positive'].includes(r.status)&&r.serology_result)?r.serology_result==='Negative'?'سالبة ✅':'موجبة ⚠️':'لم يُفحص'}</span></td>
-          <td><button class="ibtn" onclick="printDonorFromList(storeDonorForPrint({donor_name:'${(r.donors?.full_name||'').replace(/'/g,'')}',bottle_number:${r.bottle_number||0},bottle_type:'${r.bottle_type||''}',donation_date:'${r.donation_date||''}',donation_type:'${r.donation_type||''}',birth_year:${r.donors?.birth_year||0},gender:'${r.donors?.gender||''}',mobile:'${r.donors?.mobile||''}',national_id:'${r.donors?.national_id||''}',address:'${(r.donors?.address||'').replace(/'/g,'')}',expiry_date:'${r.expiry_date||''}',blood_type:'${r.blood_type||''}' }))" title="طباعة" style="color:#BE123C"><i class="ti ti-printer"></i></button></td>
+          <td style="white-space:nowrap">
+            <button class="ibtn" onclick="printDonorFromList(storeDonorForPrint({donor_name:'${sq(r.donors?.full_name)}',bottle_number:${r.bottle_number||0},bottle_type:'${r.bottle_type||''}',donation_date:'${r.donation_date||''}',donation_type:'${r.donation_type||''}',birth_year:${r.donors?.birth_year||0},gender:'${r.donors?.gender||''}',mobile:'${sq(r.donors?.mobile)}',national_id:'${sq(r.donors?.national_id)}',address:'${sq(r.donors?.address)}',expiry_date:'${r.expiry_date||''}',blood_type:'${r.blood_type||''}' }))" title="طباعة" style="color:#BE123C"><i class="ti ti-printer"></i></button>
+            <button class="ibtn" onclick="editDonorRow('${r.id}')" title="تعديل" style="color:#2563EB"><i class="ti ti-edit"></i></button>
+            <button class="ibtn" onclick="deleteDonorRow('${r.id}','${sq(r.donors?.full_name)}')" title="حذف" style="color:#DC2626"><i class="ti ti-trash"></i></button>
+          </td>
         </tr>`;}).join('')}</tbody></table></div>`;
       const tp=Math.ceil(count/PS);
       const start=Math.max(1,Math.min(page-2,tp-4));
@@ -2714,6 +2618,103 @@ async function loadDonors(page=1){
     }
   }catch(e){toast('خطأ: '+e.message,'error');}
   finally{load(false);}
+}
+
+async function editDonorRow(id){
+  load(true);
+  try{
+    const{data:r,error}=await db.from('blood_donations')
+      .select('*,donors(*)').eq('id',id).single();
+    if(error) throw error;
+    G('ed-donid').value=r.id;
+    G('ed-donorid').value=r.donor_id;
+    G('ed-name').value=r.donors?.full_name||'';
+    G('ed-by').value=r.donors?.birth_year||'';
+    G('ed-gen').value=r.donors?.gender||'ذكر';
+    G('ed-mom').value=r.donors?.mother_name||'';
+    G('ed-nid').value=r.donors?.national_id||'';
+    G('ed-mob').value=r.donors?.mobile||'';
+    G('ed-addr').value=r.donors?.address||'';
+    G('ed-job').value=r.donors?.occupation||'';
+    G('ed-dtyp').value=r.donation_type||'تعويضي';
+    G('ed-btyp').value=r.bottle_type||'مفلتر';
+    G('ed-bnum').value=r.bottle_number||'';
+    G('ed-pat').value=r.patient_name||'';
+    G('ed-hosp').value=r.hospital_name||'';
+    G('ed-ddate').value=r.donation_date||'';
+    G('ed-dtime').value=r.donation_time||'';
+    G('ed-draw').value=r.draw_date||'';
+    G('ed-exp').value=r.expiry_date||'';
+    G('ed-bt').value=r.blood_type||'';
+    G('ed-bp').value=r.blood_pressure||'';
+    G('ed-wt').value=r.weight||'';
+    G('ed-pulse').value=r.pulse||'';
+    G('ed-hgb').value=r.hemoglobin||'';
+    G('ed-ser').value=r.serology_result||'Negative';
+    G('ed-sert').value=r.serology_type||'HIV';
+    toggleEdSer();
+    G('editDonorModal').classList.add('on');
+  }catch(e){ toast('خطأ: '+e.message,'error'); }
+  finally{ load(false); }
+}
+
+function toggleEdSer(){ G('edSerTypGrp').style.display=G('ed-ser').value==='Positive'?'flex':'none'; }
+
+async function saveDonorEdit(){
+  const donId=G('ed-donid').value, donorId=G('ed-donorid').value;
+  const nm=G('ed-name').value.trim(), by=parseInt(G('ed-by').value), dd=G('ed-ddate').value;
+  if(!nm||!by||!dd){ toast('يرجى تعبئة: الاسم، سنة التولد، تاريخ التبرع','error'); return; }
+  load(true);
+  try{
+    const{error:de}=await db.from('donors').update({
+      full_name:nm, birth_year:by, gender:G('ed-gen').value,
+      mother_name:G('ed-mom').value.trim()||null, national_id:G('ed-nid').value.trim()||null,
+      mobile:G('ed-mob').value.trim()||null, address:G('ed-addr').value.trim()||null,
+      occupation:G('ed-job').value.trim()||null
+    }).eq('id',donorId);
+    if(de) throw de;
+
+    const ser=G('ed-ser').value;
+    const{error:doe}=await db.from('blood_donations').update({
+      bottle_type:G('ed-btyp').value, donation_type:G('ed-dtyp').value,
+      patient_name:G('ed-pat').value.trim()||null, hospital_name:G('ed-hosp').value.trim()||null,
+      donation_date:dd, donation_time:G('ed-dtime').value||null,
+      draw_date:G('ed-draw').value||null, expiry_date:G('ed-exp').value||null,
+      blood_type:G('ed-bt').value||null, blood_pressure:G('ed-bp').value.trim()||null,
+      weight:parseFloat(G('ed-wt').value)||null, pulse:parseInt(G('ed-pulse').value)||null,
+      hemoglobin:parseFloat(G('ed-hgb').value)||null,
+      serology_result:ser, serology_type:ser==='Positive'?G('ed-sert').value:null
+    }).eq('id',donId);
+    if(doe) throw doe;
+
+    await db.from('audit_log').insert({
+      user_id:SES?.user?.id, user_name:UPROF?.full_name,
+      action:'UPDATE', table_name:'blood_donations',
+      record_id:donId, new_values:{donor:nm, bottle:G('ed-bnum').value}
+    });
+
+    toast('✅ تم حفظ التعديلات','success');
+    G('editDonorModal').classList.remove('on');
+    await loadDonors(DPAGE);
+  }catch(e){ toast('خطأ في الحفظ: '+e.message,'error'); }
+  finally{ load(false); }
+}
+
+async function deleteDonorRow(id,name){
+  if(!confirm(`هل تريد حذف تبرع "${name}"؟ سيتم إخفاؤه من كل القوائم والتقارير، ولا يمكن التراجع عن هذا الإجراء من الواجهة.`)) return;
+  load(true);
+  try{
+    const{error}=await db.from('blood_donations').update({is_deleted:true}).eq('id',id);
+    if(error) throw error;
+    await db.from('audit_log').insert({
+      user_id:SES?.user?.id, user_name:UPROF?.full_name,
+      action:'DELETE', table_name:'blood_donations',
+      record_id:id, new_values:{donor:name}
+    });
+    toast('تم حذف الإدخال','success');
+    await loadDonors(DPAGE);
+  }catch(e){ toast('خطأ: '+e.message,'error'); }
+  finally{ load(false); }
 }
 
 async function exportDonors(){
@@ -2763,7 +2764,7 @@ async function doSearch(){
         <th>رقم المتبرع</th><th>الاسم</th><th>الفصيلة</th><th>نوع القنينة</th><th>رقم القنينة</th>
         <th>نوع التبرع</th><th>تاريخ التبرع</th><th>تاريخ النفاد</th><th>الفحوصات</th><th></th>
       </tr></thead><tbody>${SRDATA.map(r=>`<tr>
-        <td>${N(r.donors?.donor_number)}</td><td>${N(r.donors?.full_name)}</td>
+        <td>${N(r.donors?.donor_number)}</td><td>${esc(N(r.donors?.full_name))}</td>
         <td>${N(r.blood_type)}</td><td>${r.bottle_type}</td>
         <td style="font-weight:700;color:#BE123C">${r.bottle_number}</td>
         <td><span class="pill ${r.donation_type==='طوعي'?'pg':'py'}">${r.donation_type}</span></td>
@@ -2816,7 +2817,7 @@ async function openBC(bn){
 function showBC(r){
   G('bcInfo').innerHTML=`
     <div class="bcf"><label>رقم المتبرع</label><span>${N(r.donors?.donor_number)}</span></div>
-    <div class="bcf"><label>اسم المتبرع</label><span>${N(r.donors?.full_name)}</span></div>
+    <div class="bcf"><label>اسم المتبرع</label><span>${esc(N(r.donors?.full_name))}</span></div>
     <div class="bcf red"><label>رقم القنينة</label><span>${r.bottle_number}</span></div>
     <div class="bcf"><label>نوع القنينة</label><span>${r.bottle_type}</span></div>
     <div class="bcf"><label>تاريخ السحب</label><span>${fd(r.draw_date)}</span></div>
@@ -3023,7 +3024,7 @@ function printBC(type){
       <div><div class="hd-t">مصرف الدم الرئيسي — واسط</div><div class="hd-s">وزارة الصحة</div></div>
     </div>
     <div class="row"><span class="rl">رقم المتبرع</span><span class="rv">${N(r.donors?.donor_number)}</span></div>
-    <div class="row"><span class="rl">اسم المتبرع</span><span class="rv">${N(r.donors?.full_name)}</span></div>
+    <div class="row"><span class="rl">اسم المتبرع</span><span class="rv">${esc(N(r.donors?.full_name))}</span></div>
     <div class="row"><span class="rl">رقم القنينة</span><span class="rv red">${r.bottle_number}</span></div>
     <div class="row"><span class="rl">نوع القنينة</span><span class="rv">${r.bottle_type}</span></div>
     <div class="row"><span class="rl">تاريخ السحب</span><span class="rv">${fd(r.draw_date)}</span></div>
@@ -3053,11 +3054,11 @@ async function loadInfected(type, tabEl){
       <th>نوع الإصابة</th><th>تاريخ الاكتشاف</th><th>رقم الموبايل</th>
     </tr></thead><tbody>${data.map(r=>`<tr>
       <td>${N(r.donors?.donor_number)}</td>
-      <td>${N(r.donors?.full_name)}</td>
+      <td>${esc(N(r.donors?.full_name))}</td>
       <td style="color:#BE123C;font-weight:700">${r.bottle_number}</td>
       <td><span class="pill pr">${r.serology_type||'موجب'}</span></td>
       <td>${fd(r.donation_date)}</td>
-      <td dir="ltr">${N(r.donors?.mobile)}</td>
+      <td dir="ltr">${esc(N(r.donors?.mobile))}</td>
     </tr>`).join('')}</tbody></table></div>`;
   } else {
     G('infTbl').innerHTML='<div class="empty"><i class="ti ti-shield-check" style="color:#2e7d32"></i><p>لا توجد حالات إيجابية</p></div>';
@@ -3076,10 +3077,10 @@ async function loadRejected(){
     G('rjTbl').innerHTML=`<div class="tw"><table><thead><tr>
       <th>الاسم</th><th>العمر</th><th>سبب الرفض</th><th>تاريخ الرفض</th><th>نوع الرفض</th><th>ملاحظات</th>
     </tr></thead><tbody>${data.map(r=>`<tr>
-      <td>${r.full_name}</td><td>${N(r.age)}</td><td>${r.rejection_reason}</td>
+      <td>${esc(r.full_name)}</td><td>${N(r.age)}</td><td>${esc(r.rejection_reason)}</td>
       <td>${fd(r.rejection_date)}</td>
       <td><span class="pill ${r.rejection_type==='مؤقت'?'py':'pr'}">${r.rejection_type}</span></td>
-      <td>${N(r.notes)}</td>
+      <td>${esc(N(r.notes))}</td>
     </tr>`).join('')}</tbody></table></div>`;
   } else {
     G('rjTbl').innerHTML='<div class="empty"><i class="ti ti-user-x"></i><p>لا توجد سجلات</p></div>';
@@ -3188,9 +3189,9 @@ function filterRare(){
     <div class="rare-row">
       <div class="rare-av" style="width:44px;height:44px;font-size:13px">${d.blood_type||'?'}</div>
       <div class="rare-info">
-        <div class="rare-name" style="font-size:15px">${d.full_name||'—'}</div>
-        <div class="rare-mob" style="font-size:14px;margin-top:3px">${d.mobile||'—'}</div>
-        <div class="rare-addr" style="font-size:12px;margin-top:2px">${d.address||'—'}</div>
+        <div class="rare-name" style="font-size:15px">${esc(d.full_name||'—')}</div>
+        <div class="rare-mob" style="font-size:14px;margin-top:3px">${esc(d.mobile||'—')}</div>
+        <div class="rare-addr" style="font-size:12px;margin-top:2px">${esc(d.address||'—')}</div>
       </div>
     </div>`).join('');
 }
@@ -3282,11 +3283,11 @@ async function loadRareList(bt){
       <th>رقم المتبرع</th><th>اسم المتبرع</th><th>الفصيلة</th><th>رقم الموبايل</th><th>تاريخ التبرع</th><th>عنوان السكن</th>
     </tr></thead><tbody>${data.map(r=>`<tr>
       <td>${N(r.donors?.donor_number)}</td>
-      <td>${N(r.donors?.full_name)}</td>
+      <td>${esc(N(r.donors?.full_name))}</td>
       <td style="font-weight:700;color:#BE123C">${r.blood_type}</td>
-      <td dir="ltr">${N(r.donors?.mobile)}</td>
+      <td dir="ltr">${esc(N(r.donors?.mobile))}</td>
       <td>${fd(r.donation_date)}</td>
-      <td>${N(r.donors?.address)}</td>
+      <td>${esc(N(r.donors?.address))}</td>
     </tr>`).join('')}</tbody></table></div>
     <div class="abar" style="margin-top:10px">
       <button class="btn btn-p" onclick="window.print()"><i class="ti ti-printer"></i> طباعة تقرير فصيلة ${bt}</button>
@@ -3545,9 +3546,9 @@ async function loadAudit(){
   if(data&&data.length){
     const rows=data.map(r=>`<div class="audit-row">
       <span class="a-time">${new Date(r.created_at).toLocaleString('ar-IQ')}</span>
-      <span class="a-user">${r.user_name||'النظام'}</span>
-      <span class="a-action"><span class="pill ${r.action==='INSERT'?'pg':r.action==='DELETE'?'pr':'py'}">${r.action}</span></span>
-      <span class="a-desc">${r.table_name} — ${r.record_id||''} ${r.new_values?JSON.stringify(r.new_values).substring(0,60)+'...':''}</span>
+      <span class="a-user">${esc(r.user_name||'النظام')}</span>
+      <span class="a-action"><span class="pill ${r.action==='INSERT'?'pg':r.action==='DELETE'?'pr':'py'}">${esc(r.action)}</span></span>
+      <span class="a-desc">${esc(r.table_name)} — ${esc(r.record_id||'')} ${r.new_values?esc(JSON.stringify(r.new_values).substring(0,60))+'...':''}</span>
     </div>`).join('');
     G('auditTbl').innerHTML=`<div class="tw" style="max-height:480px;overflow-y:auto">${rows}</div>`;
   } else {
@@ -3648,7 +3649,7 @@ async function saveReception(){
   if(G('rejWarn').classList.contains('show')){
     toast('المتبرع مرفوض — لا يمكن المتابعة','error'); return;
   }
-  // Block if 77-day interval not met
+  // Block if 77-day interval not met (UI-detected case: donor picked from autocomplete)
   const _iw=G('intervalWarn');
   if(_iw && _iw.dataset.blocked==='1'){
     toast('⛔ لا يمكن الحفظ — لم تمر 77 يوماً على آخر تبرع','error',5000);
@@ -3657,6 +3658,9 @@ async function saveReception(){
   const nm=G('rc-name').value.trim(), by=parseInt(G('rc-by').value);
   if(!nm||!by){ toast('يرجى تعبئة الاسم وسنة التولد','error'); return; }
   load(true);
+  // Safety net: re-check by national ID / mobile even if no autocomplete suggestion was picked
+  const _intervalBlock = await checkIntervalBeforeSave(G('rc-nid')?.value, G('rc-mob')?.value);
+  if(_intervalBlock){ load(false); toast(_intervalBlock.message,'error',6000); return; }
   try{
     const btype = G('rc-btype')?.value;
     const bnum  = parseInt(G('rc-bnum')?.value)||null;
@@ -3780,11 +3784,11 @@ async function loadDraw(){
     G('drawList').innerHTML=data.map(r=>`<div class="flow-card">
       <div class="fc-av">🩸</div>
       <div style="flex:1">
-        <div class="fc-name">${r.donors?.full_name||'—'}</div>
+        <div class="fc-name">${esc(r.donors?.full_name||'—')}</div>
         <div class="fc-sub">${r.donors?.gender||''} | ${r.donors?.birth_year?new Date().getFullYear()-r.donors.birth_year+' سنة':''} | ${r.donation_type} | ${r.donation_time?.substring(0,5)||''}</div>
       </div>
       <div class="fc-act">
-        <button class="btn btn-p" onclick="openDrawModal('${r.id}','${r.donors?.full_name||''}','${r.donation_type}','${r.donors?.mobile||''}')">
+        <button class="btn btn-p" onclick="openDrawModal('${r.id}','${sq(r.donors?.full_name)}','${r.donation_type}','${sq(r.donors?.mobile)}')">
           <i class="ti ti-droplet"></i> سحب
         </button>
       </div>
@@ -3887,11 +3891,11 @@ async function loadLab(){
     G('labList').innerHTML=data.map(r=>`<div class="flow-card">
       <div class="fc-av">🔬</div>
       <div style="flex:1">
-        <div class="fc-name">${r.donors?.full_name||'—'}</div>
+        <div class="fc-name">${esc(r.donors?.full_name||'—')}</div>
         <div class="fc-sub">قنينة: ${r.bottle_number||'—'} | ${r.blood_type||'—'} | ${r.bottle_type}</div>
       </div>
       <div class="fc-act">
-        <button class="btn btn-p" onclick="openLabModal('${r.id}','${r.donors?.full_name||''}','${r.bottle_number||''}','${r.blood_type||''}')">
+        <button class="btn btn-p" onclick="openLabModal('${r.id}','${sq(r.donors?.full_name)}','${r.bottle_number||''}','${r.blood_type||''}')">
           <i class="ti ti-microscope"></i> فحص
         </button>
       </div>
@@ -3998,7 +4002,7 @@ async function loadSupplyList(bt){
       <div class="fc-av">🩸</div>
       <div style="flex:1">
         <div class="fc-name">قنينة رقم: <strong>${r.bottle_number}</strong> | ${r.bottle_type}</div>
-        <div class="fc-sub">المتبرع: ${r.donors?.full_name||'—'} | تنتهي: ${fd(r.expiry_date)}</div>
+        <div class="fc-sub">المتبرع: ${esc(r.donors?.full_name||'—')} | تنتهي: ${fd(r.expiry_date)}</div>
       </div>
       <div class="fc-act">
         <button class="btn btn-p" onclick="openDispatch('${r.id}','${r.bottle_number}','${bt}','${r.bottle_type}')">
@@ -4168,12 +4172,12 @@ async function loadUsers(){
     G('usersTbl').innerHTML=`<div class="tw"><table><thead><tr>
       <th>الاسم الكامل</th><th>الدور الوظيفي</th><th>الحالة</th><th>تاريخ الإنشاء</th><th>إجراءات</th>
     </tr></thead><tbody>${data.map(u=>`<tr>
-      <td>${u.full_name}</td>
+      <td>${esc(u.full_name)}</td>
       <td><span style='font-size:11px;color:#757575'>${u.role==='admin'?'مدير النظام ✅':((u.permissions||[]).length+' قسم')}</span></td>
       <td><span class="pill ${u.is_active?'pg':'pr'}">${u.is_active?'نشط':'معطّل'}</span></td>
       <td>${fd(u.created_at)}</td>
       <td>${u.id!==SES?.user?.id?`
-        <button class="ibtn" onclick="showEditUser('${u.id}','${u.full_name}','${u.role}')" title="تعديل"><i class="ti ti-edit"></i></button>
+        <button class="ibtn" onclick="showEditUser('${u.id}','${esc(u.full_name)}','${u.role}')" title="تعديل"><i class="ti ti-edit"></i></button>
         <button class="ibtn" onclick="toggleUserActive('${u.id}',${u.is_active})" title="${u.is_active?'تعطيل':'تفعيل'}">
           <i class="ti ${u.is_active?'ti-user-off':'ti-user-check'}"></i>
         </button>`:'<span style="font-size:10px;color:#9e9e9e">حسابك الحالي</span>'}
@@ -4365,11 +4369,32 @@ function setAccTab(){
 }
 
 // ── Check donation interval (77 days minimum) ──
+// Looks up an existing donor by national_id (priority) or mobile, then checks
+// the 77-day interval rule against their last (non-deleted) donation.
+// Returns {blocked:true, message} if the rule blocks a new donation, else null.
+async function checkIntervalBeforeSave(nid, mob){
+  nid=(nid||'').trim(); mob=(mob||'').trim();
+  if(nid.length<6 && mob.length<7) return null; // not enough info to identify the donor reliably
+  let q=db.from('donors').select('id').eq('is_deleted',false).limit(5);
+  q = nid.length>=6 ? q.eq('national_id',nid) : q.eq('mobile',mob);
+  const{data}=await q;
+  // Only act when the match is unambiguous — a shared mobile number (e.g. family members)
+  // could otherwise attribute someone else's recent donation to this person and block them wrongly.
+  if(!data||data.length!==1) return null;
+  const result=await checkDonationInterval(data[0].id);
+  if(result && !result.allowed){
+    const remaining=77-result.diffDays;
+    return {blocked:true, message:'⛔ لا يمكن الحفظ — آخر تبرع لهذا المتبرع منذ '+result.diffDays+' يوم فقط (الحد الأدنى 77 يوماً، يتبقى '+remaining+' يوم — آخر تبرع: '+result.lastDate+')'};
+  }
+  return null;
+}
+
 async function checkDonationInterval(donorId){
   if(!donorId) return null;
   const{data}=await db.from('blood_donations')
     .select('created_at, donation_date, draw_date')
     .eq('donor_id', donorId)
+    .eq('is_deleted', false)
     .not('status','eq','rejected_positive')
     .order('created_at',{ascending:false})
     .limit(1);
@@ -4620,6 +4645,60 @@ if('serviceWorker' in navigator){
     <div class="modal-foot">
       <button class="btn" onclick="G('editUserModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
       <button class="btn btn-p" onclick="saveUserEdit()"><i class="ti ti-device-floppy"></i> حفظ التعديلات</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT DONOR MODAL -->
+<div class="overlay" id="editDonorModal">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-edit"></i> تعديل بيانات المتبرع</div>
+    <div class="modal-body">
+      <input type="hidden" id="ed-donorid">
+      <input type="hidden" id="ed-donid">
+      <div class="fsec">
+        <div class="fst"><i class="ti ti-user"></i> البيانات الشخصية</div>
+        <div class="fgrid">
+          <div class="fgrp s2"><label>الاسم الرباعي واللقب *</label><input type="text" id="ed-name" placeholder="علي محمد حسن الموسوي"></div>
+          <div class="fgrp"><label>سنة التولد *</label><input type="number" id="ed-by" placeholder="1995" min="1920" max="2007"></div>
+          <div class="fgrp"><label>الجنس *</label><select id="ed-gen"><option value="ذكر">ذكر</option><option value="أنثى">أنثى</option></select></div>
+          <div class="fgrp"><label>اسم الأم الثلاثي</label><input type="text" id="ed-mom" placeholder="فاطمة حسن علي"></div>
+          <div class="fgrp"><label>رقم البطاقة الوطنية</label><input type="text" id="ed-nid" placeholder="19XXXXXXXXXX"></div>
+          <div class="fgrp"><label>رقم الموبايل</label><input type="tel" id="ed-mob" placeholder="07XXXXXXXXX"></div>
+          <div class="fgrp s2"><label>عنوان السكن</label><input type="text" id="ed-addr" placeholder="المحلة / الحي / المدينة"></div>
+          <div class="fgrp"><label>المهنة</label><input type="text" id="ed-job" placeholder="المهنة"></div>
+        </div>
+      </div>
+      <div class="fsec">
+        <div class="fst"><i class="ti ti-droplet"></i> بيانات التبرع والقنينة</div>
+        <div class="fgrid">
+          <div class="fgrp"><label>نوع التبرع *</label><select id="ed-dtyp"><option value="تعويضي">تعويضي</option><option value="طوعي">طوعي</option></select></div>
+          <div class="fgrp"><label>نوع القنينة *</label><select id="ed-btyp"><option>مفلتر</option><option>رباعي</option><option>ريفيس</option><option>ثنائي</option><option>أحادي</option><option>تريما دم كامل</option><option>تريما صفائح دموية</option><option>حملة تبرع رباعي</option><option>حملة تبرع مفلتر</option><option>رباعي Sag</option></select></div>
+          <div class="fgrp"><label>رقم القنينة</label><input type="text" id="ed-bnum" class="ro" readonly></div>
+          <div class="fgrp"><label>اسم المريض</label><input type="text" id="ed-pat" placeholder="(للتبرع التعويضي فقط)"></div>
+          <div class="fgrp"><label>اسم المستشفى</label><input type="text" id="ed-hosp" placeholder="مستشفى..."></div>
+          <div class="fgrp"><label>تاريخ التبرع *</label><input type="date" id="ed-ddate"></div>
+          <div class="fgrp"><label>وقت التبرع</label><input type="time" id="ed-dtime"></div>
+          <div class="fgrp"><label>تاريخ السحب</label><input type="date" id="ed-draw"></div>
+          <div class="fgrp"><label>تاريخ النفاد</label><input type="date" id="ed-exp"></div>
+        </div>
+      </div>
+      <div class="fsec">
+        <div class="fst"><i class="ti ti-stethoscope"></i> الفحوصات السريرية والمختبرية</div>
+        <div class="fgrid">
+          <div class="fgrp"><label>فصيلة الدم</label><select id="ed-bt"><option value="">غير محدد</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select></div>
+          <div class="fgrp"><label>ضغط الدم (mmHg)</label><input type="text" id="ed-bp" placeholder="120/80"></div>
+          <div class="fgrp"><label>الوزن (كغ)</label><input type="number" id="ed-wt" placeholder="70" step="0.5"></div>
+          <div class="fgrp"><label>النبض (ن/دقيقة)</label><input type="number" id="ed-pulse" placeholder="72"></div>
+          <div class="fgrp"><label>الهيموكلوبين (g/dL)</label><input type="number" id="ed-hgb" placeholder="15.3" step="0.1"></div>
+          <div class="fgrp"><label>نتيجة الفحوصات *</label><select id="ed-ser" onchange="toggleEdSer()"><option value="Negative">Negative — سالب</option><option value="Positive">Positive — موجب</option></select></div>
+          <div class="fgrp" id="edSerTypGrp" style="display:none"><label>نوع الإصابة</label><select id="ed-sert"><option value="HIV">HIV</option><option value="HCV">HCV</option><option value="HBsAg">HBsAg</option><option value="سفلس VDRL">سفلس (VDRL)</option></select></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="G('editDonorModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
+      <button class="btn btn-p" onclick="saveDonorEdit()"><i class="ti ti-device-floppy"></i> حفظ التعديلات</button>
     </div>
   </div>
 </div>
