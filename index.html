@@ -2570,11 +2570,11 @@ async function loadDonors(page=1){
       .range((page-1)*PS, page*PS-1);
     if(bgF)   q=q.eq('blood_type',bgF);
     if(typeF) q=q.eq('donation_type',typeF);
-    if(s){ const clean=s.replace(/[,()]/g,'').trim(); const isNum=!isNaN(clean)&&clean!=='';
+    if(s){ const clean=s.replace(/[,()%*:]/g,'').trim(); const isNum=!isNaN(clean)&&clean!=='';
       q=db.from('blood_donations')
       .select('bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,status,id,donors!inner(donor_number,full_name,birth_year,national_id)',{count:'exact'})
       .eq('is_deleted',false)
-      .or(`bottle_number.eq.${isNum?clean:0},donors.national_id.ilike.%${clean}%,donors.donor_number.eq.${isNum?clean:0},donors.full_name.ilike.%${clean}%,donors.mobile.ilike.%${clean}%`)
+      .or(`bottle_number.eq.${isNum?clean:0},donors.national_id.ilike.*${clean}*,donors.donor_number.eq.${isNum?clean:0},donors.full_name.ilike.*${clean}*,donors.mobile.ilike.*${clean}*`)
       .order('created_at',{ascending:false}).range((page-1)*PS,page*PS-1);
     }
     const {data,count,error}=await q; if(error) throw error;
