@@ -1245,6 +1245,10 @@ function toast(msg, type='info', dur=3200){
   b.appendChild(t); setTimeout(()=>t.remove(),dur);
 }
 function load(v){ G('loader').classList.toggle('on',v); }
+function showIntervalBlockModal(message){
+  G('ibmText').textContent = message;
+  G('intervalBlockModal').classList.add('on');
+}
 function fd(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('ar-IQ',{year:'numeric',month:'2-digit',day:'2-digit'}); }
 function ft(t){ return t ? t.substring(0,5) : '—'; }
 function fnum(n){ return n!=null ? Number(n).toLocaleString('ar-IQ') : '—'; }
@@ -1340,9 +1344,9 @@ function fillDonor(d){
     if(!d.id||!iw) return;
     const result = await checkDonationInterval(d.id);
     if(result && !result.allowed){
-      const remaining = 77 - result.diffDays;
+      const remaining = result.required - result.diffDays;
       G('intervalWarnTitle').textContent = '⛔ لا يمكن التبرع — آخر تبرع منذ '+result.diffDays+' يوم فقط';
-      G('intervalWarnReason').textContent = 'المدة الدنيا بين التبرعات 77 يوماً — يتبقى '+remaining+' يوم للتمكن من التبرع (آخر تبرع: '+result.lastDate+')';
+      G('intervalWarnReason').textContent = 'المدة الدنيا بين التبرعات '+result.required+' يوماً — يتبقى '+remaining+' يوم للتمكن من التبرع (آخر تبرع: '+result.lastDate+')';
       iw.style.display='flex';
       iw.dataset.blocked='1';
     } else {
@@ -2278,7 +2282,7 @@ async function saveDonor(printAfter=false){
   if(!nm||!by||!dd){toast('يرجى تعبئة: الاسم، سنة التولد، تاريخ التبرع','error'); return;}
   load(true);
   const intervalBlock = await checkIntervalBeforeSave(G('f-nid').value, G('f-mob').value);
-  if(intervalBlock){ load(false); toast(intervalBlock.message,'error',6000); return; }
+  if(intervalBlock){ load(false); showIntervalBlockModal(intervalBlock.message); return; }
   try{
     const {data:dn,error:de}=await db.from('donors').insert({
       full_name:nm, birth_year:by, gender:G('f-gen').value,
@@ -3682,7 +3686,7 @@ async function saveReception(){
   // Block if 77-day interval not met (UI-detected case: donor picked from autocomplete)
   const _iw=G('intervalWarn');
   if(_iw && _iw.dataset.blocked==='1'){
-    toast('⛔ لا يمكن الحفظ — لم تمر 77 يوماً على آخر تبرع','error',5000);
+    showIntervalBlockModal('⛔ لا يمكن الحفظ — لم تمر 77 يوماً على آخر تبرع لهذا المتبرع.');
     return;
   }
   const nm=G('rc-name').value.trim(), by=parseInt(G('rc-by').value);
@@ -3690,7 +3694,7 @@ async function saveReception(){
   load(true);
   // Safety net: re-check by national ID / mobile even if no autocomplete suggestion was picked
   const _intervalBlock = await checkIntervalBeforeSave(G('rc-nid')?.value, G('rc-mob')?.value);
-  if(_intervalBlock){ load(false); toast(_intervalBlock.message,'error',6000); return; }
+  if(_intervalBlock){ load(false); showIntervalBlockModal(_intervalBlock.message); return; }
   try{
     const btype = G('rc-btype')?.value;
     const bnum  = parseInt(G('rc-bnum')?.value)||null;
@@ -3832,13 +3836,20 @@ async function openDrawModal(id,name,dtype,mob){
   G('dm-id').value=id;
   G('dm-donor-name').textContent=name;
   G('dm-donor-sub').textContent=dtype+' | '+mob;
-  G('dm-bt').value=''; G('dm-btyp').value='مفلتر';
+  G('dm-btyp').value='مفلتر';
   G('dm-draw').value=new Date().toISOString().split('T')[0];
-  // Get next bottle number
-  const bn=await getNextBottleNumber();
-  G('dm-bnum').value=bn||'لا يوجد تسلسل نشط';
+  G('dm-med-reason').value='سكري';
+  G('dm-med-other').value='';
+  G('dm-med-other-grp').style.display='none';
+  toggleDmMedSection(false);
   calcDmExpiry();
   G('drawModal').classList.add('on');
+}
+
+function toggleDmMedSection(show){
+  G('dm-med-section').style.display = show?'block':'none';
+  G('dm-normal-actions').style.display = show?'none':'flex';
+  G('dm-med-actions').style.display = show?'flex':'none';
 }
 
 async function getNextBottleNumber(){
@@ -3861,50 +3872,85 @@ function calcDmExpiry(){
   G('dm-exp').value=e.toISOString().split('T')[0];
 }
 
-async function saveDraw(){
-  const id=G('dm-id').value;
-  const bt=G('dm-bt').value, bn=G('dm-bnum').value;
-  if(!bt){ toast('يرجى اختيار فصيلة الدم','error'); return; }
-  if(!bn||isNaN(parseInt(bn))){ toast('رقم القنينة غير صحيح','error'); return; }
+// Outcome 1: normal successful draw — blood type is NOT recorded here (that's the lab's job);
+// a bottle number is only reserved now, at confirmation, not when the modal was opened.
+async function confirmDrawSuccess(){
+  const id=G('dm-id').value, draw=G('dm-draw').value;
+  if(!draw){ toast('يرجى تحديد تاريخ السحب','error'); return; }
   load(true);
   try{
+    const bn=await getNextBottleNumber();
+    if(!bn){ load(false); return; }
+    const btyp=G('dm-btyp').value, exp=G('dm-exp').value;
     const{error}=await db.from('blood_donations').update({
-      blood_type:bt, bottle_type:G('dm-btyp').value,
-      bottle_number:parseInt(bn),
-      draw_date:G('dm-draw').value, expiry_date:G('dm-exp').value,
-      status:'pending_lab', created_by:SES?.user?.id
+      bottle_type:btyp, bottle_number:bn, draw_date:draw, expiry_date:exp, status:'pending_lab'
     }).eq('id',id);
     if(error) throw error;
-    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'pending_lab',bottle:bn,blood_type:bt}});
-    const drawPayload={
-      donation_id:id, blood_type:bt, bottle_type:G('dm-btyp').value,
-      bottle_number:parseInt(bn), draw_date:G('dm-draw').value,
-      expiry_date:G('dm-exp').value
-    };
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'pending_lab',bottle:bn}});
+    toast('✅ تم تسجيل السحب — أُرسل للمختبر (قنينة رقم '+bn+')','success',4000);
+    G('drawModal').classList.remove('on');
+    const{data:don}=await db.from('blood_donations').select('*,donors(full_name,donor_number)').eq('id',id).single();
+    if(don){ BCDATA=don; setTimeout(()=>printBC('full'),300); }
+    await loadDraw();
+  }catch(e){ toast('خطأ: '+e.message,'error'); }
+  finally{ load(false); }
+}
 
-    if(!IS_ONLINE){
-      await enqueueOp('draw', drawPayload);
-      const q=await getPendingQueue();
-      updateOfflineBar('offline',q.length+' عملية معلّقة');
-      toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً','warning',5000);
-      G('drawModal').classList.remove('on');
-      await loadDraw();
-    } else {
-      const{error}=await db.from('blood_donations').update({
-        blood_type:bt,bottle_type:G('dm-btyp').value,
-        bottle_number:parseInt(bn),draw_date:G('dm-draw').value,
-        expiry_date:G('dm-exp').value,status:'pending_lab',created_by:SES?.user?.id
-      }).eq('id',id);
-      if(error) throw error;
-      await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'pending_lab',bottle:bn,blood_type:bt}});
-      toast('✅ تم حفظ بيانات القنينة — أُرسل للمختبر','success',4000);
-      G('drawModal').classList.remove('on');
-      const{data:don}=await db.from('blood_donations').select('*,donors(full_name,donor_number)').eq('id',id).single();
-      if(don){ BCDATA=don; setTimeout(()=>printBC('full'),300); }
-      await loadDraw();
-    }
-  }catch(e){toast('خطأ: '+e.message,'error');}
-  finally{load(false);}
+// Outcome 2: the bottle itself was damaged during the draw. A bottle number IS consumed here
+// (a physical, labeled bottle was actually spoiled) so it is never reused. The donor is not
+// penalized with the full 77-day wait — checkDonationInterval() grants a 14-day window instead
+// whenever the donor's most recent donation has status 'damaged'.
+async function confirmDamagedBottle(){
+  const id=G('dm-id').value, draw=G('dm-draw').value;
+  if(!draw){ toast('يرجى تحديد تاريخ السحب','error'); return; }
+  if(!confirm('تأكيد: القنينة تالفة؟ يُسمح لهذا المتبرع بالتبرع مجدداً بعد أسبوعين بدل 77 يوماً.')) return;
+  load(true);
+  try{
+    const bn=await getNextBottleNumber();
+    if(!bn){ load(false); return; }
+    const btyp=G('dm-btyp').value;
+    const{error}=await db.from('blood_donations').update({
+      bottle_type:btyp, bottle_number:bn, draw_date:draw, status:'damaged'
+    }).eq('id',id);
+    if(error) throw error;
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'damaged',bottle:bn}});
+    toast('⚠️ سُجّلت القنينة كتالفة (رقم '+bn+') — يُسمح بالتبرع مجدداً بعد أسبوعين','warning',5500);
+    G('drawModal').classList.remove('on');
+    await loadDraw();
+  }catch(e){ toast('خطأ: '+e.message,'error'); }
+  finally{ load(false); }
+}
+
+// Outcome 3: the donor turns out to be medically ineligible (discovered by the draw staff's
+// questioning, e.g. diabetes/hypertension) before any blood was actually drawn. No bottle
+// number is ever reserved for this attempt, so nothing needs to be freed up — the next real
+// draw simply uses whatever number is next in the sequence. The donor goes on the rejected
+// list temporarily, and this specific pending attempt is removed from the queue.
+async function confirmMedicalReject(){
+  const id=G('dm-id').value;
+  const reasonSel=G('dm-med-reason').value;
+  const other=G('dm-med-other').value.trim();
+  if(reasonSel==='أخرى' && !other){ toast('يرجى توضيح السبب','error'); return; }
+  const reason = reasonSel==='أخرى' ? other : reasonSel;
+  if(!confirm('تأكيد رفض المتبرع مؤقتاً — السبب: '+reason+'؟')) return;
+  load(true);
+  try{
+    const{data:d}=await db.from('blood_donations').select('donors(full_name)').eq('id',id).single();
+    const donorName = d?.donors?.full_name || '';
+    await db.from('rejected_donors').insert({
+      full_name:donorName, rejection_reason:reason,
+      rejection_date:new Date().toISOString().split('T')[0], rejection_type:'مؤقت',
+      created_by:SES?.user?.id
+    });
+    const{error}=await db.from('blood_donations').update({is_deleted:true}).eq('id',id);
+    if(error) throw error;
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'rejected_medical',reason}});
+    await cacheRejectedDonors();
+    toast('⛔ تم رفض المتبرع مؤقتاً وإضافته لقائمة المرفوضين','warning',5000);
+    G('drawModal').classList.remove('on');
+    await loadDraw();
+  }catch(e){ toast('خطأ: '+e.message,'error'); }
+  finally{ load(false); }
 }
 
 // ================================================================
@@ -3922,10 +3968,10 @@ async function loadLab(){
       <div class="fc-av">🔬</div>
       <div style="flex:1">
         <div class="fc-name">${esc(r.donors?.full_name||'—')}</div>
-        <div class="fc-sub">قنينة: ${r.bottle_number||'—'} | ${r.blood_type||'—'} | ${r.bottle_type}</div>
+        <div class="fc-sub">قنينة: ${r.bottle_number||'—'} | ${r.bottle_type}</div>
       </div>
       <div class="fc-act">
-        <button class="btn btn-p" onclick="openLabModal('${r.id}','${sq(r.donors?.full_name)}','${r.bottle_number||''}','${r.blood_type||''}')">
+        <button class="btn btn-p" onclick="openLabModal('${r.id}','${sq(r.donors?.full_name)}','${r.bottle_number||''}')">
           <i class="ti ti-microscope"></i> فحص
         </button>
       </div>
@@ -3935,10 +3981,11 @@ async function loadLab(){
   }
 }
 
-function openLabModal(id,name,bn,bt){
+function openLabModal(id,name,bn){
   G('lm-id').value=id;
   G('lm-donor-name').textContent=name;
-  G('lm-donor-sub').textContent='قنينة رقم: '+bn+' | فصيلة: '+bt;
+  G('lm-donor-sub').textContent='قنينة رقم: '+bn;
+  G('lm-bt').value='';
   G('lm-ser').value='Negative'; toggleLmInf();
   ['lm-hgb','lm-bp','lm-wt','lm-pulse'].forEach(id=>G(id).value='');
   G('labModal').classList.add('on');
@@ -3947,11 +3994,13 @@ function openLabModal(id,name,bn,bt){
 function toggleLmInf(){ G('lm-inf-grp').style.display=G('lm-ser').value==='Positive'?'flex':'none'; }
 
 async function saveLab(){
-  const id=G('lm-id').value, ser=G('lm-ser').value;
+  const id=G('lm-id').value, ser=G('lm-ser').value, bt=G('lm-bt').value;
+  if(!bt){ toast('يرجى اختيار فصيلة الدم','error'); return; }
   load(true);
   try{
     const newStatus=ser==='Positive'?'rejected_positive':'in_stock';
     const{error}=await db.from('blood_donations').update({
+      blood_type:bt,
       hemoglobin:parseFloat(G('lm-hgb').value)||null,
       blood_pressure:G('lm-bp').value.trim()||null,
       weight:parseFloat(G('lm-wt').value)||null,
@@ -3963,7 +4012,7 @@ async function saveLab(){
     if(error) throw error;
 
     const labPayload={
-      donation_id:id, hemoglobin:parseFloat(G('lm-hgb').value)||null,
+      donation_id:id, blood_type:bt, hemoglobin:parseFloat(G('lm-hgb').value)||null,
       blood_pressure:G('lm-bp').value.trim()||null, weight:parseFloat(G('lm-wt').value)||null,
       pulse:parseInt(G('lm-pulse').value)||null, serology_result:ser,
       serology_type:ser==='Positive'?G('lm-inf').value:null,
@@ -3978,7 +4027,7 @@ async function saveLab(){
       toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً','warning',5000);
     } else {
       const{error}=await db.from('blood_donations').update({
-        hemoglobin:labPayload.hemoglobin, blood_pressure:labPayload.blood_pressure,
+        blood_type:bt, hemoglobin:labPayload.hemoglobin, blood_pressure:labPayload.blood_pressure,
         weight:labPayload.weight, pulse:labPayload.pulse,
         serology_result:ser, serology_type:labPayload.serology_type, status:newStatus
       }).eq('id',id);
@@ -3998,7 +4047,7 @@ async function saveLab(){
       } else {
         toast('✅ نتيجة سالبة — القنينة أُضيفت للخزين','success',4000);
       }
-      await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:newStatus,serology:ser}});
+      await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:newStatus,serology:ser,blood_type:bt}});
     }
     G('labModal').classList.remove('on');
     await loadLab();
@@ -4413,8 +4462,8 @@ async function checkIntervalBeforeSave(nid, mob){
   if(!data||data.length!==1) return null;
   const result=await checkDonationInterval(data[0].id);
   if(result && !result.allowed){
-    const remaining=77-result.diffDays;
-    return {blocked:true, message:'⛔ لا يمكن الحفظ — آخر تبرع لهذا المتبرع منذ '+result.diffDays+' يوم فقط (الحد الأدنى 77 يوماً، يتبقى '+remaining+' يوم — آخر تبرع: '+result.lastDate+')'};
+    const remaining=result.required-result.diffDays;
+    return {blocked:true, message:'⛔ لا يمكن الحفظ — آخر تبرع لهذا المتبرع منذ '+result.diffDays+' يوم فقط (الحد الأدنى '+result.required+' يوماً، يتبقى '+remaining+' يوم — آخر تبرع: '+result.lastDate+')'};
   }
   return null;
 }
@@ -4422,7 +4471,7 @@ async function checkIntervalBeforeSave(nid, mob){
 async function checkDonationInterval(donorId){
   if(!donorId) return null;
   const{data}=await db.from('blood_donations')
-    .select('created_at, donation_date, draw_date')
+    .select('created_at, donation_date, draw_date, status')
     .eq('donor_id', donorId)
     .eq('is_deleted', false)
     .not('status','eq','rejected_positive')
@@ -4432,12 +4481,15 @@ async function checkDonationInterval(donorId){
   // Use whichever date is available
   const raw = data[0].donation_date || data[0].draw_date || data[0].created_at;
   if(!raw) return null;
+  // A donation that ended because the bottle itself was damaged (no blood actually taken
+  // beyond that point) uses a much shorter re-eligibility window than a normal donation.
+  const required = data[0].status==='damaged' ? 14 : 77;
   const lastDate = new Date(raw);
   const today = new Date();
   today.setHours(0,0,0,0); lastDate.setHours(0,0,0,0);
   const diffDays = Math.floor((today - lastDate)/(1000*60*60*24));
   const displayDate = raw.split('T')[0];
-  return {lastDate: displayDate, diffDays, allowed: diffDays >= 77};
+  return {lastDate: displayDate, diffDays, required, allowed: diffDays >= required};
 }
 
 // ── Convert Arabic numerals to English on all inputs ──
@@ -4729,6 +4781,104 @@ if('serviceWorker' in navigator){
     <div class="modal-foot">
       <button class="btn" onclick="G('editDonorModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
       <button class="btn btn-p" onclick="saveDonorEdit()"><i class="ti ti-device-floppy"></i> حفظ التعديلات</button>
+    </div>
+  </div>
+</div>
+
+<!-- DONATION INTERVAL BLOCK MODAL — stays open until the employee dismisses it -->
+<div class="overlay" id="intervalBlockModal">
+  <div class="modal" style="text-align:center;border-top:6px solid #BE123C">
+    <div style="font-size:44px;margin-bottom:6px">⛔</div>
+    <div style="font-size:17px;font-weight:800;color:#BE123C;margin-bottom:12px">لا يمكن قبول هذا التبرع</div>
+    <div id="ibmText" style="font-size:16px;line-height:1.9;font-weight:600;color:#1a1a1a;background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:14px"></div>
+    <button class="btn btn-p" style="width:100%;justify-content:center;margin-top:16px;font-size:15px;padding:13px" onclick="G('intervalBlockModal').classList.remove('on')">
+      <i class="ti ti-check"></i> فهمت
+    </button>
+  </div>
+</div>
+
+<!-- DRAW MODAL -->
+<div class="overlay" id="drawModal">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-droplet"></i> سحب الدم</div>
+    <div class="modal-body">
+      <input type="hidden" id="dm-id">
+      <div style="background:#F8FAFC;border:1px solid #EEF2F6;border-radius:10px;padding:10px 12px;margin-bottom:12px">
+        <div id="dm-donor-name" style="font-weight:700;font-size:15px;color:#1a1a1a"></div>
+        <div id="dm-donor-sub" style="font-size:12px;color:#757575;margin-top:2px"></div>
+      </div>
+      <div class="fgrid">
+        <div class="fgrp"><label>نوع القنينة *</label><select id="dm-btyp" onchange="calcDmExpiry()"><option>مفلتر</option><option>رباعي</option><option>ريفيس</option><option>ثنائي</option><option>أحادي</option><option>تريما دم كامل</option><option>تريما صفائح دموية</option><option>حملة تبرع رباعي</option><option>حملة تبرع مفلتر</option><option>رباعي Sag</option></select></div>
+        <div class="fgrp"><label>تاريخ السحب *</label><input type="date" id="dm-draw" onchange="calcDmExpiry()"></div>
+        <div class="fgrp"><label>تاريخ النفاد (تلقائي)</label><input type="date" id="dm-exp" class="auto" readonly></div>
+      </div>
+      <div id="dm-med-section" style="display:none;margin-top:10px;background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px">
+        <div class="fgrid">
+          <div class="fgrp"><label>سبب عدم الأهلية *</label>
+            <select id="dm-med-reason" onchange="G('dm-med-other-grp').style.display=this.value==='أخرى'?'block':'none'">
+              <option value="سكري">سكري</option>
+              <option value="ضغط">ضغط</option>
+              <option value="أخرى">أخرى</option>
+            </select>
+          </div>
+          <div class="fgrp" id="dm-med-other-grp" style="display:none"><label>وضّح السبب *</label><input type="text" id="dm-med-other" placeholder="السبب"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot" style="flex-wrap:wrap">
+      <div id="dm-normal-actions" style="display:flex;gap:7px;width:100%;flex-wrap:wrap">
+        <button class="btn" onclick="G('drawModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
+        <button class="btn" style="border-color:#DC2626;color:#DC2626" onclick="toggleDmMedSection(true)"><i class="ti ti-ban"></i> غير مؤهل طبياً</button>
+        <button class="btn" style="border-color:#D97706;color:#D97706" onclick="confirmDamagedBottle()"><i class="ti ti-alert-triangle"></i> قنينة تالفة</button>
+        <button class="btn btn-p" style="margin-right:auto" onclick="confirmDrawSuccess()"><i class="ti ti-check"></i> تأكيد السحب</button>
+      </div>
+      <div id="dm-med-actions" style="display:none;gap:7px;width:100%">
+        <button class="btn" onclick="toggleDmMedSection(false)"><i class="ti ti-arrow-right"></i> رجوع</button>
+        <button class="btn" style="background:#DC2626;color:#fff;border-color:#DC2626" onclick="confirmMedicalReject()"><i class="ti ti-ban"></i> تأكيد الرفض</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LAB MODAL -->
+<div class="overlay" id="labModal">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-microscope"></i> فحص العينة</div>
+    <div class="modal-body">
+      <input type="hidden" id="lm-id">
+      <div style="background:#F8FAFC;border:1px solid #EEF2F6;border-radius:10px;padding:10px 12px;margin-bottom:12px">
+        <div id="lm-donor-name" style="font-weight:700;font-size:15px;color:#1a1a1a"></div>
+        <div id="lm-donor-sub" style="font-size:12px;color:#757575;margin-top:2px"></div>
+      </div>
+      <div class="fgrid">
+        <div class="fgrp"><label>فصيلة الدم *</label><select id="lm-bt"><option value="">اختر...</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select></div>
+        <div class="fgrp"><label>ضغط الدم (mmHg)</label><input type="text" id="lm-bp" placeholder="120/80"></div>
+        <div class="fgrp"><label>الوزن (كغ)</label><input type="number" id="lm-wt" placeholder="70" step="0.5"></div>
+        <div class="fgrp"><label>النبض (ن/دقيقة)</label><input type="number" id="lm-pulse" placeholder="72"></div>
+        <div class="fgrp"><label>الهيموكلوبين (g/dL)</label><input type="number" id="lm-hgb" placeholder="15.3" step="0.1"></div>
+        <div class="fgrp"><label>نتيجة الفحوصات *</label><select id="lm-ser" onchange="toggleLmInf()"><option value="Negative">Negative — سالب</option><option value="Positive">Positive — موجب</option></select></div>
+        <div class="fgrp" id="lm-inf-grp" style="display:none"><label>نوع الإصابة</label><select id="lm-inf"><option value="HIV">HIV</option><option value="HCV">HCV</option><option value="HBsAg">HBsAg</option><option value="سفلس VDRL">سفلس (VDRL)</option></select></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="G('labModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
+      <button class="btn btn-p" onclick="saveLab()"><i class="ti ti-device-floppy"></i> حفظ النتيجة</button>
+    </div>
+  </div>
+</div>
+
+<!-- DISPATCH MODAL -->
+<div class="overlay" id="dispModal">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-package"></i> صرف قنينة</div>
+    <div class="modal-body">
+      <input type="hidden" id="disp-id">
+      <div id="disp-info" style="background:#F8FAFC;border:1px solid #EEF2F6;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:14px"></div>
+      <div class="fgrp"><label>اسم المستشفى *</label><input type="text" id="disp-hosp" placeholder="اسم المستشفى المستلمة"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="G('dispModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
+      <button class="btn btn-p" onclick="saveDispatch()"><i class="ti ti-truck-delivery"></i> تأكيد الصرف</button>
     </div>
   </div>
 </div>
