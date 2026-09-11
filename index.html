@@ -1270,7 +1270,7 @@ async function donorSearch(field, val){
       let q = db.from('donors')
         .select('id,full_name,birth_year,gender,mother_name,national_id,mobile,address,occupation')
         .eq('is_deleted',false).limit(6);
-      if(field==='name') q=q.ilike('full_name','%'+val.trim()+'%');
+      if(field==='name') q=q.ilike('full_name','%'+val.trim().replace(/ة/g,'ه')+'%');
       if(field==='nid')  q=q.eq('national_id',val.trim());
       if(field==='mob')  q=q.eq('mobile',val.trim());
 
@@ -3124,17 +3124,22 @@ async function loadRareGrid(){
     </div>`;
   }).join('');
 
-  // 2. Load rare donors
-  const{data,error}=await db.from('donors')
-    .select('id,full_name,mobile,address,blood_type,is_deleted')
-    .in('blood_type', RARE)
-    .eq('is_deleted',false)
-    .order('blood_type')
-    .order('full_name')
-    .limit(3000);
-
-  if(error||!data){ G('rareList').innerHTML='<div class="empty"><p>تعذّر التحميل</p></div>'; return; }
-  window._RARE_DATA = data;
+  // 2. Load rare donors — paginated (Supabase max 1000 per request)
+  let allDonors = [], from = 0, pageSize = 1000, hasMore = true;
+  while(hasMore){
+    const{data,error}=await db.from('donors')
+      .select('id,full_name,mobile,address,blood_type,is_deleted')
+      .in('blood_type', RARE)
+      .eq('is_deleted',false)
+      .order('blood_type').order('full_name')
+      .range(from, from+pageSize-1);
+    if(error||!data) break;
+    allDonors = allDonors.concat(data);
+    hasMore = data.length === pageSize;
+    from += pageSize;
+  }
+  if(!allDonors.length){ G('rareList').innerHTML='<div class="empty"><p>لا توجد بيانات</p></div>'; return; }
+  window._RARE_DATA = allDonors;
   filterRare();
 }
 
@@ -3143,12 +3148,13 @@ function filterRare(){
   const q    = (G('rareSearch')?.value||'').trim().toLowerCase();
   const bg   = G('rareBGFilter')?.value||'';
 
+  const qN = normalizeAr(q);
   const filtered = data.filter(d=>{
     const matchBG = !bg || d.blood_type===bg;
-    const matchQ  = !q ||
-      (d.full_name||'').toLowerCase().includes(q)||
-      (d.mobile||'').includes(q)||
-      (d.address||'').toLowerCase().includes(q);
+    const matchQ  = !qN ||
+      normalizeAr(d.full_name).includes(qN)||
+      (d.mobile||'').includes(qN)||
+      normalizeAr(d.address).includes(qN);
     return matchBG && matchQ;
   });
 
@@ -3165,13 +3171,22 @@ function filterRare(){
     return;
   }
 
+  // Show list only when user has searched or filtered
+  const hasQuery = qN || bg;
+  if(!hasQuery){
+    G('rareList').innerHTML=`<div class="empty" style="padding:24px 0">
+      <p style="font-size:14px;color:#94A3B8">ابحث بالاسم أو الهاتف أو اختر فصيلة لعرض النتائج</p>
+    </div>`;
+    return;
+  }
+
   G('rareList').innerHTML = filtered.map(d=>`
     <div class="rare-row">
-      <div class="rare-av">${d.blood_type||'?'}</div>
+      <div class="rare-av" style="width:44px;height:44px;font-size:13px">${d.blood_type||'?'}</div>
       <div class="rare-info">
-        <div class="rare-name">${d.full_name||'—'}</div>
-        <div class="rare-addr">${d.address||'—'}</div>
-        <div class="rare-mob">${d.mobile||'—'}</div>
+        <div class="rare-name" style="font-size:15px">${d.full_name||'—'}</div>
+        <div class="rare-mob" style="font-size:14px;margin-top:3px">${d.mobile||'—'}</div>
+        <div class="rare-addr" style="font-size:12px;margin-top:2px">${d.address||'—'}</div>
       </div>
     </div>`).join('');
 }
@@ -3181,12 +3196,13 @@ async function exportRarePDF(){
   const data = window._RARE_DATA||[];
   const q    = (G('rareSearch')?.value||'').trim().toLowerCase();
   const bg   = G('rareBGFilter')?.value||'';
+  const qN = normalizeAr(q);
   const filtered = data.filter(d=>{
     const matchBG = !bg || d.blood_type===bg;
-    const matchQ  = !q ||
-      (d.full_name||'').toLowerCase().includes(q)||
-      (d.mobile||'').includes(q)||
-      (d.address||'').toLowerCase().includes(q);
+    const matchQ  = !qN ||
+      normalizeAr(d.full_name).includes(qN)||
+      (d.mobile||'').includes(qN)||
+      normalizeAr(d.address).includes(qN);
     return matchBG && matchQ;
   });
 
@@ -4363,6 +4379,35 @@ async function checkDonationInterval(donorId){
   const diffDays = Math.floor((today - lastDate)/(1000*60*60*24));
   const displayDate = raw.split('T')[0];
   return {lastDate: displayDate, diffDays, allowed: diffDays >= 77};
+}
+
+// ── Convert Arabic numerals to English on all inputs ──
+function toEnNums(s){
+  return (s||'').replace(/[٠١٢٣٤٥٦٧٨٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString());
+}
+document.addEventListener('input', e=>{
+  const el = e.target;
+  if(!el || !['INPUT','TEXTAREA'].includes(el.tagName)) return;
+  const type = el.type||'text';
+  if(['checkbox','radio','file','range','color'].includes(type)) return;
+  const val = el.value;
+  const converted = toEnNums(val);
+  if(converted !== val){
+    const pos = el.selectionStart;
+    el.value = converted;
+    try{ el.setSelectionRange(pos, pos); }catch(e){}
+  }
+}, true);
+
+// ── Arabic text normalization for search ──
+function normalizeAr(s){
+  if(!s) return '';
+  return toEnNums(s)
+    .toLowerCase()
+    .replace(/ة/g,'ه')
+    .replace(/[أإآا]/g,'ا')
+    .replace(/ى/g,'ي')
+    .trim();
 }
 
 // ── Fetch next bottle number for selected type ──
