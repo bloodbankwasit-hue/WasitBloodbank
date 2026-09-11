@@ -547,6 +547,30 @@ tbody tr:hover td{background:#fafafa}
 .rc-filled-banner.show{display:flex}
 .rc-filled-text{font-size:12.5px;color:#166534;font-weight:600}
 .rc-filled-clear{background:none;border:none;color:#DC2626;font-size:12px;cursor:pointer;font-weight:600;padding:2px 6px;font-family:inherit}
+
+/* ═══ RARE BLOOD TYPES ═══ */
+.rare-wrap{display:flex;flex-direction:column;gap:12px}
+.rare-search-bar{display:flex;gap:8px;align-items:center}
+.rare-search-bar input{flex:1;padding:10px 14px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:14px;direction:rtl}
+.rare-search-bar select{padding:10px 12px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:13px;background:#fff}
+.rare-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.rs-card{background:#fff;border-radius:12px;padding:10px 12px;text-align:center;border:1.5px solid #EEF2F6;cursor:pointer;transition:all .15s}
+.rs-card.active{border-color:#BE123C;background:#FFF1F2}
+.rs-card:active{transform:scale(.97)}
+.rs-type{font-size:15px;font-weight:800;color:#BE123C}
+.rs-count{font-size:11px;color:#94A3B8;margin-top:2px}
+.rare-list{background:#fff;border-radius:14px;overflow:hidden;border:1px solid #EEF2F6}
+.rare-row{display:flex;align-items:center;padding:11px 14px;border-bottom:1px solid #F8FAFC;gap:10px}
+.rare-row:last-child{border-bottom:none}
+.rare-av{width:36px;height:36px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#BE123C;flex-shrink:0}
+.rare-info{flex:1;min-width:0}
+.rare-name{font-size:13px;font-weight:700;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rare-addr{font-size:11px;color:#94A3B8;margin-top:2px}
+.rare-mob{font-size:12px;color:#BE123C;font-weight:600}
+.rare-call{background:none;border:none;color:#16A34A;font-size:20px;cursor:pointer;padding:4px;flex-shrink:0}
+.rare-export-btn{width:100%;padding:12px;background:#1E293B;color:#fff;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px}
+.rare-export-btn:active{background:#0F172A}
+.rare-count-badge{background:#BE123C;color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;margin-right:auto}
 @media print{
   .sidebar,.topbar,.abar,.pag,#loader,#toastBox,.overlay{display:none!important}
   .content{overflow:visible}
@@ -761,10 +785,37 @@ tbody tr:hover td{background:#fafafa}
 
       <!-- DONORS LIST -->
       <div class="sc" id="s-donors">
-        <div class="abar">
-          <input type="text" class="sinp" id="dSrch" placeholder="بحث بالاسم، رقم المتبرع، رقم القنينة، رقم الهوية..." onkeydown="if(event.key==='Enter')loadDonors(1)">
-          <button class="btn btn-p" onclick="loadDonors(1)"><i class="ti ti-search"></i> بحث</button>
-          <button class="btn" onclick="exportDonors()"><i class="ti ti-file-spreadsheet"></i> تصدير CSV</button>
+        <div style="background:#fff;border-radius:14px;padding:12px;border:1px solid #EEF2F6;margin-bottom:10px">
+          <div style="display:grid;grid-template-columns:1fr;gap:8px">
+            <input type="text" class="sinp" id="dSrch"
+              placeholder="🔍 اسم / هاتف / بطاقة وطنية / رقم قنينة..."
+              onkeydown="if(event.key==='Enter')loadDonors(1)" autocomplete="off"
+              style="padding:10px 12px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:14px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <select id="dBGFilter" onchange="loadDonors(1)"
+                style="padding:9px 10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:13px;background:#fff">
+                <option value="">كل الفصائل</option>
+                <option value="A+">A+</option><option value="A-">A-</option>
+                <option value="B+">B+</option><option value="B-">B-</option>
+                <option value="O+">O+</option><option value="O-">O-</option>
+                <option value="AB+">AB+</option><option value="AB-">AB-</option>
+              </select>
+              <select id="dTypeFilter" onchange="loadDonors(1)"
+                style="padding:9px 10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:13px;background:#fff">
+                <option value="">كل التبرعات</option>
+                <option value="طوعي">طوعي</option>
+                <option value="تعويضي">تعويضي</option>
+              </select>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <button class="btn btn-p" onclick="loadDonors(1)" style="justify-content:center">
+                <i class="ti ti-search"></i> بحث
+              </button>
+              <button class="btn" onclick="exportDonors()" style="justify-content:center">
+                <i class="ti ti-file-spreadsheet"></i> تصدير CSV
+              </button>
+            </div>
+          </div>
         </div>
         <div id="dTbl"><div class="empty"><i class="ti ti-users"></i><p>جاري التحميل...</p></div></div>
         <div class="pag" id="dPag"></div>
@@ -847,9 +898,54 @@ tbody tr:hover td{background:#fafafa}
 
       <!-- RARE -->
       <div class="sc" id="s-rare">
-        <div class="sh"><div class="sh-t"><i class="ti ti-droplet-half"></i> الفصائل النادرة — اضغط على فصيلة لعرض قائمة المتبرعين</div></div>
-        <div class="btg" id="rareGrid"></div>
-        <div id="rareTbl"><div class="empty"><i class="ti ti-droplet-half"></i><p>اختر فصيلة من الأعلى</p></div></div>
+        <div class="rare-wrap">
+
+          <!-- SECTION 1: INVENTORY STATS -->
+          <div class="sh"><div class="sh-t">🩸 خزين الفصائل النادرة</div></div>
+          <div class="rare-stats" id="rareStats">
+            <div class="empty" style="grid-column:1/-1"><p>جاري التحميل...</p></div>
+          </div>
+
+          <!-- SECTION 2: RARE DONORS -->
+          <div class="sh" style="margin-top:8px">
+            <div class="sh-t">👥 أصحاب الفصائل النادرة</div>
+          </div>
+
+          <!-- Advanced Search -->
+          <div style="background:#fff;border-radius:14px;padding:12px;border:1px solid #EEF2F6">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+              <div style="grid-column:1/-1">
+                <input type="text" id="rareSearch" placeholder="🔍 اسم / هاتف / عنوان..."
+                  oninput="filterRare()" autocomplete="off"
+                  style="width:100%;padding:10px 12px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:14px;direction:rtl">
+              </div>
+              <select id="rareBGFilter" onchange="filterRare()"
+                style="padding:9px 10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:13px;background:#fff">
+                <option value="">كل الفصائل</option>
+                <option value="A-">A-</option>
+                <option value="B-">B-</option>
+                <option value="O-">O-</option>
+                <option value="AB-">AB-</option>
+                <option value="A+">A+</option>
+                <option value="AB+">AB+</option>
+              </select>
+              <button onclick="filterRare();exportRarePDF()"
+                style="padding:9px;background:#1E293B;color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer">
+                📤 تصدير
+              </button>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:11px;color:#94A3B8">النتائج:</span>
+              <span class="rare-count-badge" id="rareCountBadge">0</span>
+            </div>
+          </div>
+
+          <!-- Donors List -->
+          <div class="rare-list" id="rareList">
+            <div class="empty"><p>جاري التحميل...</p></div>
+          </div>
+
+        </div>
       </div>
 
       <!-- STATS -->
@@ -1215,11 +1311,12 @@ function fillDonor(d){
   const form=G('s-reception');
   if(form) form.dataset.existingDonorId=d.id;
 
-  // Show filled banner
+  // Show filled banner with blood type if known
   const banner=G('rcFilledBanner');
   const txt=G('rcFilledText');
   if(banner&&txt){
-    txt.textContent='✅ متبرع معروف: '+d.full_name;
+    const btLabel = d.blood_type ? ` | فصيلة: ${d.blood_type}` : '';
+    txt.textContent='✅ متبرع معروف: '+d.full_name+btLabel;
     banner.classList.add('show');
   }
 
@@ -2494,6 +2591,30 @@ function printForm(){
 .rc-filled-banner.show{display:flex}
 .rc-filled-text{font-size:12.5px;color:#166534;font-weight:600}
 .rc-filled-clear{background:none;border:none;color:#DC2626;font-size:12px;cursor:pointer;font-weight:600;padding:2px 6px;font-family:inherit}
+
+/* ═══ RARE BLOOD TYPES ═══ */
+.rare-wrap{display:flex;flex-direction:column;gap:12px}
+.rare-search-bar{display:flex;gap:8px;align-items:center}
+.rare-search-bar input{flex:1;padding:10px 14px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:14px;direction:rtl}
+.rare-search-bar select{padding:10px 12px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:13px;background:#fff}
+.rare-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.rs-card{background:#fff;border-radius:12px;padding:10px 12px;text-align:center;border:1.5px solid #EEF2F6;cursor:pointer;transition:all .15s}
+.rs-card.active{border-color:#BE123C;background:#FFF1F2}
+.rs-card:active{transform:scale(.97)}
+.rs-type{font-size:15px;font-weight:800;color:#BE123C}
+.rs-count{font-size:11px;color:#94A3B8;margin-top:2px}
+.rare-list{background:#fff;border-radius:14px;overflow:hidden;border:1px solid #EEF2F6}
+.rare-row{display:flex;align-items:center;padding:11px 14px;border-bottom:1px solid #F8FAFC;gap:10px}
+.rare-row:last-child{border-bottom:none}
+.rare-av{width:36px;height:36px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#BE123C;flex-shrink:0}
+.rare-info{flex:1;min-width:0}
+.rare-name{font-size:13px;font-weight:700;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rare-addr{font-size:11px;color:#94A3B8;margin-top:2px}
+.rare-mob{font-size:12px;color:#BE123C;font-weight:600}
+.rare-call{background:none;border:none;color:#16A34A;font-size:20px;cursor:pointer;padding:4px;flex-shrink:0}
+.rare-export-btn{width:100%;padding:12px;background:#1E293B;color:#fff;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px}
+.rare-export-btn:active{background:#0F172A}
+.rare-count-badge{background:#BE123C;color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;margin-right:auto}
 @media print{@page{margin:10mm}}</style></head><body>
   <div class="hdr">
     <div class="en">Ministry of Health<br>Wasit Health Directorate<br>Technical Affairs Dept.<br><strong>Blood Donor Questionnaire</strong></div>
@@ -2544,6 +2665,8 @@ async function loadDonors(page=1){
       .select('bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,status,id,donors!inner(donor_number,full_name,birth_year,national_id)',{count:'exact'})
       .eq('is_deleted',false).order('created_at',{ascending:false})
       .range((page-1)*PS, page*PS-1);
+    if(bgF) q=q.eq('blood_type',bgF);
+    if(typeF) q=q.eq('donation_type',typeF);
     if(s){ q=db.from('blood_donations')
       .select('bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,status,id,donors!inner(donor_number,full_name,birth_year,national_id)',{count:'exact'})
       .eq('is_deleted',false)
@@ -2866,6 +2989,30 @@ function printBC(type){
 .rc-filled-banner.show{display:flex}
 .rc-filled-text{font-size:12.5px;color:#166534;font-weight:600}
 .rc-filled-clear{background:none;border:none;color:#DC2626;font-size:12px;cursor:pointer;font-weight:600;padding:2px 6px;font-family:inherit}
+
+/* ═══ RARE BLOOD TYPES ═══ */
+.rare-wrap{display:flex;flex-direction:column;gap:12px}
+.rare-search-bar{display:flex;gap:8px;align-items:center}
+.rare-search-bar input{flex:1;padding:10px 14px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:14px;direction:rtl}
+.rare-search-bar select{padding:10px 12px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:13px;background:#fff}
+.rare-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.rs-card{background:#fff;border-radius:12px;padding:10px 12px;text-align:center;border:1.5px solid #EEF2F6;cursor:pointer;transition:all .15s}
+.rs-card.active{border-color:#BE123C;background:#FFF1F2}
+.rs-card:active{transform:scale(.97)}
+.rs-type{font-size:15px;font-weight:800;color:#BE123C}
+.rs-count{font-size:11px;color:#94A3B8;margin-top:2px}
+.rare-list{background:#fff;border-radius:14px;overflow:hidden;border:1px solid #EEF2F6}
+.rare-row{display:flex;align-items:center;padding:11px 14px;border-bottom:1px solid #F8FAFC;gap:10px}
+.rare-row:last-child{border-bottom:none}
+.rare-av{width:36px;height:36px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#BE123C;flex-shrink:0}
+.rare-info{flex:1;min-width:0}
+.rare-name{font-size:13px;font-weight:700;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rare-addr{font-size:11px;color:#94A3B8;margin-top:2px}
+.rare-mob{font-size:12px;color:#BE123C;font-weight:600}
+.rare-call{background:none;border:none;color:#16A34A;font-size:20px;cursor:pointer;padding:4px;flex-shrink:0}
+.rare-export-btn{width:100%;padding:12px;background:#1E293B;color:#fff;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px}
+.rare-export-btn:active{background:#0F172A}
+.rare-count-badge{background:#BE123C;color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;margin-right:auto}
 @media print{@page{margin:6mm}}</style></head><body>
   <div class="card">
     <div class="hd"><div class="hd-ico">🩸</div>
@@ -2955,16 +3102,152 @@ async function saveRejected(){
 // RARE BLOOD TYPES
 // ================================================================
 async function loadRareGrid(){
-  const {data:btd}=await db.from('blood_donations').select('blood_type').eq('is_deleted',false).not('blood_type','is',null);
-  const btc={};
-  (btd||[]).forEach(r=>{btc[r.blood_type]=(btc[r.blood_type]||0)+1;});
-  const bts=['A+','A-','B+','B-','O+','O-','AB+','AB-'];
-  const rare=['O-','AB-','A-','B-'];
-  G('rareGrid').innerHTML=bts.map(bt=>`<div class="btc ${rare.includes(bt)?'warn':''}" onclick="loadRareList('${bt}')">
-    <div class="btc-t">${bt}</div>
-    <div class="btc-n">${fnum(btc[bt]||0)}${rare.includes(bt)?' ⚠':''}</div>
-  </div>`).join('');
+  const RARE = ['A-','B-','O-','AB-','A+','AB+'];
+
+  // 1. Load inventory stats (in_stock bottles with rare blood types)
+  const{data:inv}=await db.from('blood_donations')
+    .select('blood_type')
+    .in('blood_type', RARE)
+    .eq('status','in_stock');
+
+  const invCounts = {};
+  RARE.forEach(t=>invCounts[t]=0);
+  (inv||[]).forEach(d=>{ if(invCounts[d.blood_type]!==undefined) invCounts[d.blood_type]++; });
+
+  G('rareStats').innerHTML = RARE.map(t=>{
+    const n = invCounts[t];
+    const cls = n===0?'danger':n<3?'warn':'ok';
+    const colors = {ok:'#16A34A',warn:'#D97706',danger:'#DC2626'};
+    return `<div class="rs-card" onclick="document.getElementById('rareBGFilter').value='${t}';filterRare()" style="border-color:${n>0?'#EEF2F6':'#FECDD3'}">
+      <div class="rs-type" style="color:${colors[cls]}">${t}</div>
+      <div class="rs-count" style="color:${colors[cls]};font-weight:600">${n} قنينة</div>
+    </div>`;
+  }).join('');
+
+  // 2. Load rare donors
+  const{data,error}=await db.from('donors')
+    .select('id,full_name,mobile,address,blood_type,is_deleted')
+    .in('blood_type', RARE)
+    .eq('is_deleted',false)
+    .order('blood_type')
+    .order('full_name')
+    .limit(3000);
+
+  if(error||!data){ G('rareList').innerHTML='<div class="empty"><p>تعذّر التحميل</p></div>'; return; }
+  window._RARE_DATA = data;
+  filterRare();
 }
+
+function filterRare(){
+  const data = window._RARE_DATA||[];
+  const q    = (G('rareSearch')?.value||'').trim().toLowerCase();
+  const bg   = G('rareBGFilter')?.value||'';
+
+  const filtered = data.filter(d=>{
+    const matchBG = !bg || d.blood_type===bg;
+    const matchQ  = !q ||
+      (d.full_name||'').toLowerCase().includes(q)||
+      (d.mobile||'').includes(q)||
+      (d.address||'').toLowerCase().includes(q);
+    return matchBG && matchQ;
+  });
+
+  const badge=G('rareCountBadge');
+  if(badge) badge.textContent=filtered.length;
+
+  // Highlight active card
+  const RARE=['A-','B-','O-','AB-','A+','AB+'];
+  document.querySelectorAll('.rs-card').forEach((el,i)=>
+    el.classList.toggle('active', bg===RARE[i]));
+
+  if(!filtered.length){
+    G('rareList').innerHTML='<div class="empty"><p>لا توجد نتائج</p></div>';
+    return;
+  }
+
+  G('rareList').innerHTML = filtered.map(d=>`
+    <div class="rare-row">
+      <div class="rare-av">${d.blood_type||'?'}</div>
+      <div class="rare-info">
+        <div class="rare-name">${d.full_name||'—'}</div>
+        <div class="rare-addr">${d.address||'—'}</div>
+        <div class="rare-mob">${d.mobile||'—'}</div>
+      </div>
+    </div>`).join('');
+}
+
+
+async function exportRarePDF(){
+  const data = window._RARE_DATA||[];
+  const q    = (G('rareSearch')?.value||'').trim().toLowerCase();
+  const bg   = G('rareBGFilter')?.value||'';
+  const filtered = data.filter(d=>{
+    const matchBG = !bg || d.blood_type===bg;
+    const matchQ  = !q ||
+      (d.full_name||'').toLowerCase().includes(q)||
+      (d.mobile||'').includes(q)||
+      (d.address||'').toLowerCase().includes(q);
+    return matchBG && matchQ;
+  });
+
+  if(!filtered.length){ toast('لا توجد بيانات للتصدير','error'); return; }
+  toast('⏳ جاري تجهيز القائمة...','warning',3000);
+
+  try{
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'pt',format:'a4',compress:true});
+    const W=595,H=842,sc=2;
+    const cv=document.createElement('canvas');
+    cv.width=W*sc; cv.height=H*sc;
+    const ctx=cv.getContext('2d');
+    ctx.scale(sc,sc);
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+
+    // Header
+    ctx.fillStyle='#BE123C'; ctx.fillRect(0,0,W,45);
+    ctx.fillStyle='#fff'; ctx.font='bold 14px Arial'; ctx.textAlign='center';
+    ctx.fillText('قائمة أصحاب الفصائل النادرة — مصرف الدم الرئيسي واسط',W/2,28);
+    ctx.font='10px Arial';
+    const bgLabel = bg ? `فصيلة: ${bg}` : 'جميع الفصائل';
+    ctx.fillText(`${bgLabel} | المجموع: ${filtered.length} متبرع`,W/2,40);
+
+    // Table header
+    let y=60;
+    ctx.fillStyle='#F1F5F9'; ctx.fillRect(10,y,W-20,20);
+    ctx.fillStyle='#1E293B'; ctx.font='bold 9px Arial'; ctx.textAlign='right';
+    [[W-15,'الاسم'],[W-185,'الفصيلة'],[W-240,'رقم الهاتف'],[W-380,'العنوان']].forEach(([x,t])=>ctx.fillText(t,x,y+14));
+    y+=22;
+
+    filtered.forEach((d,i)=>{
+      if(y>H-30){
+        doc.addImage(cv.toDataURL('image/jpeg',0.85),'JPEG',0,0,595,842);
+        doc.addPage();
+        ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+        y=20;
+      }
+      ctx.fillStyle=i%2===0?'#fff':'#F8FAFC';
+      ctx.fillRect(10,y,W-20,18);
+      ctx.fillStyle='#1E293B'; ctx.font='9px Arial'; ctx.textAlign='right';
+      ctx.fillText((d.full_name||'—').substring(0,30),W-15,y+13);
+      ctx.fillStyle='#BE123C'; ctx.font='bold 9px Arial';
+      ctx.fillText(d.blood_type||'—',W-185,y+13);
+      ctx.fillStyle='#1E293B'; ctx.font='9px Arial';
+      ctx.fillText(d.mobile||'—',W-240,y+13);
+      ctx.fillText((d.address||'—').substring(0,20),W-380,y+13);
+      y+=18;
+    });
+
+    doc.addImage(cv.toDataURL('image/jpeg',0.85),'JPEG',0,0,595,842);
+    const blob=doc.output('blob');
+    const fname=`فصائل_نادرة_${bg||'الكل'}_${new Date().toISOString().split('T')[0]}.pdf`;
+    await shareOrDownloadFile(blob,fname,'application/pdf');
+    toast('✅ تم تصدير القائمة','success');
+  }catch(e){
+    console.error(e);
+    toast('خطأ: '+e.message,'error');
+  }
+}
+
 
 async function loadRareList(bt){
   load(true);
@@ -3203,6 +3486,30 @@ function printStats(){
 .rc-filled-banner.show{display:flex}
 .rc-filled-text{font-size:12.5px;color:#166534;font-weight:600}
 .rc-filled-clear{background:none;border:none;color:#DC2626;font-size:12px;cursor:pointer;font-weight:600;padding:2px 6px;font-family:inherit}
+
+/* ═══ RARE BLOOD TYPES ═══ */
+.rare-wrap{display:flex;flex-direction:column;gap:12px}
+.rare-search-bar{display:flex;gap:8px;align-items:center}
+.rare-search-bar input{flex:1;padding:10px 14px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:14px;direction:rtl}
+.rare-search-bar select{padding:10px 12px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:13px;background:#fff}
+.rare-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.rs-card{background:#fff;border-radius:12px;padding:10px 12px;text-align:center;border:1.5px solid #EEF2F6;cursor:pointer;transition:all .15s}
+.rs-card.active{border-color:#BE123C;background:#FFF1F2}
+.rs-card:active{transform:scale(.97)}
+.rs-type{font-size:15px;font-weight:800;color:#BE123C}
+.rs-count{font-size:11px;color:#94A3B8;margin-top:2px}
+.rare-list{background:#fff;border-radius:14px;overflow:hidden;border:1px solid #EEF2F6}
+.rare-row{display:flex;align-items:center;padding:11px 14px;border-bottom:1px solid #F8FAFC;gap:10px}
+.rare-row:last-child{border-bottom:none}
+.rare-av{width:36px;height:36px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#BE123C;flex-shrink:0}
+.rare-info{flex:1;min-width:0}
+.rare-name{font-size:13px;font-weight:700;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rare-addr{font-size:11px;color:#94A3B8;margin-top:2px}
+.rare-mob{font-size:12px;color:#BE123C;font-weight:600}
+.rare-call{background:none;border:none;color:#16A34A;font-size:20px;cursor:pointer;padding:4px;flex-shrink:0}
+.rare-export-btn{width:100%;padding:12px;background:#1E293B;color:#fff;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px}
+.rare-export-btn:active{background:#0F172A}
+.rare-count-badge{background:#BE123C;color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;margin-right:auto}
 @media print{@page{margin:10mm}}</style></head>
   <body>${c}<script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
   w.document.close();
@@ -3368,8 +3675,19 @@ async function saveReception(){
       const existingId = G('s-reception')?.dataset?.existingDonorId;
       let dn;
       if(existingId){
-        const{data:ed}=await db.from('donors').select('id').eq('id',existingId).single();
-        dn = ed;
+        // Update existing donor with any newly filled fields
+        const updateFields = {};
+        if(payload.mother_name)  updateFields.mother_name  = payload.mother_name;
+        if(payload.national_id)  updateFields.national_id  = payload.national_id;
+        if(payload.mobile)       updateFields.mobile        = payload.mobile;
+        if(payload.address)      updateFields.address       = payload.address;
+        if(payload.occupation)   updateFields.occupation    = payload.occupation;
+        if(payload.birth_year)   updateFields.birth_year    = payload.birth_year;
+
+        if(Object.keys(updateFields).length > 0){
+          await db.from('donors').update(updateFields).eq('id', existingId);
+        }
+        dn = {id: existingId};
       } else {
         const{data:nd,error:de}=await db.from('donors').insert({
           full_name:payload.full_name, birth_year:payload.birth_year, gender:payload.gender,
