@@ -14,7 +14,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js" async></script>
 
 <style>
@@ -1109,6 +1109,8 @@ tbody tr:hover td{background:#fafafa}
 </div>
 
 <script>
+// FIRST LINE - if this runs, JS is working
+document.getElementById("diagLog").innerHTML += '<div style="color:#0ff">✅ JS script started</div>';
 // ================================================================
 // ⚠ CONFIG — غيّر هاتين القيمتين بعد إنشاء مشروعك في Supabase
 //   Dashboard → Settings → API → Project URL + anon/public key
@@ -1119,8 +1121,15 @@ const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 // ================================================================
 // INIT
 // ================================================================
+// Safety check - if supabase CDN failed to load
+if(typeof supabase === 'undefined'){
+  document.body.innerHTML = '<div style="font-family:Arial;direction:rtl;text-align:center;padding:40px;background:#fff;min-height:100vh"><div style="font-size:60px;margin-bottom:20px">⚠️</div><h2 style="color:#BE123C;margin-bottom:12px">تعذّر تحميل التطبيق</h2><p style="color:#64748B;font-size:15px;margin-bottom:20px">تعذّر الاتصال بخادم Supabase.<br>تأكد من الاتصال بالإنترنت وأعد تحميل الصفحة.</p><button onclick="location.reload()" style="background:#BE123C;color:#fff;border:none;padding:14px 32px;border-radius:12px;font-size:16px;cursor:pointer;font-family:inherit">🔄 إعادة التحميل</button></div>';
+  throw new Error('Supabase CDN not loaded');
+}
+document.getElementById("diagLog").innerHTML += '<div style="color:#0ff">✅ Supabase loaded</div>';
 const { createClient } = supabase;
 const db = createClient(SURL, SKEY);
+document.getElementById("diagLog").innerHTML += '<div style="color:#0ff">✅ DB client created</div>';
 let SES = null, UPROF = null, DPAGE = 1, SRDATA = [], BCDATA = null;
 const PS = 20;
 
