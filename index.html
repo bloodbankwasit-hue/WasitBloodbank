@@ -1570,13 +1570,6 @@ function printDonorFromList(storeId){
 }
 
 
-  if(typeof d === 'string') try{ d=JSON.parse(decodeURIComponent(d)); }catch(e){
-    try{ d=JSON.parse(d.replace(/&quot;/g,'"')); }catch(e2){ return; }
-  }
-  _lastDonation = d;
-  G('printChoiceModal').classList.add('on');
-}
-
 // ================================================================
 // OFFLINE ENGINE
 // ================================================================
