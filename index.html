@@ -1223,6 +1223,22 @@ function fillDonor(d){
   // Close all lists
   ['ac-name','ac-nid','ac-mob'].forEach(id=>{ const e=G(id); if(e) e.classList.remove('show'); });
   setTimeout(()=>checkRejectedName(),100);
+  // Check donation interval
+  setTimeout(async()=>{
+    const iw=G('intervalWarn');
+    if(!d.id||!iw) return;
+    const result = await checkDonationInterval(d.id);
+    if(result && !result.allowed){
+      const remaining = 77 - result.diffDays;
+      G('intervalWarnTitle').textContent = '⛔ لا يمكن التبرع — آخر تبرع منذ '+result.diffDays+' يوم فقط';
+      G('intervalWarnReason').textContent = 'المدة الدنيا بين التبرعات 77 يوماً — يتبقى '+remaining+' يوم للتمكن من التبرع (آخر تبرع: '+result.lastDate+')';
+      iw.style.display='flex';
+      iw.dataset.blocked='1';
+    } else {
+      iw.style.display='none';
+      iw.dataset.blocked='';
+    }
+  },200);
 }
 
 function clearDonorFill(){
@@ -3302,6 +3318,12 @@ async function saveReception(){
   if(G('rejWarn').classList.contains('show')){
     toast('المتبرع مرفوض — لا يمكن المتابعة','error'); return;
   }
+  // Block if 77-day interval not met
+  const _iw=G('intervalWarn');
+  if(_iw && _iw.dataset.blocked==='1'){
+    toast('⛔ لا يمكن الحفظ — لم تمر 77 يوماً على آخر تبرع','error',5000);
+    return;
+  }
   const nm=G('rc-name').value.trim(), by=parseInt(G('rc-by').value);
   if(!nm||!by){ toast('يرجى تعبئة الاسم وسنة التولد','error'); return; }
   load(true);
@@ -3396,6 +3418,7 @@ function resetReception(){
   ['rc-name','rc-by','rc-age','rc-mom','rc-nid','rc-mob','rc-addr','rc-job','rc-pat','rc-hosp'].forEach(id=>{const e=G(id);if(e)e.value='';});
   if(G('rc-btype')) G('rc-btype').value='';
   if(G('rc-bnum'))  { G('rc-bnum').value=''; G('rc-bnum').dataset.seqId=''; }
+  const iw2=G('intervalWarn'); if(iw2){ iw2.style.display='none'; iw2.dataset.blocked=''; }
   G('rc-dtype').value='تعويضي';
   G('rejWarn').classList.remove('show');
   toggleRcPat();
@@ -3997,6 +4020,22 @@ function buildAccountScreen(){
 function setAccTab(){
   document.querySelectorAll('.bn-item').forEach(b=>b.classList.remove('on'));
   G('tab-acc-btn')?.classList.add('on');
+}
+
+// ── Check donation interval (77 days minimum) ──
+async function checkDonationInterval(donorId){
+  if(!donorId) return null;
+  const{data}=await db.from('blood_donations')
+    .select('donation_date')
+    .eq('donor_id', donorId)
+    .not('status','eq','rejected_positive')
+    .order('donation_date',{ascending:false})
+    .limit(1);
+  if(!data||!data.length) return null; // no previous donation
+  const lastDate = new Date(data[0].donation_date);
+  const today = new Date();
+  const diffDays = Math.floor((today - lastDate)/(1000*60*60*24));
+  return {lastDate: data[0].donation_date, diffDays, allowed: diffDays >= 77};
 }
 
 // ── Fetch next bottle number for selected type ──
