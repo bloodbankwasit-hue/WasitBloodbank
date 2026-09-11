@@ -1790,9 +1790,8 @@ window.addEventListener('online',  onOnline);
 window.addEventListener('offline', onOffline);
 
 async function appInit(){
-  await initOfflineDB();
-  if(IS_ONLINE) cacheRejectedDonors();
-  else onOffline();
+  try{ await initOfflineDB(); }catch(e){ console.log('IndexedDB unavailable:', e); }
+  try{ if(IS_ONLINE) cacheRejectedDonors(); else onOffline(); }catch(e){}
   G('tbDate').textContent = new Date().toLocaleDateString('ar-IQ',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   setDefaults();
   try{
@@ -3923,7 +3922,7 @@ function applyMobileLayout(){
   else { sb.style.cssText='display:flex;flex-direction:column'; }
 }
 window.addEventListener('resize', applyMobileLayout);
-window.addEventListener('load', ()=>{ appInit(); setTimeout(applyMobileLayout,100); });
+window.addEventListener('load', ()=>{ appInit().catch(e=>console.log('appInit err:',e)); setTimeout(applyMobileLayout,100); });
 
 // Service Worker — PWA offline support
 if('serviceWorker' in navigator){
