@@ -1109,8 +1109,17 @@ tbody tr:hover td{background:#fafafa}
 </div>
 
 <script>
-// FIRST LINE - if this runs, JS is working
-document.getElementById("diagLog").innerHTML += '<div style="color:#0ff">✅ JS script started</div>';
+// Catch ALL JS errors
+window.onerror = function(msg, src, line, col, err){
+  alert('JS Error at line '+line+':\n'+msg);
+  return true;
+};
+// FIRST LINE TEST
+try{
+  var dl = document.getElementById("diagLog");
+  if(dl) dl.innerHTML += '<div style="color:#0ff">✅ JS STARTED</div>';
+  else alert("diagLog not found!");
+} catch(e){ alert("First line error: "+e.message); }
 // ================================================================
 // ⚠ CONFIG — غيّر هاتين القيمتين بعد إنشاء مشروعك في Supabase
 //   Dashboard → Settings → API → Project URL + anon/public key
