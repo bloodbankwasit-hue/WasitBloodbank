@@ -482,6 +482,180 @@ tbody tr:hover td{background:#fafafa}
   .page-title-bar{display:flex}
 }
 
+/* ═══════ RECEPTION FORM — DESKTOP REDESIGN ═══════ */
+@media(min-width:769px){
+  #s-reception{max-width:920px;margin:0 auto}
+  #s-reception .fsec{
+    padding:30px 34px;border-radius:20px;border:1px solid #FCE7EC;
+    box-shadow:0 6px 28px rgba(190,18,60,.07);
+    animation:rcFadeIn .35s ease;
+  }
+  @keyframes rcFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  #s-reception .fst{
+    font-size:20px;font-weight:800;color:#BE123C;
+    border-bottom:2px solid #FFE4E9;padding-bottom:16px;margin-bottom:26px;gap:10px;
+  }
+  #s-reception .fst i{font-size:23px}
+  #s-reception .fgrid{grid-template-columns:repeat(3,1fr);gap:20px 22px}
+  #s-reception .fgrp label{font-size:13.5px;font-weight:700;color:#374151;margin-bottom:3px}
+  #s-reception .fgrp input,#s-reception .fgrp select{
+    padding:14px 16px;border-radius:13px;font-size:15px;border:1.5px solid #E5E7EB;
+    background:#F9FAFB;transition:all .18s;
+  }
+  #s-reception .fgrp input:hover,#s-reception .fgrp select:hover{border-color:#FBCFE8}
+  #s-reception .fgrp input:focus,#s-reception .fgrp select:focus{
+    border-color:#BE123C;background:#fff;box-shadow:0 0 0 4px rgba(190,18,60,.09);
+  }
+  #s-reception .fgrp input.ro{background:#F3F4F6;border-color:#E5E7EB}
+  #s-reception .fgrp input.auto,
+  #s-reception input#rc-donornum, #s-reception input#rc-date, #s-reception input#rc-time, #s-reception input#rc-bnum{
+    background:linear-gradient(135deg,#FFF1F2,#FFF7ED);border-color:#FBCFE8;font-weight:700;color:#BE123C;
+  }
+  #s-reception .btn-action{
+    max-width:920px;margin:10px auto 0;border-radius:15px;font-size:16px;padding:19px;
+    box-shadow:0 8px 22px rgba(190,18,60,.25);transition:transform .15s,box-shadow .15s;
+  }
+  #s-reception .btn-action:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(190,18,60,.32)}
+  #s-reception > .btn{max-width:920px;margin-left:auto;margin-right:auto;display:block;width:100%}
+}
+
+/* ═══════ DESKTOP UNIFIED HOME + POPUP NAVIGATION ═══════ */
+@media(min-width:769px){
+  /* The old sidebar + bottom tab bar are replaced by the unified icon home + popups */
+  .sb{display:none !important}
+  .bottom-nav{display:none !important}
+  .back-btn{display:none !important}
+
+  .dth-hero{
+    display:flex;align-items:center;gap:16px;
+    background:linear-gradient(120deg,#BE123C,#E11D48 60%,#F43F5E);
+    border-radius:22px;padding:28px 32px;margin-bottom:26px;color:#fff;
+    box-shadow:0 10px 30px rgba(190,18,60,.25);
+  }
+  .dth-hero-icon{font-size:44px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.2))}
+  .dth-hero-title{font-size:22px;font-weight:800}
+  .dth-hero-sub{font-size:13.5px;opacity:.9;margin-top:4px}
+
+  .dth-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px}
+  .dth-card{
+    background:#fff;border-radius:18px;padding:22px 14px;text-align:center;cursor:pointer;
+    border:1px solid #F1F5F9;box-shadow:0 2px 10px rgba(0,0,0,.05);
+    transition:transform .16s,box-shadow .16s,border-color .16s;position:relative;overflow:hidden;
+  }
+  .dth-card::before{
+    content:'';position:absolute;inset:0;background:linear-gradient(160deg,rgba(190,18,60,.05),transparent 60%);
+    opacity:0;transition:opacity .16s;
+  }
+  .dth-card:hover{transform:translateY(-4px);box-shadow:0 10px 24px rgba(190,18,60,.15);border-color:#FBCFE8}
+  .dth-card:hover::before{opacity:1}
+  .dth-card-icon{font-size:34px;margin-bottom:10px}
+  .dth-card-name{font-size:14.5px;font-weight:800;color:#1a1a1a}
+  .dth-card-desc{font-size:11.5px;color:#94A3B8;margin-top:4px}
+  .dth-card-badge{
+    position:absolute;top:10px;left:10px;background:#DC2626;color:#fff;font-size:10px;
+    font-weight:700;border-radius:20px;padding:2px 8px;display:none;
+  }
+  .dth-card-badge.show{display:block}
+
+  /* Section popup */
+  #sectionPopup .sec-popup-box{
+    background:#F1F5F9;border-radius:20px;width:min(1100px,92vw);max-height:90vh;
+    display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3);
+  }
+  .sec-popup-head{
+    display:flex;align-items:center;justify-content:space-between;
+    background:#fff;padding:16px 24px;border-bottom:1px solid #EEF2F6;flex-shrink:0;
+  }
+  .sec-popup-title{font-size:17px;font-weight:800;color:#BE123C}
+  .sec-popup-close{
+    background:#F1F5F9;border:none;border-radius:50%;width:36px;height:36px;cursor:pointer;
+    color:#616161;font-size:16px;transition:background .15s;
+  }
+  .sec-popup-close:hover{background:#FFE4E9;color:#BE123C}
+  .sec-popup-body{padding:26px 28px;overflow-y:auto;flex:1}
+  .sec-popup-body .sc{display:block !important}
+
+  /* ── General livelier desktop styling for everything opened inside a popup ── */
+  .sec-popup-body .sh{margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #FFE4E9}
+  .sec-popup-body .sh-t{font-size:19px;font-weight:800;color:#BE123C;gap:9px}
+  .sec-popup-body .sh-t i{font-size:21px}
+
+  .sec-popup-body .flow-card{
+    padding:16px 18px;border-radius:16px;border-color:#F1F5F9;gap:14px;
+    box-shadow:0 2px 10px rgba(0,0,0,.04);transition:transform .14s,box-shadow .14s,border-color .14s;
+  }
+  .sec-popup-body .flow-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(190,18,60,.1);border-color:#FBCFE8}
+  .sec-popup-body .fc-av{width:50px;height:50px;font-size:24px;background:linear-gradient(135deg,#FFF1F2,#FFE4E9)}
+  .sec-popup-body .fc-name{font-size:15.5px}
+  .sec-popup-body .fc-sub{font-size:12.5px}
+
+  .sec-popup-body .empty{padding:60px 20px}
+  .sec-popup-body .empty i{font-size:40px;color:#CBD5E1;margin-bottom:10px;display:block}
+  .sec-popup-body .empty p{font-size:14.5px}
+
+  .sec-popup-body .tw{border-radius:14px;box-shadow:0 3px 14px rgba(0,0,0,.05);border-color:#F1F5F9}
+  .sec-popup-body .tw table{width:100%;border-collapse:collapse}
+  .sec-popup-body .tw th{background:#FFF1F2;color:#BE123C;font-size:12.5px;font-weight:700;padding:12px 10px}
+  .sec-popup-body .tw td{padding:12px 10px;font-size:13.5px}
+  .sec-popup-body .tw tr:hover td{background:#FFFBFB}
+
+  .sec-popup-body .stock-bt{padding:20px 10px;border-radius:16px}
+  .sec-popup-body .stock-bt:hover{transform:translateY(-3px)}
+  .sec-popup-body .stock-bt-type{font-size:24px}
+
+  .sec-popup-body .bottle-cards-grid{grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:12px}
+  .sec-popup-body .bottle-card{padding:14px 8px;border-radius:14px}
+  .sec-popup-body .bottle-card-num{font-size:19px}
+
+  .sec-popup-body .acc-menu-list{border-radius:16px;box-shadow:0 3px 14px rgba(0,0,0,.05)}
+  .sec-popup-body .ami{padding:16px 20px;transition:background .14s}
+  .sec-popup-body .ami:hover{background:#FFF7F8}
+  .sec-popup-body .ami-icon{width:42px;height:42px;font-size:20px;border-radius:12px}
+  .sec-popup-body .ami-text{font-size:14.5px}
+
+  .sec-popup-body .rare-row{padding:14px 16px;border-radius:12px;transition:background .14s}
+  .sec-popup-body .rare-row:hover{background:#FFFBFB}
+
+  .sec-popup-body .fsec{padding:26px 28px;border-radius:18px;border-color:#F1F5F9;box-shadow:0 4px 20px rgba(0,0,0,.05)}
+  .sec-popup-body .fst{font-size:17px;color:#BE123C;padding-bottom:14px;margin-bottom:20px}
+  .sec-popup-body .fgrid{gap:16px 18px}
+  .sec-popup-body .fgrp label{font-size:13px;font-weight:700;color:#374151}
+  .sec-popup-body .fgrp input,.sec-popup-body .fgrp select,.sec-popup-body .fgrp textarea{
+    padding:12px 14px;border-radius:11px;font-size:14.5px;border:1.5px solid #E5E7EB;background:#F9FAFB;
+  }
+  .sec-popup-body .fgrp input:focus,.sec-popup-body .fgrp select:focus{
+    border-color:#BE123C;background:#fff;box-shadow:0 0 0 4px rgba(190,18,60,.08);
+  }
+
+  .sec-popup-body .btn-action{border-radius:14px;padding:17px;transition:transform .14s,box-shadow .14s;box-shadow:0 6px 18px rgba(190,18,60,.2)}
+  .sec-popup-body .btn-action:hover{transform:translateY(-2px);box-shadow:0 9px 22px rgba(190,18,60,.28)}
+  .sec-popup-body .btn-p:hover{filter:brightness(1.06)}
+  .sec-popup-body .ibtn:hover{background:#FFF1F2;border-color:#FBCFE8}
+
+  .sec-popup-body .wcard,.sec-popup-body .seq-card{transition:transform .14s,box-shadow .14s}
+  .sec-popup-body .wcard:hover,.sec-popup-body .seq-card:hover{transform:translateY(-3px);box-shadow:0 8px 20px rgba(0,0,0,.08)}
+
+  .sec-popup-body .sc-card{padding:20px 12px;border-radius:16px;box-shadow:0 3px 14px rgba(0,0,0,.05);transition:transform .14s}
+  .sec-popup-body .sc-card:hover{transform:translateY(-3px)}
+  .sec-popup-body .sc-ico{font-size:28px}
+  .sec-popup-body .sc-val{font-size:26px}
+  .sec-popup-body .sc-lbl{font-size:11.5px}
+
+  .modal{border-radius:20px;padding:28px;box-shadow:0 20px 50px rgba(0,0,0,.2)}
+  .modal-title{font-size:16px;color:#BE123C}
+  .modal .fgrp input,.modal .fgrp select,.modal .fgrp textarea{
+    padding:12px 14px;border-radius:11px;font-size:14.5px;border:1.5px solid #E5E7EB;background:#F9FAFB;
+  }
+  .modal .fgrp input:focus,.modal .fgrp select:focus{
+    border-color:#BE123C;background:#fff;box-shadow:0 0 0 4px rgba(190,18,60,.08);
+  }
+  .modal .btn-p:hover{filter:brightness(1.06)}
+  .modal .btn:hover{background:#F8FAFC}
+}
+@media(max-width:768px){
+  #s-dthome{display:none !important}
+}
+
 
 /* ═══════ OFFLINE SYSTEM ═══════ */
 .offline-bar{
@@ -1042,6 +1216,18 @@ tbody tr:hover td{background:#fafafa}
 
 
       <!-- ========== WORK HOME ========== -->
+      <!-- ========== DESKTOP UNIFIED HOME ========== -->
+      <div class="sc" id="s-dthome">
+        <div class="dth-hero">
+          <div class="dth-hero-icon">🩸</div>
+          <div>
+            <div class="dth-hero-title">مصرف الدم الرئيسي — واسط</div>
+            <div class="dth-hero-sub">اختر القسم اللي تريد تشتغل عليه</div>
+          </div>
+        </div>
+        <div class="dth-grid" id="dtHomeGrid"></div>
+      </div>
+
       <div class="sc" id="s-workhome">
         <div class="work-grid" id="workGrid">
           <!-- Populated by JS based on permissions -->
@@ -1061,8 +1247,16 @@ tbody tr:hover td{background:#fafafa}
           <div><div class="rej-warn-t" id="rejWarnTitle">مرفوض من التبرع</div><div class="rej-warn-r" id="rejWarnReason"></div></div>
         </div>
         <div class="fsec">
-          <div class="fst"><i class="ti ti-user"></i> بيانات المتبرع</div>
+          <div class="fst"><i class="ti ti-user"></i> بيانات الاستقبال</div>
           <div class="fgrid">
+            <div class="fgrp"><label>تسلسل المتبرع</label><input type="text" id="rc-donornum" class="ro" readonly placeholder="تلقائي" style="background:#f0f9ff;color:#0F766E;font-weight:700"></div>
+            <div class="fgrp"><label>تاريخ التبرع</label>
+              <input type="date" id="rc-date" class="ro" readonly style="background:#f0f9ff;color:#0F766E;font-weight:600">
+            </div>
+            <div class="fgrp"><label>وقت التبرع</label>
+              <input type="text" id="rc-time" class="ro" readonly style="background:#f0f9ff;color:#0F766E;font-weight:600">
+            </div>
+
             <div class="fgrp s2">
               <label>الاسم الرباعي واللقب *</label>
               <div class="ac-wrap">
@@ -1073,11 +1267,14 @@ tbody tr:hover td{background:#fafafa}
                 <div class="ac-list" id="ac-name"></div>
               </div>
             </div>
+
             <div class="fgrp"><label>سنة التولد *</label><input type="number" id="rc-by" placeholder="1995" min="1920" max="2007" oninput="calcRcAge()"></div>
-            <div class="fgrp"><label>العمر</label><input type="text" id="rc-age" class="ro" readonly placeholder="تلقائي"></div>
             <div class="fgrp"><label>الجنس *</label><select id="rc-gen"><option value="ذكر">ذكر</option><option value="أنثى">أنثى</option></select></div>
-            <div class="fgrp"><label>اسم الأم</label><input type="text" id="rc-mom" placeholder="اسم الأم الثلاثي"></div>
-            <div class="fgrp">
+            <div class="fgrp"><label>العمر</label><input type="text" id="rc-age" class="ro" readonly placeholder="تلقائي"></div>
+
+            <div class="fgrp s2"><label>اسم الأم</label><input type="text" id="rc-mom" placeholder="اسم الأم الثلاثي"></div>
+
+            <div class="fgrp s2">
               <label>رقم البطاقة الوطنية</label>
               <div class="ac-wrap">
                 <input type="text" id="rc-nid" placeholder="19XXXXXXXXXX"
@@ -1086,7 +1283,8 @@ tbody tr:hover td{background:#fafafa}
                 <div class="ac-list" id="ac-nid"></div>
               </div>
             </div>
-            <div class="fgrp">
+
+            <div class="fgrp s2">
               <label>رقم الموبايل</label>
               <div class="ac-wrap">
                 <input type="tel" id="rc-mob" placeholder="07XXXXXXXXX"
@@ -1095,13 +1293,11 @@ tbody tr:hover td{background:#fafafa}
                 <div class="ac-list" id="ac-mob"></div>
               </div>
             </div>
+
             <div class="fgrp s2"><label>عنوان السكن</label><input type="text" id="rc-addr" placeholder="المحلة / الحي / المدينة"></div>
-            <div class="fgrp"><label>المهنة</label><input type="text" id="rc-job" placeholder="المهنة"></div>
-          </div>
-        </div>
-        <div class="fsec">
-          <div class="fst"><i class="ti ti-droplet"></i> بيانات القنينة والتبرع</div>
-          <div class="fgrid">
+            <div class="fgrp s2"><label>المهنة</label><input type="text" id="rc-job" placeholder="المهنة"></div>
+
+            <div class="fgrp"><label>نوع التبرع *</label><select id="rc-dtype" onchange="toggleRcPat()"><option value="تعويضي">تعويضي</option><option value="طوعي">طوعي</option></select></div>
             <div class="fgrp"><label>نوع القنينة *</label>
               <select id="rc-btype" onchange="fetchNextBN()">
                 <option value="">اختر نوع القنينة</option>
@@ -1117,11 +1313,8 @@ tbody tr:hover td{background:#fafafa}
             <div class="fgrp"><label>رقم القنينة (تلقائي)</label>
               <input type="text" id="rc-bnum" class="ro" readonly placeholder="اختر النوع أولاً" style="background:#f0f9ff;color:#0F766E;font-weight:700;font-size:16px">
             </div>
-            <div class="fgrp"><label>تاريخ التبرع</label>
-              <input type="date" id="rc-date" class="ro" readonly style="background:#f0f9ff;color:#0F766E;font-weight:600">
-            </div>
-            <div class="fgrp"><label>نوع التبرع *</label><select id="rc-dtype" onchange="toggleRcPat()"><option value="تعويضي">تعويضي</option><option value="طوعي">طوعي</option></select></div>
-            <div class="fgrp" id="rc-pat-grp"><label>اسم المريض</label><input type="text" id="rc-pat" placeholder="اسم المريض"></div>
+
+            <div class="fgrp s2" id="rc-pat-grp"><label>اسم المريض</label><input type="text" id="rc-pat" placeholder="اسم المريض"></div>
             <div class="fgrp s2" id="rc-hosp-grp"><label>اسم المستشفى</label><input type="text" id="rc-hosp" placeholder="المستشفى"></div>
           </div>
         </div>
@@ -1243,7 +1436,7 @@ const TITLES = {
   dashboard:'لوحة التحكم', add:'إضافة متبرع جديد', donors:'سجل المتبرعين',
   search:'بحث متقدم', barcode:'الباركود والطباعة', infected:'المصابون',
   rejected:'المرفوضون مؤقتاً', rare:'الفصائل النادرة',
-  stats:'الإحصائيات', audit:'سجل التتبع', settings:'الإعدادات'
+  stats:'الإحصائيات', audit:'سجل التتبع', settings:'الإعدادات', dthome:'الرئيسية'
 };
 
 function G(id){ return document.getElementById(id); }
@@ -1295,7 +1488,7 @@ async function donorSearch(field, val){
   _acTimer = setTimeout(async()=>{
     try{
       let q = db.from('donors')
-        .select('id,full_name,birth_year,gender,mother_name,national_id,mobile,address,occupation')
+        .select('id,full_name,birth_year,gender,mother_name,national_id,mobile,address,occupation,donor_number')
         .eq('is_deleted',false).limit(6);
       if(field==='name') q=q.ilike('full_name','%'+val.trim().replace(/ة/g,'ه')+'%');
       if(field==='nid')  q=q.eq('national_id',val.trim());
@@ -1332,6 +1525,7 @@ function fillDonor(d){
   if(G('rc-mob'))   G('rc-mob').value  = d.mobile||'';
   if(G('rc-addr'))  G('rc-addr').value = d.address||'';
   if(G('rc-job'))   G('rc-job').value  = d.occupation||'';
+  if(G('rc-donornum')) G('rc-donornum').value = d.donor_number||'تلقائي';
   calcRcAge();
 
   // Mark as returning donor
@@ -1373,6 +1567,7 @@ function clearDonorFill(){
   if(form) delete form.dataset.existingDonorId;
   const banner=G('rcFilledBanner');
   if(banner) banner.classList.remove('show');
+  if(G('rc-donornum')) G('rc-donornum').value='';
   ['ac-name','ac-nid','ac-mob'].forEach(id=>{ const e=G(id); if(e) e.classList.remove('show'); });
 }
 
@@ -1884,12 +2079,17 @@ async function processQueuedOp(op){
     }).select().single();
     if(de) throw de;
     const{error:doe}=await db.from('blood_donations').insert({
-      donor_id:dn.id,bottle_type:'مفلتر',donation_type:d.donation_type,
+      donor_id:dn.id,bottle_type:d.bottle_type,bottle_number:d.bottle_number,donation_type:d.donation_type,
       patient_name:d.patient_name,hospital_name:d.hospital_name,
       donation_date:d.donation_date,donation_time:d.donation_time,
       status:'pending_draw',created_by:d.created_by
     });
     if(doe) throw doe;
+    if(d.pool_id){
+      await db.from('bottle_number_pool').delete().eq('id', d.pool_id);
+    } else if(d.seq_id){
+      await db.from('bottle_sequences').update({current_number:d.bottle_number+1}).eq('id', d.seq_id);
+    }
   } else if(op.type==='draw'){
     const{error}=await db.from('blood_donations').update({
       blood_type:d.blood_type,bottle_type:d.bottle_type,
@@ -2141,13 +2341,13 @@ async function showApp(){
   G('app').classList.add('on');
   applyMobileLayout();
 
-  // Fresh login → dashboard. Returning user → last page
-  const targetPage = IS_FRESH_LOGIN
-    ? 'dashboard'
-    : (localStorage.getItem('bb_lastPage') || 'dashboard');
+  const isMob = window.innerWidth <= 768;
+  // Fresh login → dashboard (mobile) / unified home (desktop). Returning mobile user → last page.
+  const targetPage = isMob
+    ? (IS_FRESH_LOGIN ? 'dashboard' : (localStorage.getItem('bb_lastPage') || 'dashboard'))
+    : 'dthome';
   IS_FRESH_LOGIN = false;
 
-  const isMob = window.innerWidth <= 768;
   if(isMob){
     document.querySelectorAll('.bn-item').forEach(b=>b.classList.remove('on'));
     G('tab-home-btn')?.classList.add('on');
@@ -2157,7 +2357,7 @@ async function showApp(){
 
 
 async function nav(name, el){
-  if(name && name!=='workhome' && name!=='account')
+  if(name && name!=='workhome' && name!=='account' && name!=='dthome')
     localStorage.setItem('bb_lastPage', name);
   document.querySelectorAll('.sc').forEach(s=>s.classList.remove('on'));
   const sc=G('s-'+name);
@@ -2167,13 +2367,14 @@ async function nav(name, el){
   G('pgTitle').textContent=TITLES[name]||name;
   closeSb();
   // Back button: show on all screens except main ones
-  const _noBack=['dashboard','workhome','account'];
+  const _noBack=['dashboard','workhome','account','dthome'];
   const _showBack = !_noBack.includes(name);
   const _bb=G('backBtn'); if(_bb) _bb.classList.toggle('show',_showBack);
   const _bbm=G('backBtnMob'); if(_bbm) _bbm.classList.toggle('show',_showBack);
   const sbEl=document.querySelector('.sb');
   const pageEl=document.querySelector('.page');
   switch(name){
+    case 'dthome':     buildDtHomeGrid(); break;
     case 'dashboard':  await loadDash(); break;
     case 'workhome':   break; // grid already built
     case 'account':    break; // already built
@@ -3684,8 +3885,9 @@ function dangerZone(){
 // WORKFLOW — RECEPTION (الاستقبال)
 // ================================================================
 function setupReception(){
-  const today=new Date().toISOString().split('T')[0];
-  // Set today's date defaults if needed
+  if(G('rc-date')) G('rc-date').value=new Date().toISOString().split('T')[0];
+  if(G('rc-time')) G('rc-time').value=new Date().toTimeString().substring(0,5);
+  if(G('rc-donornum') && !G('rc-donornum').value) G('rc-donornum').value='';
 }
 
 function toggleRcPat(){
@@ -3753,6 +3955,7 @@ async function saveReception(){
     const btype = G('rc-btype')?.value;
     const bnum  = parseInt(G('rc-bnum')?.value)||null;
     const seqId = G('rc-bnum')?.dataset?.seqId;
+    const poolId = G('rc-bnum')?.dataset?.poolId;
     if(!btype){ toast('يرجى اختيار نوع القنينة','error'); load(false); return; }
     if(!bnum){  toast('يرجى اختيار نوع القنينة للحصول على الرقم','error'); load(false); return; }
 
@@ -3771,6 +3974,7 @@ async function saveReception(){
       bottle_type:btype,
       bottle_number:bnum,
       seq_id:seqId,
+      pool_id:poolId,
       created_by:SES?.user?.id
     };
 
@@ -3811,15 +4015,18 @@ async function saveReception(){
         dn = nd;
       }
       const{data:don,error:doe}=await db.from('blood_donations').insert({
-        donor_id:dn.id, bottle_type:'مفلتر', donation_type:payload.donation_type,
+        donor_id:dn.id, bottle_type:btype, bottle_number:bnum, donation_type:payload.donation_type,
         patient_name:payload.patient_name, hospital_name:payload.hospital_name,
         donation_date:payload.donation_date, donation_time:payload.donation_time,
         status:'pending_draw', created_by:payload.created_by
       }).select().single();
       if(doe) throw doe;
-      await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'INSERT',table_name:'blood_donations',record_id:don.id,new_values:{donor:nm,status:'pending_draw'}});
-      // Increment sequence number
-      if(payload.seq_id){
+      await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'INSERT',table_name:'blood_donations',record_id:don.id,new_values:{donor:nm,status:'pending_draw',bottle:bnum}});
+      // Consume the bottle number: from the reuse pool if that's where it came from,
+      // otherwise advance the main sequence.
+      if(payload.pool_id){
+        await db.from('bottle_number_pool').delete().eq('id', payload.pool_id);
+      } else if(payload.seq_id){
         await db.from('bottle_sequences')
           .update({current_number: bnum+1})
           .eq('id', payload.seq_id);
@@ -3850,8 +4057,10 @@ async function saveReception(){
 function resetReception(){
   ['rc-name','rc-by','rc-age','rc-mom','rc-nid','rc-mob','rc-addr','rc-job','rc-pat','rc-hosp'].forEach(id=>{const e=G(id);if(e)e.value='';});
   if(G('rc-date')){ const t=new Date().toISOString().split('T')[0]; G('rc-date').value=t; }
+  if(G('rc-time')){ G('rc-time').value=new Date().toTimeString().substring(0,5); }
+  if(G('rc-donornum')) G('rc-donornum').value='';
   if(G('rc-btype')) G('rc-btype').value='';
-  if(G('rc-bnum'))  { G('rc-bnum').value=''; G('rc-bnum').dataset.seqId=''; }
+  if(G('rc-bnum'))  { G('rc-bnum').value=''; G('rc-bnum').dataset.seqId=''; G('rc-bnum').dataset.poolId=''; }
   const iw2=G('intervalWarn'); if(iw2){ iw2.style.display='none'; iw2.dataset.blocked=''; }
   G('rc-dtype').value='تعويضي';
   G('rejWarn').classList.remove('show');
@@ -3864,7 +4073,7 @@ function resetReception(){
 async function loadDraw(){
   load(true);
   const{data}=await db.from('blood_donations')
-    .select('id,donation_type,donation_date,donation_time,donors(full_name,birth_year,gender,mobile)')
+    .select('id,donation_type,donation_date,donation_time,bottle_number,bottle_type,donors(full_name,birth_year,gender,mobile)')
     .eq('status','pending_draw').eq('is_deleted',false)
     .order('created_at',{ascending:true});
   load(false);
@@ -3873,10 +4082,10 @@ async function loadDraw(){
       <div class="fc-av">🩸</div>
       <div style="flex:1">
         <div class="fc-name">${esc(r.donors?.full_name||'—')}</div>
-        <div class="fc-sub">${r.donors?.gender||''} | ${r.donors?.birth_year?new Date().getFullYear()-r.donors.birth_year+' سنة':''} | ${r.donation_type} | ${r.donation_time?.substring(0,5)||''}</div>
+        <div class="fc-sub">قنينة: ${r.bottle_number||'—'} (${r.bottle_type||'—'}) | ${r.donation_type}</div>
       </div>
       <div class="fc-act">
-        <button class="btn btn-p" onclick="openDrawModal('${r.id}','${sq(r.donors?.full_name)}','${r.donation_type}','${sq(r.donors?.mobile)}')">
+        <button class="btn btn-p" onclick="openDrawModal('${r.id}','${sq(r.donors?.full_name)}','${r.donation_type}','${r.bottle_number||''}','${r.bottle_type||''}')">
           <i class="ti ti-droplet"></i> سحب
         </button>
       </div>
@@ -3886,11 +4095,14 @@ async function loadDraw(){
   }
 }
 
-async function openDrawModal(id,name,dtype,mob){
+// Bottle type & number are fixed at RECEPTION (not draw's responsibility) — this modal only
+// displays them, prominently, alongside the donor's name.
+async function openDrawModal(id,name,dtype,bn,btyp){
   G('dm-id').value=id;
+  G('dm-btyp-val').value=btyp;
   G('dm-donor-name').textContent=name;
-  G('dm-donor-sub').textContent=dtype+' | '+mob;
-  G('dm-btyp').value='مفلتر';
+  G('dm-bnum-big').textContent=bn||'—';
+  G('dm-btyp-sub').textContent=btyp||'—';
   G('dm-draw').value=new Date().toISOString().split('T')[0];
   G('dm-med-reason').value='سكري';
   G('dm-med-other').value='';
@@ -3906,42 +4118,28 @@ function toggleDmMedSection(show){
   G('dm-med-actions').style.display = show?'flex':'none';
 }
 
-async function getNextBottleNumber(){
-  const{data}=await db.from('bottle_sequences')
-    .select('*').eq('is_active',true).order('created_at',{ascending:false}).limit(1);
-  if(!data||!data.length){ toast('لا يوجد تسلسل قناني نشط — أضف من الإعدادات','error'); return null; }
-  const seq=data[0];
-  if(seq.current_number>seq.end_number){
-    toast('انتهى التسلسل رقم '+seq.end_number+' — أضف تسلسلاً جديداً','error'); return null;
-  }
-  await db.from('bottle_sequences').update({current_number:seq.current_number+1}).eq('id',seq.id);
-  return seq.current_number;
-}
-
 function calcDmExpiry(){
   const draw=G('dm-draw').value; if(!draw) return;
-  const bt=G('dm-btyp').value;
+  const bt=G('dm-btyp-val').value;
   const days=['ثنائي','أحادي','تريما صفائح دموية'].includes(bt)?5:42;
   const e=new Date(draw); e.setDate(e.getDate()+days);
   G('dm-exp').value=e.toISOString().split('T')[0];
 }
 
-// Outcome 1: normal successful draw — blood type is NOT recorded here (that's the lab's job);
-// a bottle number is only reserved now, at confirmation, not when the modal was opened.
+// Outcome 1: normal successful draw. Bottle type & number were already fixed at RECEPTION —
+// draw only records that the draw actually happened (date, expiry) and forwards to the lab.
 async function confirmDrawSuccess(){
   const id=G('dm-id').value, draw=G('dm-draw').value;
   if(!draw){ toast('يرجى تحديد تاريخ السحب','error'); return; }
   load(true);
   try{
-    const bn=await getNextBottleNumber();
-    if(!bn){ load(false); return; }
-    const btyp=G('dm-btyp').value, exp=G('dm-exp').value;
+    const exp=G('dm-exp').value;
     const{error}=await db.from('blood_donations').update({
-      bottle_type:btyp, bottle_number:bn, draw_date:draw, expiry_date:exp, status:'pending_lab'
+      draw_date:draw, expiry_date:exp, status:'pending_lab'
     }).eq('id',id);
     if(error) throw error;
-    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'pending_lab',bottle:bn}});
-    toast('✅ تم تسجيل السحب — أُرسل للمختبر (قنينة رقم '+bn+')','success',4000);
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'pending_lab'}});
+    toast('✅ تم تسجيل السحب — أُرسل للمختبر','success',4000);
     G('drawModal').classList.remove('on');
     const{data:don}=await db.from('blood_donations').select('*,donors(full_name,donor_number)').eq('id',id).single();
     if(don){ BCDATA=don; setTimeout(()=>printBC('full'),300); }
@@ -3950,25 +4148,22 @@ async function confirmDrawSuccess(){
   finally{ load(false); }
 }
 
-// Outcome 2: the bottle itself was damaged during the draw. A bottle number IS consumed here
-// (a physical, labeled bottle was actually spoiled) so it is never reused. The donor is not
-// penalized with the full 77-day wait — checkDonationInterval() grants a 14-day window instead
-// whenever the donor's most recent donation has status 'damaged'.
+// Outcome 2: the bottle itself was damaged during the draw. Its number was already assigned
+// at reception and stays consumed (a real, physically-labeled bottle was spoiled — it's never
+// reused). The donor is not penalized with the full 77-day wait — checkDonationInterval()
+// grants a 14-day window instead whenever the donor's most recent donation has status 'damaged'.
 async function confirmDamagedBottle(){
   const id=G('dm-id').value, draw=G('dm-draw').value;
   if(!draw){ toast('يرجى تحديد تاريخ السحب','error'); return; }
   if(!confirm('تأكيد: القنينة تالفة؟ يُسمح لهذا المتبرع بالتبرع مجدداً بعد أسبوعين بدل 77 يوماً.')) return;
   load(true);
   try{
-    const bn=await getNextBottleNumber();
-    if(!bn){ load(false); return; }
-    const btyp=G('dm-btyp').value;
     const{error}=await db.from('blood_donations').update({
-      bottle_type:btyp, bottle_number:bn, draw_date:draw, status:'damaged'
+      draw_date:draw, status:'damaged'
     }).eq('id',id);
     if(error) throw error;
-    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'damaged',bottle:bn}});
-    toast('⚠️ سُجّلت القنينة كتالفة (رقم '+bn+') — يُسمح بالتبرع مجدداً بعد أسبوعين','warning',5500);
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'damaged'}});
+    toast('⚠️ سُجّلت القنينة كتالفة — يُسمح بالتبرع مجدداً بعد أسبوعين','warning',5500);
     G('drawModal').classList.remove('on');
     await loadDraw();
   }catch(e){ toast('خطأ: '+e.message,'error'); }
@@ -3976,10 +4171,12 @@ async function confirmDamagedBottle(){
 }
 
 // Outcome 3: the donor turns out to be medically ineligible (discovered by the draw staff's
-// questioning, e.g. diabetes/hypertension) before any blood was actually drawn. No bottle
-// number is ever reserved for this attempt, so nothing needs to be freed up — the next real
-// draw simply uses whatever number is next in the sequence. The donor goes on the rejected
-// list temporarily, and this specific pending attempt is removed from the queue.
+// questioning, e.g. diabetes/hypertension) before any blood was actually drawn. Unlike the
+// other two outcomes, a bottle number WAS already consumed at reception (before this was
+// known) — since no blood was ever taken, we release it back into a reuse pool
+// (bottle_number_pool) instead of wasting it or risking a duplicate by rewinding the shared
+// sequence counter. The next donor of the same bottle type gets this number first, and the
+// main sequence continues untouched from wherever it currently is.
 async function confirmMedicalReject(){
   const id=G('dm-id').value;
   const reasonSel=G('dm-med-reason').value;
@@ -3989,18 +4186,24 @@ async function confirmMedicalReject(){
   if(!confirm('تأكيد رفض المتبرع مؤقتاً — السبب: '+reason+'؟')) return;
   load(true);
   try{
-    const{data:d}=await db.from('blood_donations').select('donors(full_name)').eq('id',id).single();
+    const{data:d}=await db.from('blood_donations').select('donor_id,bottle_number,bottle_type,donors(full_name)').eq('id',id).single();
     const donorName = d?.donors?.full_name || '';
     await db.from('rejected_donors').insert({
       full_name:donorName, rejection_reason:reason,
       rejection_date:new Date().toISOString().split('T')[0], rejection_type:'مؤقت',
       created_by:SES?.user?.id
     });
+    // Release the already-reserved bottle number back into the reuse pool
+    if(d?.bottle_number && d?.bottle_type){
+      await db.from('bottle_number_pool').insert({
+        bottle_type:d.bottle_type, bottle_number:d.bottle_number, created_by:SES?.user?.id
+      });
+    }
     const{error}=await db.from('blood_donations').update({is_deleted:true}).eq('id',id);
     if(error) throw error;
-    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'rejected_medical',reason}});
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'rejected_medical',reason,released_bottle:d?.bottle_number}});
     await cacheRejectedDonors();
-    toast('⛔ تم رفض المتبرع مؤقتاً وإضافته لقائمة المرفوضين','warning',5000);
+    toast('⛔ تم رفض المتبرع مؤقتاً — رقم القنينة '+(d?.bottle_number||'')+' أُعيد لإعادة الاستخدام','warning',5500);
     G('drawModal').classList.remove('on');
     await loadDraw();
   }catch(e){ toast('خطأ: '+e.message,'error'); }
@@ -4145,24 +4348,30 @@ async function loadSupply(selectedBT){
 // Bottle expiry color: 60-day scale split into 4 bands of 15 days each
 // (green → yellow → orange → red), each band gradients from dark (at the
 // fresher edge of the band) to pale (at the more-urgent edge).
-function bottleExpiryColor(expiryDate){
+// Color is based on the PERCENTAGE of the bottle's own shelf life remaining (not an absolute
+// day count) — so a bottle type with a 42-day life and one with a 60-day life both show dark
+// green when freshly drawn, and dark red exactly at their own expiry.
+function bottleExpiryColor(drawDate, expiryDate){
   if(!expiryDate) return '#94A3B8';
   const today=new Date(); today.setHours(0,0,0,0);
   const exp=new Date(expiryDate); exp.setHours(0,0,0,0);
-  const days=Math.max(0, Math.min(60, Math.floor((exp-today)/86400000)));
+  const start=drawDate?new Date(drawDate):null; if(start) start.setHours(0,0,0,0);
+  const totalDays = (start && exp>start) ? Math.round((exp-start)/86400000) : 60;
+  const daysLeft = Math.floor((exp-today)/86400000);
+  const pct = Math.max(0, Math.min(100, (daysLeft/totalDays)*100));
   function mix(dark,pale,t){
     const h=c=>[c.slice(1,3),c.slice(3,5),c.slice(5,7)].map(v=>parseInt(v,16));
     const a=h(dark), b=h(pale);
     return '#'+a.map((v,i)=>Math.round(v+(b[i]-v)*t).toString(16).padStart(2,'0')).join('');
   }
   const bands=[
-    {lo:45,hi:60,dark:'#166534',pale:'#86EFAC'}, // green — freshest end is dark
-    {lo:30,hi:45,dark:'#CA8A04',pale:'#FEF08A'}, // yellow
-    {lo:15,hi:30,dark:'#C2410C',pale:'#FDBA74'}, // orange
-    {lo:0, hi:15,dark:'#7F1D1D',pale:'#FECACA', reverse:true}  // red — most-expired end (0 days) is darkest
+    {lo:75,hi:100,dark:'#166534',pale:'#86EFAC'}, // green — freshest end is dark
+    {lo:50,hi:75, dark:'#CA8A04',pale:'#FEF08A'}, // yellow
+    {lo:25,hi:50, dark:'#C2410C',pale:'#FDBA74'}, // orange
+    {lo:0, hi:25, dark:'#7F1D1D',pale:'#FECACA', reverse:true}  // red — most-expired end (0%) is darkest
   ];
-  const b=bands.find(x=>days>=x.lo) || bands[bands.length-1];
-  const t=b.reverse ? ((days-b.lo)/(b.hi-b.lo)) : 1-((days-b.lo)/(b.hi-b.lo));
+  const b=bands.find(x=>pct>=x.lo) || bands[bands.length-1];
+  const t=b.reverse ? ((pct-b.lo)/(b.hi-b.lo)) : 1-((pct-b.lo)/(b.hi-b.lo));
   return mix(b.dark,b.pale,t);
 }
 function contrastText(hex){
@@ -4180,10 +4389,10 @@ async function loadSupplyList(bt){
   if(data&&data.length){
     G('supplyList').innerHTML=`<div style="font-size:14px;font-weight:700;color:#BE123C;margin:12px 0 8px">فصيلة ${bt} — ${data.length} قنينة</div>
     <div class="bottle-cards-grid">${data.map(r=>{
-      const color=bottleExpiryColor(r.expiry_date);
+      const color=bottleExpiryColor(r.draw_date, r.expiry_date);
       const tc=contrastText(color);
       return `<div class="bottle-card" style="background:${color};color:${tc}"
-        onclick="openDispatch('${r.id}','${r.bottle_number}','${bt}','${sq(r.bottle_type)}')">
+        onclick="openBottleDetail('${r.id}')">
         <div class="bottle-card-num">${r.bottle_number}</div>
         <div class="bottle-card-date">${fd(r.draw_date)}</div>
       </div>`;
@@ -4191,6 +4400,21 @@ async function loadSupplyList(bt){
   } else {
     G('supplyList').innerHTML='<div class="empty"><i class="ti ti-package"></i><p>لا توجد قناني من فصيلة '+bt+'</p></div>';
   }
+}
+
+async function openBottleDetail(id){
+  load(true);
+  const{data:r,error}=await db.from('blood_donations')
+    .select('id,bottle_number,bottle_type,blood_type,draw_date,donors(full_name)')
+    .eq('id',id).single();
+  load(false);
+  if(error||!r){ toast('تعذر تحميل بيانات القنينة','error'); return; }
+  G('bd-id').value=r.id;
+  G('bd-num-big').textContent=r.bottle_number||'—';
+  G('bd-donor-name').textContent=esc(r.donors?.full_name||'—');
+  G('bd-draw-date').textContent=fd(r.draw_date);
+  G('bd-storage').textContent='— قيد الإضافة —';
+  G('bottleDetailModal').classList.add('on');
 }
 
 function openDispatch(id,bn,bt,btyp){
@@ -4490,6 +4714,50 @@ function switchMainTab(tab, el){
   }
 }
 
+// ── Desktop unified home grid + section popups ──
+function buildDtHomeGrid(){
+  const isAdmin = UPROF?.role === 'admin';
+  const perms   = Array.isArray(UPROF?.permissions) ? UPROF.permissions : [];
+  const grid    = G('dtHomeGrid');
+  if(!grid) return;
+  const dashCard = {key:'dashboard', icon:'🏠', name:'لوحة التحكم', desc:'نظرة عامة وإحصائيات'};
+  let cards = [dashCard, ...WORK_CARDS.filter(c => isAdmin || perms.includes(c.key))];
+  if(isAdmin) cards = [...cards, ...ADMIN_ONLY_CARDS];
+  grid.innerHTML = cards.map(c=>`
+    <div class="dth-card" onclick="openSectionPopup('${c.key}','${c.name}')">
+      <span class="dth-card-icon">${c.icon}</span>
+      <div class="dth-card-name">${c.name}</div>
+      <div class="dth-card-desc">${c.desc}</div>
+    </div>`).join('');
+}
+
+let _popupSectionId=null, _popupHostParent=null, _popupHostNext=null;
+
+async function openSectionPopup(key, title){
+  const sec=G('s-'+key);
+  if(!sec) return;
+  _popupSectionId='s-'+key;
+  _popupHostParent=sec.parentNode;
+  _popupHostNext=sec.nextSibling;
+  G('sectionPopupTitle').textContent = title||TITLES[key]||'';
+  G('sectionPopupBody').appendChild(sec);
+  G('sectionPopup').classList.add('on');
+  await nav(key, null);
+}
+
+function closeSectionPopup(){
+  if(_popupSectionId){
+    const sec=G(_popupSectionId);
+    if(sec && _popupHostParent){
+      if(_popupHostNext) _popupHostParent.insertBefore(sec,_popupHostNext);
+      else _popupHostParent.appendChild(sec);
+    }
+  }
+  G('sectionPopup').classList.remove('on');
+  _popupSectionId=null; _popupHostParent=null; _popupHostNext=null;
+  nav('dthome', null);
+}
+
 function buildWorkGrid(){
   const isAdmin = UPROF?.role === 'admin';
   const perms   = Array.isArray(UPROF?.permissions) ? UPROF.permissions : [];
@@ -4626,6 +4894,17 @@ async function fetchNextBN(){
   const inp   = G('rc-bnum');
   if(!btype || !inp){ if(inp) inp.value=''; return; }
   inp.value = 'جاري...';
+  inp.dataset.poolId=''; inp.dataset.seqId='';
+  // First offer a number released earlier (e.g. a donor rejected medically at the draw stage
+  // after a number was already reserved for them) before drawing a fresh one from the sequence.
+  const{data:pooled}=await db.from('bottle_number_pool')
+    .select('id,bottle_number').eq('bottle_type',btype)
+    .order('bottle_number',{ascending:true}).limit(1);
+  if(pooled && pooled.length){
+    inp.value = pooled[0].bottle_number;
+    inp.dataset.poolId = pooled[0].id;
+    return;
+  }
   const{data,error}=await db.from('bottle_sequences')
     .select('id,current_number,end_number')
     .eq('bottle_type', btype)
@@ -4661,8 +4940,8 @@ function goBack(){
     const btn = document.getElementById('tab-work-btn');
     switchMainTab('work', btn);
   } else {
-    // On desktop: go to dashboard
-    nav('dashboard', document.getElementById('navDashboard'));
+    // On desktop: sections open as popups now — closing the popup is the "back" action
+    closeSectionPopup();
   }
 }
 
@@ -4902,12 +5181,22 @@ if('serviceWorker' in navigator){
     <div class="modal-title"><i class="ti ti-droplet"></i> سحب الدم</div>
     <div class="modal-body">
       <input type="hidden" id="dm-id">
-      <div style="background:#F8FAFC;border:1px solid #EEF2F6;border-radius:10px;padding:10px 12px;margin-bottom:12px">
-        <div id="dm-donor-name" style="font-weight:700;font-size:15px;color:#1a1a1a"></div>
-        <div id="dm-donor-sub" style="font-size:12px;color:#757575;margin-top:2px"></div>
+      <input type="hidden" id="dm-btyp-val">
+      <div style="background:#FFF1F2;border:1.5px solid #FECDD3;border-radius:12px;padding:14px;margin-bottom:14px;text-align:center">
+        <div id="dm-donor-name" style="font-weight:800;font-size:20px;color:#1a1a1a;line-height:1.3"></div>
+        <div style="display:flex;justify-content:center;gap:18px;margin-top:8px">
+          <div>
+            <div style="font-size:11px;color:#757575">رقم القنينة</div>
+            <div id="dm-bnum-big" style="font-size:24px;font-weight:800;color:#BE123C">—</div>
+          </div>
+          <div style="width:1px;background:#FECDD3"></div>
+          <div>
+            <div style="font-size:11px;color:#757575">نوع القنينة</div>
+            <div id="dm-btyp-sub" style="font-size:16px;font-weight:700;color:#1a1a1a;margin-top:2px">—</div>
+          </div>
+        </div>
       </div>
       <div class="fgrid">
-        <div class="fgrp"><label>نوع القنينة *</label><select id="dm-btyp" onchange="calcDmExpiry()"><option>مفلتر</option><option>رباعي</option><option>ريفيس</option><option>ثنائي</option><option>أحادي</option><option>تريما دم كامل</option><option>تريما صفائح دموية</option><option>حملة تبرع رباعي</option><option>حملة تبرع مفلتر</option><option>رباعي Sag</option></select></div>
         <div class="fgrp"><label>تاريخ السحب *</label><input type="date" id="dm-draw" onchange="calcDmExpiry()"></div>
         <div class="fgrp"><label>تاريخ النفاد (تلقائي)</label><input type="date" id="dm-exp" class="auto" readonly></div>
       </div>
@@ -5008,6 +5297,42 @@ if('serviceWorker' in navigator){
       <button class="btn" onclick="G('dispModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
       <button class="btn btn-p" onclick="saveDispatch()"><i class="ti ti-truck-delivery"></i> تأكيد الصرف</button>
     </div>
+  </div>
+</div>
+
+<!-- BOTTLE DETAIL MODAL -->
+<div class="overlay" id="bottleDetailModal">
+  <div class="modal" style="text-align:center">
+    <input type="hidden" id="bd-id">
+    <div style="font-size:12px;color:#757575;margin-bottom:2px">رقم القنينة</div>
+    <div id="bd-num-big" style="font-size:34px;font-weight:800;color:#BE123C;margin-bottom:6px">—</div>
+    <div id="bd-donor-name" style="font-size:13px;color:#757575;margin-bottom:14px">—</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center">
+      <div style="background:#F8FAFC;border:1px solid #EEF2F6;border-radius:10px;padding:10px">
+        <div style="font-size:11px;color:#757575">تاريخ السحب</div>
+        <div id="bd-draw-date" style="font-size:16px;font-weight:700;color:#1a1a1a;margin-top:3px">—</div>
+      </div>
+      <div style="background:#F8FAFC;border:1px solid #EEF2F6;border-radius:10px;padding:10px">
+        <div style="font-size:11px;color:#757575">مكان الخزن</div>
+        <div id="bd-storage" style="font-size:14px;font-weight:700;color:#1a1a1a;margin-top:3px">—</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:18px">
+      <button class="btn" style="flex:1;justify-content:center;border-color:#7F1D1D;color:#7F1D1D" onclick="toast('قيد الإضافة','warning')"><i class="ti ti-trash"></i> تلف</button>
+      <button class="btn btn-p" style="flex:1;justify-content:center" onclick="toast('قيد الإضافة','warning')"><i class="ti ti-package"></i> تجهيز</button>
+    </div>
+    <button class="btn" style="width:100%;justify-content:center;margin-top:8px" onclick="G('bottleDetailModal').classList.remove('on')"><i class="ti ti-x"></i> إغلاق</button>
+  </div>
+</div>
+
+<!-- DESKTOP SECTION POPUP — hosts any section (reception, draw, lab...) as an overlay -->
+<div class="overlay" id="sectionPopup">
+  <div class="sec-popup-box">
+    <div class="sec-popup-head">
+      <div class="sec-popup-title" id="sectionPopupTitle">—</div>
+      <button class="sec-popup-close" onclick="closeSectionPopup()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="sec-popup-body" id="sectionPopupBody"></div>
   </div>
 </div>
 </body>
