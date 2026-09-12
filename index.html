@@ -328,6 +328,11 @@ tbody tr:hover td{background:#fafafa}
   
   /* Tabs */
   .tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
+
+  /* Audit log: stack instead of a fixed-width row, so long IDs/JSON never overflow */
+  .audit-row{flex-direction:column;gap:3px;align-items:stretch}
+  .a-time,.a-user,.a-action{width:auto}
+  .a-desc{overflow-wrap:anywhere;white-space:normal}
   .tab{white-space:nowrap;flex-shrink:0}
 
   /* Bottom nav - only when app is open */
@@ -390,6 +395,13 @@ tbody tr:hover td{background:#fafafa}
 .stock-bt.empty-bt{opacity:.45}
 .stock-bt-type{font-size:20px;font-weight:800;color:#BE123C}
 .stock-bt-count{font-size:13px;color:#757575;margin-top:4px;font-weight:600}
+
+/* ===== BOTTLE EXPIRY CARDS ===== */
+.bottle-cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:10px}
+.bottle-card{border-radius:12px;padding:10px 6px;text-align:center;cursor:pointer;transition:transform .1s;box-shadow:0 1px 5px rgba(0,0,0,.12)}
+.bottle-card:active{transform:scale(.96)}
+.bottle-card-num{font-size:17px;font-weight:800}
+.bottle-card-date{font-size:10.5px;margin-top:3px;opacity:.9}
 
 /* ===== BIG ACTION BUTTON ===== */
 .btn-action{width:100%;padding:16px;background:#BE123C;color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;transition:background .15s}
@@ -1887,8 +1899,7 @@ async function processQueuedOp(op){
     if(error) throw error;
   } else if(op.type==='lab'){
     const{error}=await db.from('blood_donations').update({
-      hemoglobin:d.hemoglobin,blood_pressure:d.blood_pressure,
-      weight:d.weight,pulse:d.pulse,serology_result:d.serology_result,
+      blood_type:d.blood_type,serology_result:d.serology_result,
       serology_type:d.serology_type,status:d.status
     }).eq('id',d.donation_id);
     if(error) throw error;
@@ -3178,6 +3189,26 @@ async function loadRareGrid(){
     from += pageSize;
   }
   if(!allDonors.length){ G('rareList').innerHTML='<div class="empty"><p>لا توجد بيانات</p></div>'; return; }
+
+  // 3. Latest donation date per donor — computed live from actual donation records (not a
+  // stored field), so it always reflects the most recent donation automatically.
+  let lastDonation = {}, from2 = 0, more2 = true;
+  while(more2){
+    const{data,error}=await db.from('blood_donations')
+      .select('donor_id,donation_date')
+      .in('blood_type', RARE).eq('is_deleted',false)
+      .not('donation_date','is',null)
+      .range(from2, from2+999);
+    if(error||!data) break;
+    data.forEach(d=>{
+      if(!d.donor_id||!d.donation_date) return;
+      if(!lastDonation[d.donor_id] || d.donation_date>lastDonation[d.donor_id]) lastDonation[d.donor_id]=d.donation_date;
+    });
+    more2 = data.length===1000;
+    from2 += 1000;
+  }
+  allDonors = allDonors.map(d=>({...d, last_donation: lastDonation[d.id]||null}));
+
   window._RARE_DATA = allDonors;
   filterRare();
 }
@@ -3226,6 +3257,7 @@ function filterRare(){
         <div class="rare-name" style="font-size:15px">${esc(d.full_name||'—')}</div>
         <div class="rare-mob" style="font-size:14px;margin-top:3px">${esc(d.mobile||'—')}</div>
         <div class="rare-addr" style="font-size:12px;margin-top:2px">${esc(d.address||'—')}</div>
+        <div class="rare-date" style="font-size:12px;margin-top:2px;color:#757575">آخر تبرع: ${d.last_donation?fd(d.last_donation):'—'}</div>
       </div>
     </div>`).join('');
 }
@@ -3270,7 +3302,7 @@ async function exportRarePDF(){
     let y=60;
     ctx.fillStyle='#F1F5F9'; ctx.fillRect(10,y,W-20,20);
     ctx.fillStyle='#1E293B'; ctx.font='bold 9px Arial'; ctx.textAlign='right';
-    [[W-15,'الاسم'],[W-185,'الفصيلة'],[W-240,'رقم الهاتف'],[W-380,'العنوان']].forEach(([x,t])=>ctx.fillText(t,x,y+14));
+    [[W-15,'الاسم'],[W-185,'الفصيلة'],[W-240,'رقم الهاتف'],[W-330,'آخر تبرع'],[W-410,'العنوان']].forEach(([x,t])=>ctx.fillText(t,x,y+14));
     y+=22;
 
     filtered.forEach((d,i)=>{
@@ -3288,7 +3320,8 @@ async function exportRarePDF(){
       ctx.fillText(d.blood_type||'—',W-185,y+13);
       ctx.fillStyle='#1E293B'; ctx.font='9px Arial';
       ctx.fillText(d.mobile||'—',W-240,y+13);
-      ctx.fillText((d.address||'—').substring(0,20),W-380,y+13);
+      ctx.fillText(d.last_donation?fd(d.last_donation):'—',W-330,y+13);
+      ctx.fillText((d.address||'—').substring(0,18),W-410,y+13);
       y+=18;
     });
 
@@ -3573,6 +3606,27 @@ function printStats(){
 // ================================================================
 // AUDIT LOG
 // ================================================================
+const AUDIT_TABLE_LABELS={
+  blood_donations:'تبرع دم', donors:'متبرع', users:'مستخدم', user_profiles:'حساب موظف',
+  rejected_donors:'قائمة المرفوضين', bottle_sequences:'تسلسل قناني'
+};
+const AUDIT_STATUS_LABELS={
+  pending_draw:'بانتظار السحب', pending_lab:'بانتظار المختبر', in_stock:'بالخزين',
+  damaged:'قنينة تالفة', rejected_positive:'مرفوض دائم', rejected_medical:'مرفوض طبياً',
+  dispatched:'تم الصرف'
+};
+const AUDIT_FIELD_LABELS={
+  donor:'المتبرع', bottle:'رقم القنينة', status:'الحالة', blood_type:'الفصيلة',
+  serology:'نتيجة الفحص', serology_type:'نوع الإصابة', reason:'السبب'
+};
+function humanizeAuditValues(v){
+  if(!v||typeof v!=='object') return '';
+  return Object.entries(v).map(([k,val])=>{
+    const label=AUDIT_FIELD_LABELS[k]||k;
+    const shown=(k==='status'&&AUDIT_STATUS_LABELS[val])?AUDIT_STATUS_LABELS[val]:val;
+    return `${label}: ${shown}`;
+  }).join('، ');
+}
 async function loadAudit(){
   load(true);
   const {data}=await db.from('audit_log').select('*').order('created_at',{ascending:false}).limit(100);
@@ -3582,7 +3636,7 @@ async function loadAudit(){
       <span class="a-time">${new Date(r.created_at).toLocaleString('ar-IQ')}</span>
       <span class="a-user">${esc(r.user_name||'النظام')}</span>
       <span class="a-action"><span class="pill ${r.action==='INSERT'?'pg':r.action==='DELETE'?'pr':'py'}">${esc(r.action)}</span></span>
-      <span class="a-desc">${esc(r.table_name)} — ${esc(r.record_id||'')} ${r.new_values?esc(JSON.stringify(r.new_values).substring(0,60))+'...':''}</span>
+      <span class="a-desc">${esc(AUDIT_TABLE_LABELS[r.table_name]||r.table_name)}${r.new_values?' — '+esc(humanizeAuditValues(r.new_values)):''}</span>
     </div>`).join('');
     G('auditTbl').innerHTML=`<div class="tw" style="max-height:480px;overflow-y:auto">${rows}</div>`;
   } else {
@@ -3959,7 +4013,7 @@ async function confirmMedicalReject(){
 async function loadLab(){
   load(true);
   const{data}=await db.from('blood_donations')
-    .select('id,blood_type,bottle_number,bottle_type,donation_date,donors(full_name,birth_year,gender)')
+    .select('id,blood_type,bottle_number,bottle_type,donation_date,draw_date,donors(full_name,birth_year,gender)')
     .eq('status','pending_lab').eq('is_deleted',false)
     .order('created_at',{ascending:true});
   load(false);
@@ -3971,7 +4025,7 @@ async function loadLab(){
         <div class="fc-sub">قنينة: ${r.bottle_number||'—'} | ${r.bottle_type}</div>
       </div>
       <div class="fc-act">
-        <button class="btn btn-p" onclick="openLabModal('${r.id}','${sq(r.donors?.full_name)}','${r.bottle_number||''}')">
+        <button class="btn btn-p" onclick="openLabModal('${r.id}','${sq(r.donors?.full_name)}','${r.bottle_number||''}','${r.draw_date||''}')">
           <i class="ti ti-microscope"></i> فحص
         </button>
       </div>
@@ -3981,74 +4035,92 @@ async function loadLab(){
   }
 }
 
-function openLabModal(id,name,bn){
+async function openLabModal(id,name,bn,drawDate){
   G('lm-id').value=id;
   G('lm-donor-name').textContent=name;
-  G('lm-donor-sub').textContent='قنينة رقم: '+bn;
+  G('lm-bnum-big').textContent=bn||'—';
+  G('lm-draw-date').textContent=drawDate?fd(drawDate):'—';
   G('lm-bt').value='';
-  G('lm-ser').value='Negative'; toggleLmInf();
-  ['lm-hgb','lm-bp','lm-wt','lm-pulse'].forEach(id=>G(id).value='');
+  G('lm-allneg').checked=false;
+  document.querySelectorAll('.lm-dis').forEach(c=>c.checked=false);
   G('labModal').classList.add('on');
+  // Pre-fill with whatever a previous employee may have already saved (blood type
+  // and test results can be entered by two different employees, in either order).
+  try{
+    const{data}=await db.from('blood_donations').select('blood_type,serology_result,serology_type').eq('id',id).single();
+    if(data){
+      if(data.blood_type) G('lm-bt').value=data.blood_type;
+      if(data.serology_result==='Negative') G('lm-allneg').checked=true;
+      else if(data.serology_result==='Positive' && data.serology_type){
+        const parts=data.serology_type.split(',').map(s=>s.trim());
+        document.querySelectorAll('.lm-dis').forEach(c=>{ if(parts.includes(c.value)) c.checked=true; });
+      }
+    }
+  }catch(e){ /* pre-fill is a convenience only — ignore failures */ }
 }
 
-function toggleLmInf(){ G('lm-inf-grp').style.display=G('lm-ser').value==='Positive'?'flex':'none'; }
+function lmAllNegChange(){
+  if(G('lm-allneg').checked) document.querySelectorAll('.lm-dis').forEach(c=>c.checked=false);
+}
+function lmDiseaseChange(){
+  if([...document.querySelectorAll('.lm-dis')].some(c=>c.checked)) G('lm-allneg').checked=false;
+}
 
+// Blood type and test results don't have to be entered by the same employee in the same
+// visit — one employee may save just the type, another the tests, in either order. The
+// donation only leaves 'pending_lab' once BOTH pieces are known (either just entered, or
+// already saved earlier by someone else).
 async function saveLab(){
-  const id=G('lm-id').value, ser=G('lm-ser').value, bt=G('lm-bt').value;
-  if(!bt){ toast('يرجى اختيار فصيلة الدم','error'); return; }
+  const id=G('lm-id').value, bt=G('lm-bt').value;
+  const diseases=[...document.querySelectorAll('.lm-dis:checked')].map(c=>c.value);
+  const allNeg=G('lm-allneg').checked;
+  const testsGiven = allNeg || diseases.length>0;
+  if(!bt && !testsGiven){ toast('يرجى تحديد الفصيلة أو نتيجة الفحوصات على الأقل','error'); return; }
+  if(!IS_ONLINE){ toast('هذه الخطوة تحتاج اتصال بالإنترنت','error'); return; }
   load(true);
   try{
-    const newStatus=ser==='Positive'?'rejected_positive':'in_stock';
-    const{error}=await db.from('blood_donations').update({
-      blood_type:bt,
-      hemoglobin:parseFloat(G('lm-hgb').value)||null,
-      blood_pressure:G('lm-bp').value.trim()||null,
-      weight:parseFloat(G('lm-wt').value)||null,
-      pulse:parseInt(G('lm-pulse').value)||null,
-      serology_result:ser,
-      serology_type:ser==='Positive'?G('lm-inf').value:null,
-      status:newStatus
-    }).eq('id',id);
+    const{data:cur}=await db.from('blood_donations').select('blood_type,serology_result,serology_type').eq('id',id).single();
+    const effBt = bt || cur?.blood_type || null;
+    let effSer, effSerType;
+    if(testsGiven){
+      effSer = diseases.length ? 'Positive' : 'Negative';
+      effSerType = diseases.length ? diseases.join(', ') : null;
+    } else {
+      effSer = cur?.serology_result || null;
+      effSerType = cur?.serology_type || null;
+    }
+    const complete = !!effBt && !!effSer;
+    const newStatus = complete ? (effSer==='Positive'?'rejected_positive':'in_stock') : 'pending_lab';
+
+    const updatePayload={};
+    if(bt) updatePayload.blood_type=bt;
+    if(testsGiven){ updatePayload.serology_result=effSer; updatePayload.serology_type=effSerType; }
+    if(complete) updatePayload.status=newStatus;
+
+    const{error}=await db.from('blood_donations').update(updatePayload).eq('id',id);
     if(error) throw error;
 
-    const labPayload={
-      donation_id:id, blood_type:bt, hemoglobin:parseFloat(G('lm-hgb').value)||null,
-      blood_pressure:G('lm-bp').value.trim()||null, weight:parseFloat(G('lm-wt').value)||null,
-      pulse:parseInt(G('lm-pulse').value)||null, serology_result:ser,
-      serology_type:ser==='Positive'?G('lm-inf').value:null,
-      status:newStatus, donation_date:new Date().toISOString().split('T')[0],
-      created_by:SES?.user?.id
-    };
-
-    if(!IS_ONLINE){
-      await enqueueOp('lab', labPayload);
-      const q=await getPendingQueue();
-      updateOfflineBar('offline',q.length+' عملية معلّقة');
-      toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً','warning',5000);
-    } else {
-      const{error}=await db.from('blood_donations').update({
-        blood_type:bt, hemoglobin:labPayload.hemoglobin, blood_pressure:labPayload.blood_pressure,
-        weight:labPayload.weight, pulse:labPayload.pulse,
-        serology_result:ser, serology_type:labPayload.serology_type, status:newStatus
-      }).eq('id',id);
-      if(error) throw error;
-      if(ser==='Positive'){
+    if(complete){
+      if(effSer==='Positive'){
         const{data:don}=await db.from('blood_donations').select('donors(full_name)').eq('id',id).single();
         if(don?.donors?.full_name){
           await db.from('rejected_donors').insert({
-            full_name:don.donors.full_name, rejection_reason:'إصابة: '+G('lm-inf').value,
+            full_name:don.donors.full_name, rejection_reason:'إصابة: '+effSerType,
             rejection_date:new Date().toISOString().split('T')[0], rejection_type:'دائم',
             created_by:SES?.user?.id
           });
-          // Update local cache
           await cacheRejectedDonors();
         }
         toast('⚠️ نتيجة موجبة — تم نقل المتبرع للمرفوضين دائماً','warning',5000);
       } else {
-        toast('✅ نتيجة سالبة — القنينة أُضيفت للخزين','success',4000);
+        toast('✅ اكتمل الفحص — القنينة أُضيفت للخزين','success',4000);
       }
-      await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:newStatus,serology:ser,blood_type:bt}});
+    } else if(bt){
+      toast('✅ تم حفظ الفصيلة — بانتظار نتيجة الفحوصات','success',4000);
+    } else {
+      toast('✅ تم حفظ نتيجة الفحوصات — بانتظار تحديد الفصيلة','success',4000);
     }
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:updatePayload});
     G('labModal').classList.remove('on');
     await loadLab();
   }catch(e){toast('خطأ: '+e.message,'error');}
@@ -4070,25 +4142,52 @@ async function loadSupply(selectedBT){
   if(selectedBT) await loadSupplyList(selectedBT);
 }
 
+// Bottle expiry color: 60-day scale split into 4 bands of 15 days each
+// (green → yellow → orange → red), each band gradients from dark (at the
+// fresher edge of the band) to pale (at the more-urgent edge).
+function bottleExpiryColor(expiryDate){
+  if(!expiryDate) return '#94A3B8';
+  const today=new Date(); today.setHours(0,0,0,0);
+  const exp=new Date(expiryDate); exp.setHours(0,0,0,0);
+  const days=Math.max(0, Math.min(60, Math.floor((exp-today)/86400000)));
+  function mix(dark,pale,t){
+    const h=c=>[c.slice(1,3),c.slice(3,5),c.slice(5,7)].map(v=>parseInt(v,16));
+    const a=h(dark), b=h(pale);
+    return '#'+a.map((v,i)=>Math.round(v+(b[i]-v)*t).toString(16).padStart(2,'0')).join('');
+  }
+  const bands=[
+    {lo:45,hi:60,dark:'#166534',pale:'#86EFAC'}, // green — freshest end is dark
+    {lo:30,hi:45,dark:'#CA8A04',pale:'#FEF08A'}, // yellow
+    {lo:15,hi:30,dark:'#C2410C',pale:'#FDBA74'}, // orange
+    {lo:0, hi:15,dark:'#7F1D1D',pale:'#FECACA', reverse:true}  // red — most-expired end (0 days) is darkest
+  ];
+  const b=bands.find(x=>days>=x.lo) || bands[bands.length-1];
+  const t=b.reverse ? ((days-b.lo)/(b.hi-b.lo)) : 1-((days-b.lo)/(b.hi-b.lo));
+  return mix(b.dark,b.pale,t);
+}
+function contrastText(hex){
+  const h=hex.replace('#','');
+  const r=parseInt(h.slice(0,2),16), g=parseInt(h.slice(2,4),16), bl=parseInt(h.slice(4,6),16);
+  const lum=(0.299*r+0.587*g+0.114*bl)/255;
+  return lum>0.6 ? '#1a1a1a' : '#fff';
+}
+
 async function loadSupplyList(bt){
   const{data}=await db.from('blood_donations')
-    .select('id,bottle_number,bottle_type,blood_type,expiry_date,donors(full_name)')
+    .select('id,bottle_number,bottle_type,blood_type,draw_date,expiry_date,donors(full_name)')
     .eq('status','in_stock').eq('blood_type',bt).eq('is_deleted',false)
     .order('expiry_date',{ascending:true});
   if(data&&data.length){
-    G('supplyList').innerHTML=`<div style="font-size:14px;font-weight:700;color:#BE123C;margin:12px 0 8px">فصيلة ${bt} — ${data.length} قنينة</div>`+
-    data.map(r=>`<div class="flow-card">
-      <div class="fc-av">🩸</div>
-      <div style="flex:1">
-        <div class="fc-name">قنينة رقم: <strong>${r.bottle_number}</strong> | ${r.bottle_type}</div>
-        <div class="fc-sub">المتبرع: ${esc(r.donors?.full_name||'—')} | تنتهي: ${fd(r.expiry_date)}</div>
-      </div>
-      <div class="fc-act">
-        <button class="btn btn-p" onclick="openDispatch('${r.id}','${r.bottle_number}','${bt}','${r.bottle_type}')">
-          <i class="ti ti-package"></i> صرف
-        </button>
-      </div>
-    </div>`).join('');
+    G('supplyList').innerHTML=`<div style="font-size:14px;font-weight:700;color:#BE123C;margin:12px 0 8px">فصيلة ${bt} — ${data.length} قنينة</div>
+    <div class="bottle-cards-grid">${data.map(r=>{
+      const color=bottleExpiryColor(r.expiry_date);
+      const tc=contrastText(color);
+      return `<div class="bottle-card" style="background:${color};color:${tc}"
+        onclick="openDispatch('${r.id}','${r.bottle_number}','${bt}','${sq(r.bottle_type)}')">
+        <div class="bottle-card-num">${r.bottle_number}</div>
+        <div class="bottle-card-date">${fd(r.draw_date)}</div>
+      </div>`;
+    }).join('')}</div>`;
   } else {
     G('supplyList').innerHTML='<div class="empty"><i class="ti ti-package"></i><p>لا توجد قناني من فصيلة '+bt+'</p></div>';
   }
@@ -4846,23 +4945,52 @@ if('serviceWorker' in navigator){
     <div class="modal-title"><i class="ti ti-microscope"></i> فحص العينة</div>
     <div class="modal-body">
       <input type="hidden" id="lm-id">
-      <div style="background:#F8FAFC;border:1px solid #EEF2F6;border-radius:10px;padding:10px 12px;margin-bottom:12px">
-        <div id="lm-donor-name" style="font-weight:700;font-size:15px;color:#1a1a1a"></div>
-        <div id="lm-donor-sub" style="font-size:12px;color:#757575;margin-top:2px"></div>
+      <div style="background:#FFF1F2;border:1.5px solid #FECDD3;border-radius:12px;padding:14px;margin-bottom:14px;text-align:center">
+        <div id="lm-donor-name" style="font-weight:800;font-size:20px;color:#1a1a1a;line-height:1.3"></div>
+        <div style="display:flex;justify-content:center;gap:18px;margin-top:8px">
+          <div>
+            <div style="font-size:11px;color:#757575">رقم القنينة</div>
+            <div id="lm-bnum-big" style="font-size:24px;font-weight:800;color:#BE123C">—</div>
+          </div>
+          <div style="width:1px;background:#FECDD3"></div>
+          <div>
+            <div style="font-size:11px;color:#757575">تاريخ السحب</div>
+            <div id="lm-draw-date" style="font-size:16px;font-weight:700;color:#1a1a1a;margin-top:2px">—</div>
+          </div>
+        </div>
       </div>
       <div class="fgrid">
-        <div class="fgrp"><label>فصيلة الدم *</label><select id="lm-bt"><option value="">اختر...</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select></div>
-        <div class="fgrp"><label>ضغط الدم (mmHg)</label><input type="text" id="lm-bp" placeholder="120/80"></div>
-        <div class="fgrp"><label>الوزن (كغ)</label><input type="number" id="lm-wt" placeholder="70" step="0.5"></div>
-        <div class="fgrp"><label>النبض (ن/دقيقة)</label><input type="number" id="lm-pulse" placeholder="72"></div>
-        <div class="fgrp"><label>الهيموكلوبين (g/dL)</label><input type="number" id="lm-hgb" placeholder="15.3" step="0.1"></div>
-        <div class="fgrp"><label>نتيجة الفحوصات *</label><select id="lm-ser" onchange="toggleLmInf()"><option value="Negative">Negative — سالب</option><option value="Positive">Positive — موجب</option></select></div>
-        <div class="fgrp" id="lm-inf-grp" style="display:none"><label>نوع الإصابة</label><select id="lm-inf"><option value="HIV">HIV</option><option value="HCV">HCV</option><option value="HBsAg">HBsAg</option><option value="سفلس VDRL">سفلس (VDRL)</option></select></div>
+        <div class="fgrp s2"><label>فصيلة الدم *</label><select id="lm-bt"><option value="">اختر...</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select></div>
+      </div>
+      <div style="margin-top:14px">
+        <label style="font-size:13px;color:#616161;font-weight:700;display:block;margin-bottom:8px">نتيجة الفحوصات *</label>
+        <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #BBF7D0;background:#F0FDF4;border-radius:10px;margin-bottom:8px;cursor:pointer">
+          <input type="checkbox" id="lm-allneg" onchange="lmAllNegChange()" style="width:18px;height:18px">
+          <span style="font-weight:700;color:#166534">All-Negative — كل الفحوصات سالبة</span>
+        </label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #FECACA;background:#FEF2F2;border-radius:10px;cursor:pointer">
+            <input type="checkbox" class="lm-dis" value="HBsAg" onchange="lmDiseaseChange()" style="width:18px;height:18px"><span style="font-weight:600;color:#991B1B">HBsAg</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #FECACA;background:#FEF2F2;border-radius:10px;cursor:pointer">
+            <input type="checkbox" class="lm-dis" value="HCV" onchange="lmDiseaseChange()" style="width:18px;height:18px"><span style="font-weight:600;color:#991B1B">HCV</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #FECACA;background:#FEF2F2;border-radius:10px;cursor:pointer">
+            <input type="checkbox" class="lm-dis" value="Anti-HBc" onchange="lmDiseaseChange()" style="width:18px;height:18px"><span style="font-weight:600;color:#991B1B">Anti-HBc</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #FECACA;background:#FEF2F2;border-radius:10px;cursor:pointer">
+            <input type="checkbox" class="lm-dis" value="HIV" onchange="lmDiseaseChange()" style="width:18px;height:18px"><span style="font-weight:600;color:#991B1B">HIV</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #FECACA;background:#FEF2F2;border-radius:10px;cursor:pointer;grid-column:1/3">
+            <input type="checkbox" class="lm-dis" value="Syphilis" onchange="lmDiseaseChange()" style="width:18px;height:18px"><span style="font-weight:600;color:#991B1B">Syphilis</span>
+          </label>
+        </div>
       </div>
     </div>
     <div class="modal-foot">
       <button class="btn" onclick="G('labModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
       <button class="btn btn-p" onclick="saveLab()"><i class="ti ti-device-floppy"></i> حفظ النتيجة</button>
+
     </div>
   </div>
 </div>
