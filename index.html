@@ -932,7 +932,7 @@ tbody tr:hover td{background:#fafafa}
             <div class="fgrp"><label>رقم البطاقة الوطنية</label><input type="text" id="f-nid" placeholder="19XXXXXXXXXX"></div>
             <div class="fgrp"><label>رقم الموبايل</label><input type="tel" id="f-mob" placeholder="07XXXXXXXXX"></div>
             <div class="fgrp s2"><label>عنوان السكن</label><input type="text" id="f-addr" placeholder="المحلة / الحي / المدينة"></div>
-            <div class="fgrp"><label>المهنة</label><input type="text" id="f-job" placeholder="المهنة"></div>
+            <div class="fgrp"><label>المهنة</label><select id="f-job"><option value="">اختر...</option><option value="موظف">موظف</option><option value="كاسب">كاسب</option><option value="متقاعد">متقاعد</option><option value="عسكري">عسكري</option><option value="طالب">طالب</option></select></div>
           </div>
         </div>
         <div class="fsec">
@@ -1295,7 +1295,7 @@ tbody tr:hover td{background:#fafafa}
             </div>
 
             <div class="fgrp s2"><label>عنوان السكن</label><input type="text" id="rc-addr" placeholder="المحلة / الحي / المدينة"></div>
-            <div class="fgrp s2"><label>المهنة</label><input type="text" id="rc-job" placeholder="المهنة"></div>
+            <div class="fgrp s2"><label>المهنة</label><select id="rc-job"><option value="">اختر...</option><option value="موظف">موظف</option><option value="كاسب">كاسب</option><option value="متقاعد">متقاعد</option><option value="عسكري">عسكري</option><option value="طالب">طالب</option></select></div>
 
             <div class="fgrp"><label>نوع التبرع *</label><select id="rc-dtype" onchange="toggleRcPat()"><option value="تعويضي">تعويضي</option><option value="طوعي">طوعي</option></select></div>
             <div class="fgrp"><label>نوع القنينة *</label>
@@ -1440,6 +1440,34 @@ const TITLES = {
 };
 
 function G(id){ return document.getElementById(id); }
+
+// Pressing Enter moves focus to the next field, same as Tab (skips hidden/readonly/disabled
+// fields). Applied to the donor-entry forms and the donor-edit modal.
+function enableEnterAsTab(containerSelector){
+  const container = document.querySelector(containerSelector);
+  if(!container) return;
+  container.addEventListener('keydown', function(e){
+    if(e.key !== 'Enter') return;
+    if(e.target.tagName === 'TEXTAREA') return;
+    if(e.target.closest('.ac-list')) return;
+    e.preventDefault();
+    const focusable = Array.from(container.querySelectorAll('input, select, textarea'))
+      .filter(el => !el.disabled && !el.readOnly && el.offsetParent !== null);
+    const idx = focusable.indexOf(e.target);
+    if(idx > -1 && idx < focusable.length - 1){
+      const next = focusable[idx+1];
+      next.focus();
+      if(typeof next.select === 'function' && next.tagName === 'INPUT') next.select();
+    }
+  });
+}
+['#s-reception', '#s-add', '#editDonorModal'].forEach(sel=>{
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded', ()=>enableEnterAsTab(sel));
+  } else {
+    enableEnterAsTab(sel);
+  }
+});
 function N(n){ return n == null ? '—' : n; }
 
 function toast(msg, type='info', dur=3200){
@@ -5126,7 +5154,7 @@ if('serviceWorker' in navigator){
           <div class="fgrp"><label>رقم البطاقة الوطنية</label><input type="text" id="ed-nid" placeholder="19XXXXXXXXXX"></div>
           <div class="fgrp"><label>رقم الموبايل</label><input type="tel" id="ed-mob" placeholder="07XXXXXXXXX"></div>
           <div class="fgrp s2"><label>عنوان السكن</label><input type="text" id="ed-addr" placeholder="المحلة / الحي / المدينة"></div>
-          <div class="fgrp"><label>المهنة</label><input type="text" id="ed-job" placeholder="المهنة"></div>
+          <div class="fgrp"><label>المهنة</label><select id="ed-job"><option value="">اختر...</option><option value="موظف">موظف</option><option value="كاسب">كاسب</option><option value="متقاعد">متقاعد</option><option value="عسكري">عسكري</option><option value="طالب">طالب</option></select></div>
         </div>
       </div>
       <div class="fsec">
