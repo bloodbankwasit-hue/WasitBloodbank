@@ -152,6 +152,9 @@ tbody tr:hover td{background:#fafafa}
 .fst i{color:#BE123C;font-size:14px}
 .fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
 .fgrp{display:flex;flex-direction:column;gap:4px}
+.rc-row3{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.rc-row3 .fgrp label{font-size:11px}
+.rc-row3 .fgrp input{padding:9px 6px;font-size:12.5px;text-align:center}
 .fgrp label{font-size:13px;color:#616161;font-weight:600}
 .fgrp input,.fgrp select,.fgrp textarea{padding:10px 12px;border:1px solid #e0e0e0;border-radius:10px;background:#fafafa;color:#1a1a1a;font-size:14px;font-family:inherit;outline:none;transition:border .15s}
 .fgrp input:focus,.fgrp select:focus{border-color:#BE123C;background:#fff}
@@ -706,7 +709,8 @@ tbody tr:hover td{background:#fafafa}
 .seq-add-btn:active{background:#9F1239}
 
 /* ═══ DONOR AUTOCOMPLETE ═══ */
-.ac-wrap{position:relative}
+.ac-wrap{position:relative;width:100%}
+.ac-wrap input{width:100%;box-sizing:border-box}
 .ac-list{
   position:absolute;top:calc(100% + 2px);right:0;left:0;z-index:500;
   background:#fff;border:1px solid #FECDD3;border-radius:10px;
@@ -1249,12 +1253,14 @@ tbody tr:hover td{background:#fafafa}
         <div class="fsec">
           <div class="fst"><i class="ti ti-user"></i> بيانات الاستقبال</div>
           <div class="fgrid">
-            <div class="fgrp"><label>تسلسل المتبرع</label><input type="text" id="rc-donornum" class="ro" readonly placeholder="تلقائي" style="background:#f0f9ff;color:#0F766E;font-weight:700"></div>
-            <div class="fgrp"><label>تاريخ التبرع</label>
-              <input type="date" id="rc-date" class="ro" readonly style="background:#f0f9ff;color:#0F766E;font-weight:600">
-            </div>
-            <div class="fgrp"><label>وقت التبرع</label>
-              <input type="text" id="rc-time" class="ro" readonly style="background:#f0f9ff;color:#0F766E;font-weight:600">
+            <div class="rc-row3">
+              <div class="fgrp"><label>تسلسل المتبرع</label><input type="text" id="rc-donornum" class="ro" readonly placeholder="تلقائي" style="background:#f0f9ff;color:#0F766E;font-weight:700"></div>
+              <div class="fgrp"><label>تاريخ التبرع</label>
+                <input type="date" id="rc-date" class="ro" readonly style="background:#f0f9ff;color:#0F766E;font-weight:600">
+              </div>
+              <div class="fgrp"><label>وقت التبرع</label>
+                <input type="text" id="rc-time" class="ro" readonly style="background:#f0f9ff;color:#0F766E;font-weight:600">
+              </div>
             </div>
 
             <div class="fgrp s2">
@@ -1595,7 +1601,7 @@ function clearDonorFill(){
   if(form) delete form.dataset.existingDonorId;
   const banner=G('rcFilledBanner');
   if(banner) banner.classList.remove('show');
-  if(G('rc-donornum')) G('rc-donornum').value='';
+  if(G('rc-donornum')) fetchNextDonorNumberPreview();
   ['ac-name','ac-nid','ac-mob'].forEach(id=>{ const e=G(id); if(e) e.classList.remove('show'); });
 }
 
@@ -2706,7 +2712,8 @@ function printForm(){
 .seq-add-btn:active{background:#9F1239}
 
 /* ═══ DONOR AUTOCOMPLETE ═══ */
-.ac-wrap{position:relative}
+.ac-wrap{position:relative;width:100%}
+.ac-wrap input{width:100%;box-sizing:border-box}
 .ac-list{
   position:absolute;top:calc(100% + 2px);right:0;left:0;z-index:500;
   background:#fff;border:1px solid #FECDD3;border-radius:10px;
@@ -3241,7 +3248,8 @@ function printBC(type){
 .seq-add-btn:active{background:#9F1239}
 
 /* ═══ DONOR AUTOCOMPLETE ═══ */
-.ac-wrap{position:relative}
+.ac-wrap{position:relative;width:100%}
+.ac-wrap input{width:100%;box-sizing:border-box}
 .ac-list{
   position:absolute;top:calc(100% + 2px);right:0;left:0;z-index:500;
   background:#fff;border:1px solid #FECDD3;border-radius:10px;
@@ -3776,7 +3784,8 @@ function printStats(){
 .seq-add-btn:active{background:#9F1239}
 
 /* ═══ DONOR AUTOCOMPLETE ═══ */
-.ac-wrap{position:relative}
+.ac-wrap{position:relative;width:100%}
+.ac-wrap input{width:100%;box-sizing:border-box}
 .ac-list{
   position:absolute;top:calc(100% + 2px);right:0;left:0;z-index:500;
   background:#fff;border:1px solid #FECDD3;border-radius:10px;
@@ -3915,7 +3924,21 @@ function dangerZone(){
 function setupReception(){
   if(G('rc-date')) G('rc-date').value=new Date().toISOString().split('T')[0];
   if(G('rc-time')) G('rc-time').value=new Date().toTimeString().substring(0,5);
-  if(G('rc-donornum') && !G('rc-donornum').value) G('rc-donornum').value='';
+  fetchNextDonorNumberPreview();
+}
+
+// Preview-only: shows the donor sequence number this NEW donor will likely get (based on the
+// highest donor_number currently on file). The real, final number is always assigned by the
+// database sequence at the moment of saving — this is just a live estimate for the employee to see.
+async function fetchNextDonorNumberPreview(){
+  const el=G('rc-donornum');
+  if(!el) return;
+  if(G('s-reception')?.dataset?.existingDonorId) return; // an existing donor's real number is already shown
+  try{
+    const{data}=await db.from('donors').select('donor_number').order('donor_number',{ascending:false}).limit(1);
+    const next=(data && data.length && data[0].donor_number) ? data[0].donor_number+1 : 1;
+    el.value=next;
+  }catch(e){ /* preview only — ignore failures */ }
 }
 
 function toggleRcPat(){
@@ -4086,7 +4109,7 @@ function resetReception(){
   ['rc-name','rc-by','rc-age','rc-mom','rc-nid','rc-mob','rc-addr','rc-job','rc-pat','rc-hosp'].forEach(id=>{const e=G(id);if(e)e.value='';});
   if(G('rc-date')){ const t=new Date().toISOString().split('T')[0]; G('rc-date').value=t; }
   if(G('rc-time')){ G('rc-time').value=new Date().toTimeString().substring(0,5); }
-  if(G('rc-donornum')) G('rc-donornum').value='';
+  fetchNextDonorNumberPreview();
   if(G('rc-btype')) G('rc-btype').value='';
   if(G('rc-bnum'))  { G('rc-bnum').value=''; G('rc-bnum').dataset.seqId=''; G('rc-bnum').dataset.poolId=''; }
   const iw2=G('intervalWarn'); if(iw2){ iw2.style.display='none'; iw2.dataset.blocked=''; }
@@ -4677,8 +4700,9 @@ function showEditUser(id,name,role,perms){
 }
 
 async function saveUserEdit(){
-  const id=G('eu-id').value,nm=G('eu-name').value.trim(),rl=G('eu-role').value;
+  const id=G('eu-id').value, nm=G('eu-name').value.trim();
   if(!nm){toast('أدخل الاسم','error');return;}
+  const perms = getCheckedPerms('eu-perms');
   load(true);
   const{error}=await db.from('user_profiles').update({full_name:nm,permissions:perms}).eq('id',id);
   load(false);
