@@ -1257,7 +1257,7 @@ tbody tr:hover td{background:#fafafa}
             <div class="rc-row3">
               <div class="fgrp"><label>تسلسل المتبرع</label><input type="text" id="rc-donornum" class="ro" readonly placeholder="تلقائي" style="background:#f0f9ff;color:#0F766E;font-weight:700"></div>
               <div class="fgrp"><label>تاريخ التبرع</label>
-                <input type="date" id="rc-date" class="ro" readonly style="background:#f0f9ff;color:#0F766E;font-weight:600">
+                <input type="text" id="rc-date" class="ro" readonly style="background:#f0f9ff;color:#0F766E;font-weight:600">
               </div>
               <div class="fgrp"><label>وقت التبرع</label>
                 <input type="text" id="rc-time" class="ro" readonly style="background:#f0f9ff;color:#0F766E;font-weight:600">
@@ -3923,7 +3923,7 @@ function dangerZone(){
 // WORKFLOW — RECEPTION (الاستقبال)
 // ================================================================
 function setupReception(){
-  if(G('rc-date')) G('rc-date').value=new Date().toISOString().split('T')[0];
+  if(G('rc-date')) G('rc-date').value=fd(new Date().toISOString().split('T')[0]);
   if(G('rc-time')) G('rc-time').value=new Date().toTimeString().substring(0,5);
   fetchNextDonorNumberPreview();
 }
@@ -4108,7 +4108,7 @@ async function saveReception(){
 
 function resetReception(){
   ['rc-name','rc-by','rc-age','rc-mom','rc-nid','rc-mob','rc-addr','rc-job','rc-pat','rc-hosp'].forEach(id=>{const e=G(id);if(e)e.value='';});
-  if(G('rc-date')){ const t=new Date().toISOString().split('T')[0]; G('rc-date').value=t; }
+  if(G('rc-date')){ const t=new Date().toISOString().split('T')[0]; G('rc-date').value=fd(t); }
   if(G('rc-time')){ G('rc-time').value=new Date().toTimeString().substring(0,5); }
   fetchNextDonorNumberPreview();
   if(G('rc-btype')) G('rc-btype').value='';
