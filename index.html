@@ -2308,7 +2308,8 @@ async function renderPublicRarePage(){
     _PUBLIC_RARE_DATA=all;
     filterPublicRare();
   }catch(e){
-    G('pubRareList').innerHTML='<div style="text-align:center;padding:40px 0;color:#BE123C">تعذر تحميل السجل حالياً</div>';
+    console.log('rare_donors_public fetch error:', e);
+    G('pubRareList').innerHTML='<div style="text-align:center;padding:40px 0;color:#BE123C;font-size:14px">تعذر تحميل السجل حالياً<br><span style="font-size:11px;opacity:.7">'+esc(e?.message||e?.error?.message||String(e))+'</span></div>';
   }
 }
 function filterPublicRare(page){
