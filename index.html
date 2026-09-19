@@ -2290,6 +2290,7 @@ function diag(msg, color){
 }
 
 let _PUBLIC_RARE_DATA=[];
+let _pubRarePage=1;
 async function renderPublicRarePage(){
   G('loginPage').style.display='none';
   G('publicRarePage').style.display='block';
@@ -2309,7 +2310,6 @@ async function renderPublicRarePage(){
     filterPublicRare();
   }catch(e){
     const msg = e?.message || e?.error?.message || JSON.stringify(e) || String(e);
-    alert('DEBUG — سبب فشل تحميل السجل:\n'+msg);
     console.log('rare_donors_public fetch error:', e);
     G('pubRareList').innerHTML='<div style="text-align:center;padding:40px 0;color:#BE123C;font-size:14px">تعذر تحميل السجل حالياً<br><span style="font-size:11px;opacity:.7">'+esc(msg)+'</span></div>';
   }
