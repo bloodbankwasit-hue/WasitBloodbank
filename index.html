@@ -2308,8 +2308,10 @@ async function renderPublicRarePage(){
     _PUBLIC_RARE_DATA=all;
     filterPublicRare();
   }catch(e){
+    const msg = e?.message || e?.error?.message || JSON.stringify(e) || String(e);
+    alert('DEBUG — سبب فشل تحميل السجل:\n'+msg);
     console.log('rare_donors_public fetch error:', e);
-    G('pubRareList').innerHTML='<div style="text-align:center;padding:40px 0;color:#BE123C;font-size:14px">تعذر تحميل السجل حالياً<br><span style="font-size:11px;opacity:.7">'+esc(e?.message||e?.error?.message||String(e))+'</span></div>';
+    G('pubRareList').innerHTML='<div style="text-align:center;padding:40px 0;color:#BE123C;font-size:14px">تعذر تحميل السجل حالياً<br><span style="font-size:11px;opacity:.7">'+esc(msg)+'</span></div>';
   }
 }
 function filterPublicRare(page){
