@@ -140,6 +140,7 @@ tbody tr:last-child td{border-bottom:none}
 tbody tr:hover td{background:#fafafa}
 .pill{display:inline-block;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600}
 .pg{background:#e8f5e9;color:#2e7d32}
+.pb{background:#EFF6FF;color:#1D4ED8}
 .pr{background:#FFF1F2;color:#BE123C}
 .py{background:#fff8e1;color:#e65100}
 .pb{background:#e3f2fd;color:#1565c0}
@@ -407,6 +408,23 @@ tbody tr:hover td{background:#fafafa}
 .bottle-card-num{font-size:17px;font-weight:800}
 .bottle-card-date{font-size:10.5px;margin-top:3px;opacity:.9}
 
+/* ===== BLOOD BAG CARDS ===== */
+.bb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:12px;margin-top:10px}
+.bb-card{background:#fff;border:1px solid #F1F5F9;border-radius:14px;padding:10px 6px 8px;text-align:center;cursor:pointer;transition:transform .12s,box-shadow .12s;box-shadow:0 1px 6px rgba(0,0,0,.06)}
+.bb-card:active{transform:scale(.96)}
+.bb-card:hover{box-shadow:0 6px 16px rgba(190,18,60,.12);transform:translateY(-2px)}
+.bb-svg{width:56px;height:80px;display:block;margin:0 auto}
+.bb-num{font-size:16px;font-weight:800;color:#1a1a1a;margin-top:4px}
+.bb-bt{font-size:11px;font-weight:700;color:#BE123C;margin-top:1px}
+.bb-dates{display:flex;flex-direction:column;gap:1px;font-size:9px;color:#757575;margin-top:4px}
+
+/* ===== STOCK-BY-COMPONENT-TYPE CARDS ===== */
+.comp-stock-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
+.comp-stock-card{background:#fff;border:1.5px solid #EEF2F6;border-radius:14px;padding:14px 8px;text-align:center;box-shadow:0 1px 5px rgba(0,0,0,.04)}
+.comp-stock-icon{font-size:22px;margin-bottom:4px}
+.comp-stock-name{font-size:11.5px;font-weight:700;color:#374151}
+.comp-stock-count{font-size:20px;font-weight:800;color:#BE123C;margin-top:2px}
+
 /* ===== BIG ACTION BUTTON ===== */
 .btn-action{width:100%;padding:16px;background:#BE123C;color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;transition:background .15s}
 .btn-action:hover{background:#9F1239}
@@ -608,6 +626,9 @@ tbody tr:hover td{background:#fafafa}
   .sec-popup-body .stock-bt-type{font-size:24px}
 
   .sec-popup-body .bottle-cards-grid{grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:12px}
+  .sec-popup-body .bb-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:16px}
+  .sec-popup-body .bb-svg{width:68px;height:96px}
+  .sec-popup-body .bb-num{font-size:18px}
   .sec-popup-body .bottle-card{padding:14px 8px;border-radius:14px}
   .sec-popup-body .bottle-card-num{font-size:19px}
 
@@ -944,7 +965,7 @@ tbody tr:hover td{background:#fafafa}
           <div class="fst"><i class="ti ti-droplet"></i> بيانات التبرع والقنينة</div>
           <div class="fgrid">
             <div class="fgrp"><label>نوع التبرع *</label><select id="f-dtyp"><option value="تعويضي">تعويضي</option><option value="طوعي">طوعي</option></select></div>
-            <div class="fgrp"><label>نوع القنينة *</label><select id="f-btyp" onchange="calcExpiry()"><option>مفلتر</option><option>رباعي</option><option>ريفيس</option><option>ثنائي</option><option>أحادي</option><option>تريما دم كامل</option><option>تريما صفائح دموية</option><option>حملة تبرع رباعي</option><option>حملة تبرع مفلتر</option><option>رباعي Sag</option></select></div>
+            <div class="fgrp"><label>نوع القنينة *</label><select id="f-btyp" onchange="calcExpiry()"><option>مفلتر</option><option>رباعي</option><option>ريفيوس</option><option>ثنائي</option><option>أحادي</option><option>تريما</option><option>حملة تبرع رباعي</option><option>حملة تبرع مفلتر</option><option>رباعي SAG</option></select></div>
             <div class="fgrp"><label>رقم القنينة (تلقائي)</label><input type="text" id="f-bnum" class="auto" readonly placeholder="جاري..."></div>
             <div class="fgrp"><label>اسم المريض</label><input type="text" id="f-pat" placeholder="(للتبرع التعويضي فقط)"></div>
             <div class="fgrp"><label>اسم المستشفى</label><input type="text" id="f-hosp" placeholder="مستشفى..."></div>
@@ -1023,7 +1044,7 @@ tbody tr:hover td{background:#fafafa}
           <div class="fgrid">
             <div class="fgrp"><label>اسم المتبرع</label><input type="text" id="sr-nm" placeholder="الاسم أو جزء منه"></div>
             <div class="fgrp"><label>رقم القنينة</label><input type="text" id="sr-bn" placeholder="رقم القنينة"></div>
-            <div class="fgrp"><label>نوع القنينة</label><select id="sr-bt"><option value="">الكل</option><option>مفلتر</option><option>رباعي</option><option>ريفيس</option><option>ثنائي</option><option>أحادي</option><option>تريما دم كامل</option><option>تريما صفائح دموية</option><option>حملة تبرع رباعي</option><option>حملة تبرع مفلتر</option><option>رباعي Sag</option></select></div>
+            <div class="fgrp"><label>نوع القنينة</label><select id="sr-bt"><option value="">الكل</option><option>مفلتر</option><option>رباعي</option><option>ريفيوس</option><option>ثنائي</option><option>أحادي</option><option>تريما</option><option>حملة تبرع رباعي</option><option>حملة تبرع مفلتر</option><option>رباعي SAG</option></select></div>
             <div class="fgrp"><label>فصيلة الدم</label><select id="sr-bl"><option value="">الكل</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select></div>
             <div class="fgrp"><label>نوع التبرع</label><select id="sr-dt"><option value="">الكل</option><option value="طوعي">طوعي</option><option value="تعويضي">تعويضي</option></select></div>
             <div class="fgrp"><label>اسم المستشفى</label><input type="text" id="sr-hosp" placeholder="المستشفى"></div>
@@ -1312,8 +1333,8 @@ tbody tr:hover td{background:#fafafa}
                 <option value="ريفيوس">ريفيوس</option>
                 <option value="رباعي SAG">رباعي SAG</option>
                 <option value="رباعي">رباعي</option>
-                <option value="TREMA صفائح">TREMA صفائح</option>
-                <option value="TREMA دم">TREMA دم</option>
+                <option value="ثنائي">ثنائي</option>
+                <option value="تريما">تريما (سحب آلي)</option>
                 <option value="أحادي">أحادي</option>
               </select>
             </div>
@@ -1361,6 +1382,7 @@ tbody tr:hover td{background:#fafafa}
       <!-- ========== SUPPLY ========== -->
       <div class="sc" id="s-supply">
         <div class="sh"><div class="sh-t"><i class="ti ti-package"></i> خزين القناني</div></div>
+        <div id="supplyTypeGrid" class="comp-stock-grid" style="margin-bottom:16px"></div>
         <div class="btg" id="supplyGrid"></div>
         <div id="supplyList"></div>
       </div>
@@ -2146,7 +2168,7 @@ async function processQueuedOp(op){
     }
   } else if(op.type==='supply'){
     const{error}=await db.from('blood_donations').update({
-      status:'dispatched',hospital_name:d.hospital_name
+      status:'dispatched',hospital_name:d.hospital_name,dispatch_date:d.dispatch_date||new Date().toISOString().split('T')[0]
     }).eq('id',d.donation_id);
     if(error) throw error;
   }
@@ -2514,10 +2536,34 @@ function calcAge(){
   if(by>1900&&by<2010) G('f-age').value=(new Date().getFullYear()-by)+' سنة';
 }
 
+// ── Component separation rules (المرحلة ١ — فصل المكونات) ──
+// Expiry, in days from the draw date, for the bottle BEFORE it's separated (i.e. while it's
+// still "whole blood"). Trima isn't listed here — it's handled entirely separately at draw time.
+const WHOLE_BLOOD_DAYS = {
+  'مفلتر':45, 'ريفيوس':45, 'ريفيس':45,
+  'رباعي':35,
+  'رباعي SAG':45, 'رباعي Sag':45,
+  'ثنائي':35,
+  'أحادي':35
+};
+// What each separable bottle type can be split into, and each component's own expiry (days
+// from the ORIGINAL draw date, not from the separation date).
+const COMPONENT_RULES = {
+  'مفلتر':     [{type:'دم مضغوط',days:45},{type:'بلازما',days:365},{type:'صفائح دموية',days:5}],
+  'ريفيوس':    [{type:'دم مضغوط',days:45},{type:'بلازما',days:365},{type:'صفائح دموية',days:5}],
+  'ريفيس':     [{type:'دم مضغوط',days:45},{type:'بلازما',days:365},{type:'صفائح دموية',days:5}],
+  'رباعي':     [{type:'دم مضغوط',days:35},{type:'بلازما',days:365},{type:'صفائح دموية',days:5},{type:'بروتين بارد',days:365}],
+  'رباعي SAG': [{type:'دم مضغوط',days:45},{type:'بلازما',days:365},{type:'صفائح دموية',days:5},{type:'بروتين بارد',days:365}],
+  'رباعي Sag': [{type:'دم مضغوط',days:45},{type:'بلازما',days:365},{type:'صفائح دموية',days:5},{type:'بروتين بارد',days:365}],
+  'ثنائي':     [{type:'دم مضغوط',days:35},{type:'بلازما',days:365}]
+};
+// Trima's two possible direct outputs (chosen by the draw employee — no separate step).
+const TRIMA_OUTPUTS = [{type:'دم مضغوط',days:21},{type:'صفائح دموية',days:5}];
+
 function calcExpiry(){
   const draw=G('f-draw').value; if(!draw) return;
   const bt=G('f-btyp').value;
-  const days=['ثنائي','أحادي','تريما صفائح دموية'].includes(bt)?5:42;
+  const days=WHOLE_BLOOD_DAYS[bt] ?? 45;
   const e=new Date(draw); e.setDate(e.getDate()+days);
   G('f-exp').value=e.toISOString().split('T')[0];
 }
@@ -2822,7 +2868,7 @@ async function loadDonors(page=1){
   const dTo   = G('dDateTo')?.value||'';
   load(true);
   try{
-    const SEL='bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,status,id,donors!inner(donor_number,full_name,birth_year,national_id)';
+    const SEL='bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,status,component_type,id,donors!inner(donor_number,full_name,birth_year,national_id)';
     let q;
     if(s){
       // PostgREST's or()/and() only accepts columns on the table being queried — it cannot
@@ -2864,17 +2910,19 @@ async function loadDonors(page=1){
     if(data&&data.length){
       G('dTbl').innerHTML=`<div class="tw"><table><thead><tr>
         <th>رقم المتبرع</th><th>الاسم الكامل</th><th>العمر</th><th>الفصيلة</th>
-        <th>نوع القنينة</th><th>رقم القنينة</th><th>نوع التبرع</th>
+        <th>نوع القنينة</th><th>المحتوى</th><th>رقم القنينة</th><th>نوع التبرع</th>
         <th>تاريخ التبرع</th><th>تاريخ النفاد</th><th>الفحوصات</th><th></th>
       </tr></thead><tbody>${data.map(r=>{
         const age=r.donors?.birth_year ? new Date().getFullYear()-r.donors.birth_year : '—';
         const exp=r.expiry_date&&new Date(r.expiry_date)<now;
+        const isSep=r.status==='separated';
         return`<tr>
           <td>${N(r.donors?.donor_number)}</td>
           <td>${esc(N(r.donors?.full_name))}</td>
           <td>${age}</td>
           <td>${N(r.blood_type)}</td>
           <td>${r.bottle_type}</td>
+          <td>${isSep?'<span class="pill py">تم الفصل</span>':`<span class="pill ${r.component_type==='دم كامل'?'pg':'pb'}">${r.component_type||'دم كامل'}</span>`}</td>
           <td style="font-weight:700;color:#BE123C">${r.bottle_number}</td>
           <td><span class="pill ${r.donation_type==='طوعي'?'pg':'py'}">${r.donation_type}</span></td>
           <td>${fd(r.donation_date)}</td>
@@ -3610,18 +3658,29 @@ async function loadStats(){
   if(!f||!t){toast('يرجى تحديد الفترة الزمنية','warning'); return;}
   load(true);
   const {data}=await db.from('blood_donations')
-    .select('donation_type,bottle_type,blood_type,serology_result,donors(gender)')
+    .select('donation_type,bottle_type,blood_type,serology_result,component_type,status,dispatch_date,donors(gender)')
     .gte('donation_date',f).lte('donation_date',t).eq('is_deleted',false);
+  const {data:outData}=await db.from('blood_donations')
+    .select('component_type')
+    .eq('status','dispatched').gte('dispatch_date',f).lte('dispatch_date',t).eq('is_deleted',false);
   load(false);
   if(!data?.length){toast('لا توجد بيانات في هذه الفترة','warning'); return;}
   const byTyp={}, byBot={}, byBld={}, byGen={ذكر:0,أنثى:0};
-  const bts=['مفلتر','رباعي','ريفيس','ثنائي','أحادي','تريما دم كامل','تريما صفائح دموية','حملة تبرع رباعي','حملة تبرع مفلتر','رباعي Sag'];
+  const byCompIn={}, byCompOut={};
+  const bts=['مفلتر','رباعي','ريفيوس','ثنائي','أحادي','تريما','حملة تبرع رباعي','حملة تبرع مفلتر','رباعي SAG'];
   data.forEach(r=>{
     byTyp[r.donation_type]=(byTyp[r.donation_type]||0)+1;
     byBot[r.bottle_type]=(byBot[r.bottle_type]||0)+1;
     if(r.blood_type) byBld[r.blood_type]=(byBld[r.blood_type]||0)+1;
     if(r.donors?.gender) byGen[r.donors.gender]=(byGen[r.donors.gender]||0)+1;
+    const ct=r.component_type||'دم كامل';
+    if(r.status!=='separated') byCompIn[ct]=(byCompIn[ct]||0)+1;
   });
+  (outData||[]).forEach(r=>{
+    const ct=r.component_type||'دم كامل';
+    byCompOut[ct]=(byCompOut[ct]||0)+1;
+  });
+  const allComps=[...new Set([...Object.keys(byCompIn),...Object.keys(byCompOut)])];
   G('stRpt').style.display='block';
   G('stRpt').innerHTML=`<div class="rpt">
     <div class="rpt-hd">
@@ -3644,6 +3703,10 @@ async function loadStats(){
       </div>
       <div class="rs"><div class="rs-t">إحصائية حسب فصيلة الدم</div>
         ${Object.entries(byBld).sort((a,b)=>b[1]-a[1]).map(([b,c])=>`<div class="rr"><span>${b}</span><span class="rv">${fnum(c)}</span></div>`).join('')}
+      </div>
+      <div class="rs"><div class="rs-t">دخول وخروج حسب نوع المحتوى (دم كامل / مضغوط / بلازما / صفائح / بروتين بارد)</div>
+        ${allComps.map(c=>`<div class="rr"><span>${c}</span><span class="rv">دخل: ${fnum(byCompIn[c]||0)} — خرج: ${fnum(byCompOut[c]||0)}</span></div>`).join('')}
+        ${!allComps.length?'<div class="rr"><span>لا توجد بيانات</span><span class="rv">0</span></div>':''}
       </div>
     </div>
   </div>`;
@@ -4160,6 +4223,11 @@ async function openDrawModal(id,name,dtype,bn,btyp){
   G('dm-med-other').value='';
   G('dm-med-other-grp').style.display='none';
   toggleDmMedSection(false);
+  const isTrima = btyp==='تريما';
+  const trimaSec=G('dm-trima-section'); if(trimaSec) trimaSec.style.display=isTrima?'block':'none';
+  const expGrp=G('dm-exp-grp'); if(expGrp) expGrp.style.display=isTrima?'none':'block';
+  if(G('dm-trima-blood')) G('dm-trima-blood').checked=false;
+  if(G('dm-trima-plt'))   G('dm-trima-plt').checked=false;
   calcDmExpiry();
   G('drawModal').classList.add('on');
 }
@@ -4173,16 +4241,57 @@ function toggleDmMedSection(show){
 function calcDmExpiry(){
   const draw=G('dm-draw').value; if(!draw) return;
   const bt=G('dm-btyp-val').value;
-  const days=['ثنائي','أحادي','تريما صفائح دموية'].includes(bt)?5:42;
+  if(bt==='تريما') return; // trima's expiry depends on which output is chosen — see confirmDrawSuccess
+  const days=WHOLE_BLOOD_DAYS[bt] ?? 45;
   const e=new Date(draw); e.setDate(e.getDate()+days);
   G('dm-exp').value=e.toISOString().split('T')[0];
 }
 
 // Outcome 1: normal successful draw. Bottle type & number were already fixed at RECEPTION —
 // draw only records that the draw actually happened (date, expiry) and forwards to the lab.
+// Trima is a special case: the machine produces its output(s) directly at draw time (no later
+// "separation" step), so the draw employee marks which of the two outputs were actually taken,
+// and each becomes its own row heading to the lab — the original pending_draw row is marked
+// 'separated' just like a normal post-lab separation would.
 async function confirmDrawSuccess(){
   const id=G('dm-id').value, draw=G('dm-draw').value;
   if(!draw){ toast('يرجى تحديد تاريخ السحب','error'); return; }
+  const btyp=G('dm-btyp-val').value;
+
+  if(btyp==='تريما'){
+    const wantBlood=G('dm-trima-blood').checked;
+    const wantPlt=G('dm-trima-plt').checked;
+    if(!wantBlood && !wantPlt){ toast('يرجى تحديد ناتج واحد على الأقل (دم مضغوط أو صفائح)','error'); return; }
+    load(true);
+    try{
+      const{data:parent,error:pe}=await db.from('blood_donations')
+        .select('donor_id,bottle_number,bottle_type,donation_type,created_by')
+        .eq('id',id).single();
+      if(pe) throw pe;
+      const rows=[];
+      TRIMA_OUTPUTS.forEach(o=>{
+        if((o.type==='دم مضغوط' && !wantBlood) || (o.type==='صفائح دموية' && !wantPlt)) return;
+        const e=new Date(draw); e.setDate(e.getDate()+o.days);
+        rows.push({
+          donor_id:parent.donor_id, bottle_number:parent.bottle_number, bottle_type:parent.bottle_type,
+          donation_type:parent.donation_type, component_type:o.type, parent_donation_id:id,
+          draw_date:draw, donation_date:draw, expiry_date:e.toISOString().split('T')[0],
+          status:'pending_lab', created_by:SES?.user?.id
+        });
+      });
+      const{error:ie}=await db.from('blood_donations').insert(rows);
+      if(ie) throw ie;
+      const{error:ue}=await db.from('blood_donations').update({draw_date:draw,status:'separated'}).eq('id',id);
+      if(ue) throw ue;
+      await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'separated',components:rows.map(r=>r.component_type).join(', ')}});
+      toast('✅ تم تسجيل سحب التريما — '+rows.length+' مكوّن أُرسل للمختبر','success',4500);
+      G('drawModal').classList.remove('on');
+      await loadDraw();
+    }catch(e){ toast('خطأ: '+e.message,'error'); }
+    finally{ load(false); }
+    return;
+  }
+
   load(true);
   try{
     const exp=G('dm-exp').value;
@@ -4334,7 +4443,7 @@ async function saveLab(){
   if(!IS_ONLINE){ toast('هذه الخطوة تحتاج اتصال بالإنترنت','error'); return; }
   load(true);
   try{
-    const{data:cur}=await db.from('blood_donations').select('blood_type,serology_result,serology_type').eq('id',id).single();
+    const{data:cur}=await db.from('blood_donations').select('blood_type,serology_result,serology_type,donor_id,bottle_number').eq('id',id).single();
     const effBt = bt || cur?.blood_type || null;
     let effSer, effSerType;
     if(testsGiven){
@@ -4356,6 +4465,14 @@ async function saveLab(){
     if(error) throw error;
 
     if(complete){
+      // One draw event can produce more than one pending-lab row sharing the same bottle
+      // number (e.g. trima's two outputs) — the test is done once, and the result applies
+      // to every sibling still awaiting testing, linked by donor + bottle number.
+      if(cur?.donor_id && cur?.bottle_number){
+        await db.from('blood_donations').update({
+          blood_type:effBt, serology_result:effSer, serology_type:effSerType, status:newStatus
+        }).eq('donor_id',cur.donor_id).eq('bottle_number',cur.bottle_number).eq('status','pending_lab').neq('id',id);
+      }
       if(effSer==='Positive'){
         const{data:don}=await db.from('blood_donations').select('donors(full_name)').eq('id',id).single();
         if(don?.donors?.full_name){
@@ -4387,9 +4504,21 @@ async function saveLab(){
 // ================================================================
 async function loadSupply(selectedBT){
   const bts=['A+','A-','B+','B-','O+','O-','AB+','AB-'];
-  const{data:counts}=await db.from('blood_donations').select('blood_type').eq('status','in_stock').eq('is_deleted',false);
+  const{data:counts}=await db.from('blood_donations').select('blood_type,component_type').eq('status','in_stock').eq('is_deleted',false);
   const cnt={};
-  (counts||[]).forEach(r=>{ cnt[r.blood_type]=(cnt[r.blood_type]||0)+1; });
+  const compCnt={'دم كامل':0,'دم مضغوط':0,'بلازما':0,'صفائح دموية':0,'بروتين بارد':0};
+  (counts||[]).forEach(r=>{
+    cnt[r.blood_type]=(cnt[r.blood_type]||0)+1;
+    const ct=r.component_type||'دم كامل';
+    compCnt[ct]=(compCnt[ct]||0)+1;
+  });
+  const compIcons={'دم كامل':'🩸','دم مضغوط':'🧪','بلازما':'💛','صفائح دموية':'🟡','بروتين بارد':'🧊'};
+  G('supplyTypeGrid').innerHTML=Object.entries(compCnt).map(([name,n])=>`
+    <div class="comp-stock-card">
+      <div class="comp-stock-icon">${compIcons[name]||'🩸'}</div>
+      <div class="comp-stock-name">${name}</div>
+      <div class="comp-stock-count">${n}</div>
+    </div>`).join('');
   G('supplyGrid').innerHTML=bts.map(bt=>`<div class="stock-bt ${(cnt[bt]||0)===0?'empty-bt':''}" onclick="loadSupplyList('${bt}')">
     <div class="stock-bt-type">${bt}</div>
     <div class="stock-bt-count">${cnt[bt]||0} قنينة</div>
@@ -4433,22 +4562,35 @@ function contrastText(hex){
   return lum>0.6 ? '#1a1a1a' : '#fff';
 }
 
+// Renders one bottle-detail card shaped like an actual blood bag, filled with the expiry
+// color, with the key data (number, blood type, draw/expiry dates) printed below it so text
+// stays readable regardless of how dark or pale the fill color is.
+function bloodBagCard(r, onclickJs){
+  const color=bottleExpiryColor(r.draw_date, r.expiry_date);
+  return `<div class="bb-card" onclick="${onclickJs}">
+    <svg viewBox="0 0 90 128" class="bb-svg">
+      <rect x="36" y="0" width="18" height="13" rx="3" fill="#94A3B8"/>
+      <path d="M14 22 Q14 12 24 12 L66 12 Q76 12 76 22 L76 96 Q76 122 45 126 Q14 122 14 96 Z"
+        fill="${color}" stroke="rgba(0,0,0,.15)" stroke-width="1.5"/>
+      <ellipse cx="45" cy="22" rx="31" ry="7" fill="#fff" opacity=".18"/>
+    </svg>
+    <div class="bb-num">${r.bottle_number||'—'}</div>
+    <div class="bb-bt">${r.blood_type||'—'} ${r.component_type&&r.component_type!=='دم كامل'?'· '+r.component_type:''}</div>
+    <div class="bb-dates">
+      <span>سحب: ${fd(r.draw_date)}</span>
+      <span>نفاد: ${fd(r.expiry_date)}</span>
+    </div>
+  </div>`;
+}
+
 async function loadSupplyList(bt){
   const{data}=await db.from('blood_donations')
-    .select('id,bottle_number,bottle_type,blood_type,draw_date,expiry_date,donors(full_name)')
+    .select('id,bottle_number,bottle_type,blood_type,component_type,draw_date,expiry_date,donors(full_name)')
     .eq('status','in_stock').eq('blood_type',bt).eq('is_deleted',false)
     .order('expiry_date',{ascending:true});
   if(data&&data.length){
     G('supplyList').innerHTML=`<div style="font-size:14px;font-weight:700;color:#BE123C;margin:12px 0 8px">فصيلة ${bt} — ${data.length} قنينة</div>
-    <div class="bottle-cards-grid">${data.map(r=>{
-      const color=bottleExpiryColor(r.draw_date, r.expiry_date);
-      const tc=contrastText(color);
-      return `<div class="bottle-card" style="background:${color};color:${tc}"
-        onclick="openBottleDetail('${r.id}')">
-        <div class="bottle-card-num">${r.bottle_number}</div>
-        <div class="bottle-card-date">${fd(r.draw_date)}</div>
-      </div>`;
-    }).join('')}</div>`;
+    <div class="bb-grid">${data.map(r=>bloodBagCard(r,`openBottleDetail('${r.id}')`)).join('')}</div>`;
   } else {
     G('supplyList').innerHTML='<div class="empty"><i class="ti ti-package"></i><p>لا توجد قناني من فصيلة '+bt+'</p></div>';
   }
@@ -4457,7 +4599,7 @@ async function loadSupplyList(bt){
 async function openBottleDetail(id){
   load(true);
   const{data:r,error}=await db.from('blood_donations')
-    .select('id,bottle_number,bottle_type,blood_type,draw_date,donors(full_name)')
+    .select('id,bottle_number,bottle_type,blood_type,component_type,draw_date,donors(full_name)')
     .eq('id',id).single();
   load(false);
   if(error||!r){ toast('تعذر تحميل بيانات القنينة','error'); return; }
@@ -4466,7 +4608,61 @@ async function openBottleDetail(id){
   G('bd-donor-name').textContent=esc(r.donors?.full_name||'—');
   G('bd-draw-date').textContent=fd(r.draw_date);
   G('bd-storage').textContent='— قيد الإضافة —';
+  G('bd-component').textContent=r.component_type||'دم كامل';
+  const canSeparate = r.component_type==='دم كامل' && !!COMPONENT_RULES[r.bottle_type];
+  const sepBtn=G('bd-separate-btn');
+  if(sepBtn) sepBtn.style.display = canSeparate ? 'flex' : 'none';
   G('bottleDetailModal').classList.add('on');
+}
+
+function openSeparateModal(){
+  const id=G('bd-id').value;
+  G('sep-id').value=id;
+  db.from('blood_donations').select('bottle_type,bottle_number,draw_date').eq('id',id).single().then(({data:r})=>{
+    if(!r) return;
+    const rules=COMPONENT_RULES[r.bottle_type]||[];
+    G('sep-bottle-info').textContent='قنينة رقم '+r.bottle_number+' — '+r.bottle_type;
+    G('sep-list').innerHTML=rules.map((c,i)=>`
+      <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #E5E7EB;border-radius:10px;margin-bottom:7px;cursor:pointer">
+        <input type="checkbox" class="sep-comp" value="${c.type}" data-days="${c.days}" checked style="width:18px;height:18px">
+        <span style="font-weight:700">${c.type}</span>
+        <span style="color:#757575;font-size:12px;margin-right:auto">إكسباير ${c.days==365?'سنة':c.days+' يوم'}</span>
+      </label>`).join('');
+  });
+  G('bottleDetailModal').classList.remove('on');
+  G('separateModal').classList.add('on');
+}
+
+async function confirmSeparate(){
+  const id=G('sep-id').value;
+  const checked=[...document.querySelectorAll('.sep-comp:checked')];
+  if(!checked.length){ toast('يرجى تحديد مكوّن واحد على الأقل','error'); return; }
+  load(true);
+  try{
+    const{data:parent,error:pe}=await db.from('blood_donations')
+      .select('donor_id,bottle_number,bottle_type,blood_type,donation_type,draw_date,serology_result,serology_type')
+      .eq('id',id).single();
+    if(pe) throw pe;
+    const rows=checked.map(c=>{
+      const e=new Date(parent.draw_date); e.setDate(e.getDate()+parseInt(c.dataset.days));
+      return {
+        donor_id:parent.donor_id, bottle_number:parent.bottle_number, bottle_type:parent.bottle_type,
+        blood_type:parent.blood_type, donation_type:parent.donation_type, component_type:c.value,
+        parent_donation_id:id, draw_date:parent.draw_date, donation_date:parent.draw_date, expiry_date:e.toISOString().split('T')[0],
+        serology_result:parent.serology_result, serology_type:parent.serology_type,
+        status:'in_stock', created_by:SES?.user?.id
+      };
+    });
+    const{error:ie}=await db.from('blood_donations').insert(rows);
+    if(ie) throw ie;
+    const{error:ue}=await db.from('blood_donations').update({status:'separated'}).eq('id',id);
+    if(ue) throw ue;
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'separated',components:rows.map(r=>r.component_type).join(', ')}});
+    toast('✅ تم الفصل إلى '+rows.length+' مكوّن بنجاح','success',4500);
+    G('separateModal').classList.remove('on');
+    await loadSupply();
+  }catch(e){ toast('خطأ: '+e.message,'error'); }
+  finally{ load(false); }
 }
 
 function openDispatch(id,bn,bt,btyp){
@@ -4481,13 +4677,13 @@ async function saveDispatch(){
   if(!hosp){ toast('يرجى إدخال اسم المستشفى','error'); return; }
   load(true);
   if(!IS_ONLINE){
-    await enqueueOp('supply',{donation_id:id,hospital_name:hosp});
+    await enqueueOp('supply',{donation_id:id,hospital_name:hosp,dispatch_date:new Date().toISOString().split('T')[0]});
     const q=await getPendingQueue();
     updateOfflineBar('offline',q.length+' عملية معلّقة');
     load(false);
     toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً','warning',5000);
   } else {
-    const{error}=await db.from('blood_donations').update({status:'dispatched',hospital_name:hosp}).eq('id',id);
+    const{error}=await db.from('blood_donations').update({status:'dispatched',hospital_name:hosp,dispatch_date:new Date().toISOString().split('T')[0]}).eq('id',id);
     load(false);
     if(error){ toast('خطأ: '+error.message,'error'); return; }
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'dispatched',hospital:hosp}});
@@ -5063,8 +5259,8 @@ if('serviceWorker' in navigator){
             <option value="ريفيوس">ريفيوس</option>
             <option value="رباعي SAG">رباعي SAG</option>
             <option value="رباعي">رباعي</option>
-            <option value="TREMA صفائح">TREMA صفائح</option>
-            <option value="TREMA دم">TREMA دم</option>
+            <option value="ثنائي">ثنائي</option>
+            <option value="تريما">تريما (سحب آلي)</option>
             <option value="أحادي">أحادي</option>
           </select>
         </div>
@@ -5186,7 +5382,7 @@ if('serviceWorker' in navigator){
         <div class="fst"><i class="ti ti-droplet"></i> بيانات التبرع والقنينة</div>
         <div class="fgrid">
           <div class="fgrp"><label>نوع التبرع *</label><select id="ed-dtyp"><option value="تعويضي">تعويضي</option><option value="طوعي">طوعي</option></select></div>
-          <div class="fgrp"><label>نوع القنينة *</label><select id="ed-btyp"><option>مفلتر</option><option>رباعي</option><option>ريفيس</option><option>ثنائي</option><option>أحادي</option><option>تريما دم كامل</option><option>تريما صفائح دموية</option><option>حملة تبرع رباعي</option><option>حملة تبرع مفلتر</option><option>رباعي Sag</option></select></div>
+          <div class="fgrp"><label>نوع القنينة *</label><select id="ed-btyp"><option>مفلتر</option><option>رباعي</option><option>ريفيوس</option><option>ثنائي</option><option>أحادي</option><option>تريما</option><option>حملة تبرع رباعي</option><option>حملة تبرع مفلتر</option><option>رباعي SAG</option></select></div>
           <div class="fgrp"><label>رقم القنينة</label><input type="text" id="ed-bnum" class="ro" readonly></div>
           <div class="fgrp"><label>اسم المريض</label><input type="text" id="ed-pat" placeholder="(للتبرع التعويضي فقط)"></div>
           <div class="fgrp"><label>اسم المستشفى</label><input type="text" id="ed-hosp" placeholder="مستشفى..."></div>
@@ -5251,7 +5447,16 @@ if('serviceWorker' in navigator){
       </div>
       <div class="fgrid">
         <div class="fgrp"><label>تاريخ السحب *</label><input type="date" id="dm-draw" onchange="calcDmExpiry()"></div>
-        <div class="fgrp"><label>تاريخ النفاد (تلقائي)</label><input type="date" id="dm-exp" class="auto" readonly></div>
+        <div class="fgrp" id="dm-exp-grp"><label>تاريخ النفاد (تلقائي)</label><input type="date" id="dm-exp" class="auto" readonly></div>
+      </div>
+      <div id="dm-trima-section" style="display:none;margin-top:10px;background:#F0F9FF;border:1px solid #BAE6FD;border-radius:10px;padding:12px">
+        <div style="font-size:12.5px;font-weight:700;color:#0369A1;margin-bottom:8px">جهاز التريما — حدد الناتج (أو الاثنين):</div>
+        <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1.5px solid #BAE6FD;background:#fff;border-radius:8px;margin-bottom:6px;cursor:pointer">
+          <input type="checkbox" id="dm-trima-blood" style="width:17px;height:17px"><span style="font-weight:600">دم مضغوط <span style="color:#757575;font-weight:400">(إكسباير ٢١ يوم)</span></span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1.5px solid #BAE6FD;background:#fff;border-radius:8px;cursor:pointer">
+          <input type="checkbox" id="dm-trima-plt" style="width:17px;height:17px"><span style="font-weight:600">صفائح دموية <span style="color:#757575;font-weight:400">(إكسباير ٥ أيام)</span></span>
+        </label>
       </div>
       <div id="dm-med-section" style="display:none;margin-top:10px;background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px">
         <div class="fgrid">
@@ -5359,7 +5564,8 @@ if('serviceWorker' in navigator){
     <input type="hidden" id="bd-id">
     <div style="font-size:12px;color:#757575;margin-bottom:2px">رقم القنينة</div>
     <div id="bd-num-big" style="font-size:34px;font-weight:800;color:#BE123C;margin-bottom:6px">—</div>
-    <div id="bd-donor-name" style="font-size:13px;color:#757575;margin-bottom:14px">—</div>
+    <div id="bd-donor-name" style="font-size:13px;color:#757575;margin-bottom:4px">—</div>
+    <div style="display:inline-block;background:#FFF1F2;color:#BE123C;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:14px" id="bd-component">دم كامل</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center">
       <div style="background:#F8FAFC;border:1px solid #EEF2F6;border-radius:10px;padding:10px">
         <div style="font-size:11px;color:#757575">تاريخ السحب</div>
@@ -5370,7 +5576,8 @@ if('serviceWorker' in navigator){
         <div id="bd-storage" style="font-size:14px;font-weight:700;color:#1a1a1a;margin-top:3px">—</div>
       </div>
     </div>
-    <div style="display:flex;gap:8px;margin-top:18px">
+    <button id="bd-separate-btn" class="btn" style="display:none;width:100%;justify-content:center;margin-top:12px;border-color:#0369A1;color:#0369A1" onclick="openSeparateModal()"><i class="ti ti-git-fork"></i> فصل المكونات</button>
+    <div style="display:flex;gap:8px;margin-top:12px">
       <button class="btn" style="flex:1;justify-content:center;border-color:#7F1D1D;color:#7F1D1D" onclick="toast('قيد الإضافة','warning')"><i class="ti ti-trash"></i> تلف</button>
       <button class="btn btn-p" style="flex:1;justify-content:center" onclick="toast('قيد الإضافة','warning')"><i class="ti ti-package"></i> تجهيز</button>
     </div>
@@ -5386,6 +5593,24 @@ if('serviceWorker' in navigator){
       <button class="sec-popup-close" onclick="closeSectionPopup()"><i class="ti ti-x"></i></button>
     </div>
     <div class="sec-popup-body" id="sectionPopupBody"></div>
+  </div>
+</div>
+
+<!-- SEPARATE COMPONENTS MODAL -->
+<div class="overlay" id="separateModal">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-git-fork"></i> فصل مكونات الدم</div>
+    <div class="modal-body">
+      <input type="hidden" id="sep-id">
+      <div id="sep-bottle-info" style="font-size:13px;color:#757575;margin-bottom:12px;text-align:center">—</div>
+      <div style="font-size:12.5px;font-weight:700;color:#374151;margin-bottom:8px">حدد المكونات الناتجة فعلياً:</div>
+      <div id="sep-list"></div>
+      <div style="font-size:11.5px;color:#94A3B8;margin-top:6px">القنينة الأصلية (دم كامل) ستختفي من الخزين، وكل مكوّن محدد يدخل الخزين كسطر مستقل بنفس اسم المتبرع ورقم القنينة.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="G('separateModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
+      <button class="btn btn-p" onclick="confirmSeparate()"><i class="ti ti-check"></i> تأكيد الفصل</button>
+    </div>
   </div>
 </div>
 </body>
