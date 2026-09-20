@@ -1300,6 +1300,63 @@ tbody tr:hover td{background:#fafafa}
       </div>
 
       <!-- ========== RECEPTION ========== -->
+      <div class="sc" id="s-separation">
+        <div class="sh"><div class="sh-t"><i class="ti ti-dna"></i> الفصل — متابعة القناني بعد السحب</div></div>
+        <div id="sepBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
+          <span id="sepBulkCount">0 محدد</span>
+          <div style="display:flex;gap:6px">
+            <button class="btn" style="background:#0369A1;color:#fff;border:none" onclick="sepBulkSeparate()"><i class="ti ti-git-fork"></i> فصل المحدد</button>
+            <button class="btn" style="background:#374151;color:#fff;border:none" onclick="document.querySelectorAll('.sep-chk').forEach(c=>c.checked=false);updateSepBulkBar()">إلغاء التحديد</button>
+          </div>
+        </div>
+        <div id="sepBoardList"></div>
+      </div>
+
+      <div class="sc" id="s-campaigns">
+        <div id="camp-archive-view">
+          <div class="sh" style="display:flex;align-items:center;justify-content:space-between">
+            <div class="sh-t"><i class="ti ti-bus"></i> أرشيف حملات التبرع</div>
+            <button class="btn btn-p" style="font-size:12px;padding:7px 12px" onclick="showAddCampaignForm()"><i class="ti ti-plus"></i> حملة جديدة</button>
+          </div>
+          <div id="campArchiveList"></div>
+        </div>
+
+        <div id="camp-add-view" style="display:none">
+          <div class="sh"><div class="sh-t"><i class="ti ti-plus"></i> حملة جديدة</div></div>
+          <div class="fsec">
+            <div class="fgrid">
+              <div class="fgrp s2"><label>اسم الحملة *</label><input type="text" id="camp-name" placeholder="مثال: حملة التبرع — جامعة واسط"></div>
+              <div class="fgrp"><label>تاريخ الحملة *</label><input type="date" id="camp-date"></div>
+              <div class="fgrp"><label>المكان / الدائرة</label><input type="text" id="camp-location" placeholder="مثال: كلية الهندسة"></div>
+            </div>
+            <div style="font-size:12.5px;font-weight:700;color:#374151;margin:14px 0 8px">حجز تسلسلات القناني</div>
+            <div id="campReserveRows"></div>
+            <button class="btn" style="font-size:12px;padding:7px 12px;margin-top:6px" onclick="addCampReserveRow()"><i class="ti ti-plus"></i> إضافة نوع قنينة</button>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:14px">
+            <button class="btn" style="flex:1;justify-content:center" onclick="G('camp-add-view').style.display='none';G('camp-archive-view').style.display='block'"><i class="ti ti-x"></i> إلغاء</button>
+            <button class="btn btn-p" style="flex:1;justify-content:center" onclick="saveCampaign()"><i class="ti ti-check"></i> حفظ وحجز التسلسلات</button>
+          </div>
+        </div>
+
+        <div id="camp-track-view" style="display:none">
+          <div class="sh" style="display:flex;align-items:center;justify-content:space-between">
+            <div class="sh-t"><i class="ti ti-list-check"></i> <span id="campTrackTitle">متابعة الحملة</span></div>
+            <button class="btn" style="font-size:12px;padding:7px 12px" onclick="G('camp-track-view').style.display='none';G('camp-archive-view').style.display='block';loadCampaigns()"><i class="ti ti-arrow-right"></i> رجوع للأرشيف</button>
+          </div>
+          <div id="campTrackSummary" style="margin-bottom:10px"></div>
+          <div id="campBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
+            <span id="campBulkCount">0 محدد</span>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn" style="background:#166534;color:#fff;border:none" onclick="bulkCampAction('drawn')"><i class="ti ti-check"></i> نجح السحب</button>
+              <button class="btn" style="background:#7F1D1D;color:#fff;border:none" onclick="bulkCampAction('damaged')"><i class="ti ti-trash"></i> تلفت</button>
+              <button class="btn" style="background:#0369A1;color:#fff;border:none" onclick="bulkCampAction('returned')"><i class="ti ti-corner-up-left"></i> إرجاع للمخزون</button>
+            </div>
+          </div>
+          <div id="campSlotsList"></div>
+        </div>
+      </div>
+
       <div class="sc" id="s-reception">
         <!-- Auto-filled banner -->
         <div class="rc-filled-banner" id="rcFilledBanner">
@@ -1511,12 +1568,37 @@ const PS = 20;
 
 const TITLES = {
   dashboard:'لوحة التحكم', add:'إضافة متبرع جديد', donors:'سجل المتبرعين',
-  search:'بحث متقدم', globalsearch:'الأرشيف الشامل', barcode:'الباركود والطباعة', infected:'المصابون',
+  search:'بحث متقدم', globalsearch:'الأرشيف الشامل', campaigns:'حملات التبرع', separation:'الفصل', barcode:'الباركود والطباعة', infected:'المصابون',
   rejected:'المرفوضون مؤقتاً', rare:'الفصائل النادرة',
   stats:'الإحصائيات', audit:'سجل التتبع', settings:'الإعدادات', dthome:'الرئيسية'
 };
 
 function G(id){ return document.getElementById(id); }
+
+// ── Lazy-load section scripts (Phase 4: split the app into files loaded on demand) ──
+// Maps a nav key to the external file that defines its functions. A key with no entry means
+// its code already lives in this main file (not yet split out). Each file is fetched at most
+// once per page load; nav() awaits this before calling the section's own load function, so a
+// section always has its functions available by the time it's actually used — whether opened
+// from the mobile tabs, the sidebar, or a desktop popup.
+const SECTION_SCRIPTS = {
+  campaigns: 'js/campaigns.js',
+  separation: 'js/campaigns.js'
+};
+const _loadedSectionScripts = {};
+function loadSectionScript(key){
+  const src = SECTION_SCRIPTS[key];
+  if(!src) return Promise.resolve(); // already in the main file
+  if(_loadedSectionScripts[src]) return _loadedSectionScripts[src];
+  _loadedSectionScripts[src] = new Promise((resolve, reject)=>{
+    const s=document.createElement('script');
+    s.src=src;
+    s.onload=()=>resolve();
+    s.onerror=()=>{ delete _loadedSectionScripts[src]; reject(new Error('تعذر تحميل '+src)); };
+    document.head.appendChild(s);
+  });
+  return _loadedSectionScripts[src];
+}
 
 // Pressing Enter moves focus to the next field, same as Tab (skips hidden/readonly/disabled
 // fields). Applied to the donor-entry forms and the donor-edit modal.
@@ -2558,6 +2640,8 @@ async function nav(name, el){
   const _bbm=G('backBtnMob'); if(_bbm) _bbm.classList.toggle('show',_showBack);
   const sbEl=document.querySelector('.sb');
   const pageEl=document.querySelector('.page');
+  try{ await loadSectionScript(name); }
+  catch(e){ toast('تعذر تحميل هذا القسم — تحقق من الاتصال بالإنترنت','error',4000); return; }
   switch(name){
     case 'dthome':     buildDtHomeGrid(); break;
     case 'dashboard':  await loadDash(); break;
@@ -2565,6 +2649,8 @@ async function nav(name, el){
     case 'account':    break; // already built
     case 'donors':    showDonorsPlaceholder(); break;
     case 'globalsearch': showGlobalSearchPlaceholder(); break;
+    case 'campaigns':  loadCampaigns(); break;
+    case 'separation': loadSeparationBoard(); break;
     case 'infected':await loadInfected('', document.querySelector('.tab')); break;
     case 'rejected':await loadRejected(); break;
     case 'rare':    await loadRareGrid(); break;
@@ -3031,7 +3117,7 @@ async function runGlobalSearch(){
     if(donorIds.length) orParts.push(`donor_id.in.(${donorIds.join(',')})`);
     if(orParts.length){
       const{data}=await db.from('blood_donations')
-        .select('id,bottle_number,bottle_type,blood_type,component_type,status,donation_date,donors!inner(donor_number,full_name,mobile)')
+        .select('id,bottle_number,bottle_type,blood_type,component_type,status,donation_date,campaign_name,donors(donor_number,full_name,mobile)')
         .eq('is_deleted',false).or(orParts.join(',')).limit(100).order('created_at',{ascending:false});
       donationRows=data||[];
     }
@@ -3049,7 +3135,7 @@ async function runGlobalSearch(){
         donationRows.map(r=>`<div class="flow-card">
           <div class="fc-av">🩸</div>
           <div style="flex:1">
-            <div class="fc-name">${esc(r.donors?.full_name||'—')} — قنينة ${r.bottle_number||'—'}</div>
+            <div class="fc-name">${r.donors?.full_name?esc(r.donors.full_name):(r.campaign_name?'متبرع حملة — '+esc(r.campaign_name):'—')} — قنينة ${r.bottle_number||'—'}</div>
             <div class="fc-sub">${r.blood_type||'—'} | ${r.component_type||'دم كامل'} | ${AUDIT_STATUS_LABELS[r.status]||r.status} | ${fd(r.donation_date)}</div>
           </div>
         </div>`).join(''));
@@ -3078,7 +3164,7 @@ async function loadDonors(page=1){
   const dTo   = G('dDateTo')?.value||'';
   load(true);
   try{
-    const SEL='bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,status,component_type,id,donors!inner(donor_number,full_name,birth_year,national_id)';
+    const SEL='bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,status,component_type,campaign_name,id,donors(donor_number,full_name,birth_year,national_id)';
     let q;
     if(s){
       // PostgREST's or()/and() only accepts columns on the table being queried — it cannot
@@ -3128,7 +3214,7 @@ async function loadDonors(page=1){
         const isSep=r.status==='separated';
         return`<tr>
           <td>${N(r.donors?.donor_number)}</td>
-          <td>${esc(N(r.donors?.full_name))}</td>
+          <td>${r.donors?.full_name?esc(r.donors.full_name):(r.campaign_name?'🚐 '+esc(r.campaign_name):'—')}</td>
           <td>${age}</td>
           <td>${N(r.blood_type)}</td>
           <td>${r.bottle_type}</td>
@@ -3167,8 +3253,14 @@ async function editDonorRow(id){
       .select('*,donors(*)').eq('id',id).single();
     if(error) throw error;
     G('ed-donid').value=r.id;
-    G('ed-donorid').value=r.donor_id;
-    G('ed-name').value=r.donors?.full_name||'';
+    G('ed-donorid').value=r.donor_id||'';
+    if(r.donor_id){
+      G('ed-name').value=r.donors?.full_name||'';
+      G('ed-name').removeAttribute('readonly');
+    } else {
+      G('ed-name').value='🚐 '+(r.campaign_name||'متبرع حملة')+' — لا يمكن تعديل بيانات المتبرع (بلا هوية)';
+      G('ed-name').setAttribute('readonly','readonly');
+    }
     G('ed-by').value=r.donors?.birth_year||'';
     G('ed-gen').value=r.donors?.gender||'ذكر';
     G('ed-mom').value=r.donors?.mother_name||'';
@@ -3202,17 +3294,26 @@ function toggleEdSer(){ G('edSerTypGrp').style.display=G('ed-ser').value==='Posi
 
 async function saveDonorEdit(){
   const donId=G('ed-donid').value, donorId=G('ed-donorid').value;
-  const nm=G('ed-name').value.trim(), by=parseInt(G('ed-by').value), dd=G('ed-ddate').value;
-  if(!nm||!by||!dd){ toast('يرجى تعبئة: الاسم، سنة التولد، تاريخ التبرع','error'); return; }
+  const dd=G('ed-ddate').value;
+  // Campaign-drawn bottles have no linked donor — skip the identity requirement/update for them.
+  if(donorId){
+    const nm=G('ed-name').value.trim(), by=parseInt(G('ed-by').value);
+    if(!nm||!by||!dd){ toast('يرجى تعبئة: الاسم، سنة التولد، تاريخ التبرع','error'); return; }
+  } else if(!dd){
+    toast('يرجى تعبئة تاريخ التبرع','error'); return;
+  }
   load(true);
   try{
-    const{error:de}=await db.from('donors').update({
-      full_name:nm, birth_year:by, gender:G('ed-gen').value,
-      mother_name:G('ed-mom').value.trim()||null, national_id:G('ed-nid').value.trim()||null,
-      mobile:G('ed-mob').value.trim()||null, address:G('ed-addr').value.trim()||null,
-      occupation:G('ed-job').value.trim()||null
-    }).eq('id',donorId);
-    if(de) throw de;
+    if(donorId){
+      const nm=G('ed-name').value.trim();
+      const{error:de}=await db.from('donors').update({
+        full_name:nm, birth_year:parseInt(G('ed-by').value), gender:G('ed-gen').value,
+        mother_name:G('ed-mom').value.trim()||null, national_id:G('ed-nid').value.trim()||null,
+        mobile:G('ed-mob').value.trim()||null, address:G('ed-addr').value.trim()||null,
+        occupation:G('ed-job').value.trim()||null
+      }).eq('id',donorId);
+      if(de) throw de;
+    }
 
     const ser=G('ed-ser').value;
     const{error:doe}=await db.from('blood_donations').update({
@@ -3230,7 +3331,7 @@ async function saveDonorEdit(){
     await db.from('audit_log').insert({
       user_id:SES?.user?.id, user_name:UPROF?.full_name,
       action:'UPDATE', table_name:'blood_donations',
-      record_id:donId, new_values:{donor:nm, bottle:G('ed-bnum').value}
+      record_id:donId, new_values:{donor:donorId?G('ed-name').value.trim():'حملة', bottle:G('ed-bnum').value}
     });
 
     toast('✅ تم حفظ التعديلات','success');
@@ -4898,9 +4999,8 @@ function openNotifPanel(){
 }
 setInterval(refreshExpiryNotifications, 5*60*1000);
 
-// ================================================================
-// WORKFLOW — SUPPLY (التجهيز)
-// ================================================================
+// [حملات التبرع + الفصل: js/campaigns.js — يُحمّل عند فتح القسم لأول مرة]
+
 async function loadSupply(selectedBT){
   await autoMarkExpiredDamaged();
   const bts=['A+','A-','B+','B-','O+','O-','AB+','AB-'];
@@ -5097,9 +5197,14 @@ async function confirmSeparate(){
     let totalRows=0;
     for(const id of ids){
       const{data:parent,error:pe}=await db.from('blood_donations')
-        .select('donor_id,bottle_number,bottle_type,blood_type,donation_type,draw_date,serology_result,serology_type')
+        .select('donor_id,bottle_number,bottle_type,blood_type,donation_type,draw_date,serology_result,serology_type,status')
         .eq('id',id).single();
       if(pe) throw pe;
+      // Separation can happen before OR after lab testing. Each component inherits the
+      // parent's CURRENT status (and any test result it already has) — if the parent was
+      // still pending_lab, the components stay pending_lab too, sharing the same bottle
+      // number/donor, so testing any one of them (see saveLab's sibling-propagation) marks
+      // all of them at once, exactly like it already does for trima's two outputs.
       const rows=checked.map(c=>{
         const e=new Date(parent.draw_date); e.setDate(e.getDate()+parseInt(c.dataset.days));
         return {
@@ -5107,7 +5212,7 @@ async function confirmSeparate(){
           blood_type:parent.blood_type, donation_type:parent.donation_type, component_type:c.value,
           parent_donation_id:id, draw_date:parent.draw_date, donation_date:parent.draw_date, expiry_date:e.toISOString().split('T')[0],
           serology_result:parent.serology_result, serology_type:parent.serology_type,
-          status:'in_stock', created_by:SES?.user?.id
+          status:parent.status, created_by:SES?.user?.id
         };
       });
       const{error:ie}=await db.from('blood_donations').insert(rows);
@@ -5119,7 +5224,8 @@ async function confirmSeparate(){
     }
     toast('✅ تم فصل '+ids.length+' قنينة إلى '+totalRows+' مكوّن بنجاح','success',4500);
     G('separateModal').classList.remove('on');
-    await loadSupply();
+    if(G('s-separation')?.classList.contains('on')) await loadSeparationBoard();
+    else await loadSupply();
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }
 }
@@ -5458,8 +5564,10 @@ async function toggleUserActive(id,cur){
 // ================================================================
 const WORK_CARDS = [
   {key:'reception', icon:'➕', name:'إضافة متبرع',  desc:'تسجيل متبرع جديد'},
+  {key:'campaigns', icon:'🚐', name:'حملات التبرع',  desc:'حجز تسلسلات ومتابعة الحملات'},
   {key:'draw',      icon:'💉', name:'السحب',        desc:'وحدة سحب الدم'},
   {key:'lab',       icon:'🔬', name:'المختبر',      desc:'نتائج الفحوصات'},
+  {key:'separation',icon:'🧬', name:'الفصل',        desc:'متابعة القناني من السحب لحد الفصل'},
   {key:'supply',    icon:'📦', name:'التجهيز',      desc:'الخزين والصرف'},
   {key:'donors',    icon:'👥', name:'المتبرعون',    desc:'سجل التبرعات'},
   {key:'search',    icon:'🔍', name:'البحث',        desc:'بحث متقدم'},
