@@ -363,7 +363,7 @@ tbody tr:hover td{background:#fafafa}
   -webkit-tap-highlight-color:transparent;
   transition:all .15s;min-width:0;position:relative;
 }
-.bn-item>*:first-child{font-size:34px;line-height:1;display:block}
+.bn-item>*:first-child{line-height:1;display:block}
 .bn-item::after{
   content:'';width:6px;height:6px;border-radius:50%;
   background:transparent;display:block;transition:all .15s;
@@ -457,7 +457,7 @@ tbody tr:hover td{background:#fafafa}
 .ptb-title{font-size:13.5px;font-weight:700;color:#1E293B}
 
 /* 3-TAB BOTTOM NAV */
-.bn-icon{font-size:24px;display:block;line-height:1}
+.bn-icon{font-size:25px;display:block;line-height:1;font-weight:400}
 .bn-lbl{font-size:10px;display:block;margin-top:3px;font-weight:600}
 
 /* WORK HOME GRID */
@@ -878,12 +878,11 @@ tbody tr:hover td{background:#fafafa}
       <div class="nb"><div class="nl">المتبرعون</div>
         <div class="ni" id="navAdd" onclick="nav('add',this)"><i class="ti ti-user-plus"></i> إضافة متبرع</div>
         <div class="ni" id="navDonors" onclick="nav('donors',this)"><i class="ti ti-users"></i> سجل المتبرعين</div>
-        <div class="ni" id="navSearch" onclick="nav('search',this)"><i class="ti ti-search"></i> بحث متقدم</div>
+        <div class="ni" id="navSearch" onclick="nav('globalsearch',this)"><i class="ti ti-search"></i> البحث والأرشيف</div>
         
       </div>
       <div class="nb"><div class="nl">الحالات</div>
-        <div class="ni" id="navInfected" onclick="nav('infected',this)"><i class="ti ti-virus"></i> المصابون <span class="nbadge" id="infBadge" style="display:none">!</span></div>
-        <div class="ni" id="navRejected" onclick="nav('rejected',this)"><i class="ti ti-user-x"></i> المرفوضون مؤقتاً</div>
+        <div class="ni" id="navInfected" onclick="nav('infected',this)"><i class="ti ti-virus"></i> المصابون والمرفوضون <span class="nbadge" id="infBadge" style="display:none">!</span></div>
         <div class="ni" id="navRare" onclick="nav('rare',this)"><i class="ti ti-droplet-half"></i> الفصائل النادرة</div>
       </div>
       <div class="nb"><div class="nl">الإدارة</div>
@@ -896,7 +895,8 @@ tbody tr:hover td{background:#fafafa}
         <div class="nl">سير العمل</div>
         <div class="ni" id="navReception" onclick="nav('reception',this)"><i class="ti ti-clipboard-plus"></i> الاستقبال</div>
         <div class="ni" id="navDraw" onclick="nav('draw',this)"><i class="ti ti-droplet"></i> السحب</div>
-        <div class="ni" id="navLab" onclick="nav('lab',this)"><i class="ti ti-microscope"></i> المختبر</div>
+        <div class="ni" id="navVirology" onclick="nav('virology',this)"><i class="ti ti-microscope"></i> وحدة الفيروسات</div>
+        <div class="ni" id="navClassification" onclick="nav('classification',this)"><i class="ti ti-droplet"></i> وحدة التصنيف</div>
         <div class="ni" id="navSupply" onclick="nav('supply',this)"><i class="ti ti-package"></i> التجهيز</div>
       </div>
     </div>
@@ -1025,14 +1025,47 @@ tbody tr:hover td{background:#fafafa}
 
       <!-- DONORS LIST -->
       <div class="sc" id="s-globalsearch">
-        <div class="sh"><div class="sh-t"><i class="ti ti-database-search"></i> الأرشيف الشامل</div></div>
-        <div style="background:#fff;border-radius:14px;padding:12px;border:1px solid #EEF2F6;margin-bottom:10px">
-          <input type="text" id="gsQuery" placeholder="🔍 ابحث بأي تفصيلة: اسم، هاتف، بطاقة وطنية، رقم قنينة، رقم متبرع، سبب رفض..."
-            onkeydown="if(event.key==='Enter')runGlobalSearch()" autocomplete="off"
-            style="width:100%;padding:11px 13px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:14px;margin-bottom:8px">
-          <button class="btn btn-p" style="width:100%;justify-content:center" onclick="runGlobalSearch()"><i class="ti ti-search"></i> بحث شامل</button>
+        <div class="tabs" style="margin-bottom:10px">
+          <div class="tab on" id="gsModeQuick" onclick="switchSearchMode('quick')">🔍 بحث سريع</div>
+          <div class="tab" id="gsModeAdvanced" onclick="switchSearchMode('advanced')">🗂️ بحث متقدم</div>
         </div>
-        <div id="gsResults"></div>
+
+        <div id="quickSearchPane">
+          <div class="sh"><div class="sh-t"><i class="ti ti-database-search"></i> بحث سريع — كل البيانات</div></div>
+          <div style="background:#fff;border-radius:14px;padding:12px;border:1px solid #EEF2F6;margin-bottom:10px">
+            <input type="text" id="gsQuery" placeholder="🔍 ابحث بأي تفصيلة: اسم، هاتف، بطاقة وطنية، رقم قنينة، رقم متبرع، سبب رفض..."
+              onkeydown="if(event.key==='Enter')runGlobalSearch()" autocomplete="off"
+              style="width:100%;padding:11px 13px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:14px;margin-bottom:8px">
+            <button class="btn btn-p" style="width:100%;justify-content:center" onclick="runGlobalSearch()"><i class="ti ti-search"></i> بحث شامل</button>
+          </div>
+          <div id="gsResults"></div>
+        </div>
+
+        <div id="advancedSearchPane" style="display:none">
+          <div class="fsec">
+            <div class="fst"><i class="ti ti-filter"></i> فلاتر البحث المتقدم</div>
+            <div class="fgrid">
+              <div class="fgrp"><label>اسم المتبرع</label><input type="text" id="sr-nm" placeholder="الاسم أو جزء منه"></div>
+              <div class="fgrp"><label>رقم القنينة</label><input type="text" id="sr-bn" placeholder="رقم القنينة"></div>
+              <div class="fgrp"><label>نوع القنينة</label><select id="sr-bt"><option value="">الكل</option><option>مفلتر</option><option>رباعي</option><option>ريفيوس</option><option>ثنائي</option><option>أحادي</option><option>تريما</option><option>حملة تبرع رباعي</option><option>حملة تبرع مفلتر</option><option>رباعي SAG</option></select></div>
+              <div class="fgrp"><label>فصيلة الدم</label><select id="sr-bl"><option value="">الكل</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select></div>
+              <div class="fgrp"><label>نوع التبرع</label><select id="sr-dt"><option value="">الكل</option><option value="طوعي">طوعي</option><option value="تعويضي">تعويضي</option></select></div>
+              <div class="fgrp"><label>اسم المستشفى</label><input type="text" id="sr-hosp" placeholder="المستشفى"></div>
+              <div class="fgrp"><label>اسم المريض</label><input type="text" id="sr-pat" placeholder="اسم المريض"></div>
+              <div class="fgrp"><label>رقم الموبايل</label><input type="text" id="sr-mob" placeholder="07XXXXXXXXX"></div>
+              <div class="fgrp"><label>اسم الأم</label><input type="text" id="sr-mom" placeholder="اسم الأم"></div>
+              <div class="fgrp"><label>تاريخ التبرع من</label><input type="date" id="sr-df"></div>
+              <div class="fgrp"><label>تاريخ التبرع إلى</label><input type="date" id="sr-dt2"></div>
+              <div class="fgrp"><label>نتيجة الفحوصات</label><select id="sr-ser"><option value="">الكل</option><option value="Negative">Negative — سالب</option><option value="Positive">Positive — موجب</option></select></div>
+            </div>
+            <div class="abar" style="margin-top:10px;margin-bottom:0">
+              <button class="btn btn-p" onclick="doSearch()"><i class="ti ti-search"></i> بحث</button>
+              <button class="btn" onclick="exportSearch()"><i class="ti ti-file-spreadsheet"></i> تصدير CSV</button>
+              <button class="btn" onclick="clearSearch()"><i class="ti ti-refresh"></i> مسح الفلاتر</button>
+            </div>
+          </div>
+          <div id="srRes"></div>
+        </div>
       </div>
 
       <div class="sc" id="s-donors">
@@ -1076,33 +1109,6 @@ tbody tr:hover td{background:#fafafa}
         <div class="pag" id="dPag"></div>
       </div>
 
-      <!-- SEARCH -->
-      <div class="sc" id="s-search">
-        <div class="fsec">
-          <div class="fst"><i class="ti ti-filter"></i> فلاتر البحث المتقدم</div>
-          <div class="fgrid">
-            <div class="fgrp"><label>اسم المتبرع</label><input type="text" id="sr-nm" placeholder="الاسم أو جزء منه"></div>
-            <div class="fgrp"><label>رقم القنينة</label><input type="text" id="sr-bn" placeholder="رقم القنينة"></div>
-            <div class="fgrp"><label>نوع القنينة</label><select id="sr-bt"><option value="">الكل</option><option>مفلتر</option><option>رباعي</option><option>ريفيوس</option><option>ثنائي</option><option>أحادي</option><option>تريما</option><option>حملة تبرع رباعي</option><option>حملة تبرع مفلتر</option><option>رباعي SAG</option></select></div>
-            <div class="fgrp"><label>فصيلة الدم</label><select id="sr-bl"><option value="">الكل</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select></div>
-            <div class="fgrp"><label>نوع التبرع</label><select id="sr-dt"><option value="">الكل</option><option value="طوعي">طوعي</option><option value="تعويضي">تعويضي</option></select></div>
-            <div class="fgrp"><label>اسم المستشفى</label><input type="text" id="sr-hosp" placeholder="المستشفى"></div>
-            <div class="fgrp"><label>اسم المريض</label><input type="text" id="sr-pat" placeholder="اسم المريض"></div>
-            <div class="fgrp"><label>رقم الموبايل</label><input type="text" id="sr-mob" placeholder="07XXXXXXXXX"></div>
-            <div class="fgrp"><label>اسم الأم</label><input type="text" id="sr-mom" placeholder="اسم الأم"></div>
-            <div class="fgrp"><label>تاريخ التبرع من</label><input type="date" id="sr-df"></div>
-            <div class="fgrp"><label>تاريخ التبرع إلى</label><input type="date" id="sr-dt2"></div>
-            <div class="fgrp"><label>نتيجة الفحوصات</label><select id="sr-ser"><option value="">الكل</option><option value="Negative">Negative — سالب</option><option value="Positive">Positive — موجب</option></select></div>
-          </div>
-          <div class="abar" style="margin-top:10px;margin-bottom:0">
-            <button class="btn btn-p" onclick="doSearch()"><i class="ti ti-search"></i> بحث</button>
-            <button class="btn" onclick="exportSearch()"><i class="ti ti-file-spreadsheet"></i> تصدير CSV</button>
-            <button class="btn" onclick="clearSearch()"><i class="ti ti-refresh"></i> مسح الفلاتر</button>
-          </div>
-        </div>
-        <div id="srRes"></div>
-      </div>
-
       <!-- BARCODE -->
       <div class="sc" id="s-barcode">
         <div class="bc-card">
@@ -1131,24 +1137,30 @@ tbody tr:hover td{background:#fafafa}
 
       <!-- INFECTED -->
       <div class="sc" id="s-infected">
-        <div class="tabs">
-          <div class="tab on" onclick="loadInfected('',this)">الكل</div>
-          <div class="tab" onclick="loadInfected('HIV',this)">HIV</div>
-          <div class="tab" onclick="loadInfected('HCV',this)">HCV</div>
-          <div class="tab" onclick="loadInfected('HBsAg',this)">HBsAg</div>
-          <div class="tab" onclick="loadInfected('سفلس VDRL',this)">سفلس</div>
+        <div class="tabs" style="margin-bottom:10px">
+          <div class="tab on" id="irModeInfected" onclick="switchInfRejMode('infected')">⚠️ المصابون</div>
+          <div class="tab" id="irModeRejected" onclick="switchInfRejMode('rejected')">🚫 المرفوضون مؤقتاً</div>
         </div>
-        <div id="infTbl"><div class="empty"><i class="ti ti-virus"></i><p>جاري التحميل...</p></div></div>
-      </div>
 
-      <!-- REJECTED -->
-      <div class="sc" id="s-rejected">
-        <div class="abar">
-          <button class="btn btn-p" onclick="showRejModal()"><i class="ti ti-user-plus"></i> إضافة مرفوض</button>
-          <input type="text" class="sinp" id="rjSrch" placeholder="بحث بالاسم..." style="max-width:260px" onkeydown="if(event.key==='Enter')loadRejected()">
-          <button class="btn" onclick="loadRejected()"><i class="ti ti-search"></i> بحث</button>
+        <div id="infectedPane">
+          <div class="tabs">
+            <div class="tab on" onclick="loadInfected('',this)">الكل</div>
+            <div class="tab" onclick="loadInfected('HIV',this)">HIV</div>
+            <div class="tab" onclick="loadInfected('HCV',this)">HCV</div>
+            <div class="tab" onclick="loadInfected('HBsAg',this)">HBsAg</div>
+            <div class="tab" onclick="loadInfected('سفلس VDRL',this)">سفلس</div>
+          </div>
+          <div id="infTbl"><div class="empty"><i class="ti ti-virus"></i><p>جاري التحميل...</p></div></div>
         </div>
-        <div id="rjTbl"><div class="empty"><i class="ti ti-user-x"></i><p>جاري التحميل...</p></div></div>
+
+        <div id="rejectedPane" style="display:none">
+          <div class="abar">
+            <button class="btn btn-p" onclick="showRejModal()"><i class="ti ti-user-plus"></i> إضافة مرفوض</button>
+            <input type="text" class="sinp" id="rjSrch" placeholder="بحث بالاسم..." style="max-width:260px" onkeydown="if(event.key==='Enter')loadRejected()">
+            <button class="btn" onclick="loadRejected()"><i class="ti ti-search"></i> بحث</button>
+          </div>
+          <div id="rjTbl"><div class="empty"><i class="ti ti-user-x"></i><p>جاري التحميل...</p></div></div>
+        </div>
       </div>
 
       <!-- RARE -->
@@ -1483,9 +1495,14 @@ tbody tr:hover td{background:#fafafa}
       </div>
 
       <!-- ========== LAB ========== -->
-      <div class="sc" id="s-lab">
-        <div class="sh"><div class="sh-t"><i class="ti ti-microscope"></i> قائمة الفحص المختبري</div></div>
-        <div id="labList"><div class="empty"><i class="ti ti-microscope"></i><p>جاري التحميل...</p></div></div>
+      <div class="sc" id="s-virology">
+        <div class="sh"><div class="sh-t"><i class="ti ti-microscope"></i> وحدة الفيروسات — عينات بانتظار الفحص</div></div>
+        <div id="virologyList"><div class="empty"><i class="ti ti-microscope"></i><p>جاري التحميل...</p></div></div>
+      </div>
+
+      <div class="sc" id="s-classification">
+        <div class="sh"><div class="sh-t"><i class="ti ti-droplet"></i> وحدة التصنيف — قناني بانتظار تحديد الفصيلة</div></div>
+        <div id="classificationList"><div class="empty"><i class="ti ti-droplet"></i><p>جاري التحميل...</p></div></div>
       </div>
 
       <!-- ========== SUPPLY ========== -->
@@ -1518,20 +1535,20 @@ tbody tr:hover td{background:#fafafa}
   <!-- 3-TAB NAVIGATION (mobile only) -->
   <nav class="bottom-nav" id="bottomNav">
     <button class="bn-item on" id="tab-home-btn" onclick="switchMainTab('home',this)">
-      <span class="bn-icon">🏠</span>
+      <i class="ti ti-home bn-icon"></i>
       <span class="bn-lbl">الرئيسية</span>
     </button>
     <button class="bn-item" id="tab-work-btn" onclick="switchMainTab('work',this)">
-      <span class="bn-icon">⚕️</span>
+      <i class="ti ti-stethoscope bn-icon"></i>
       <span class="bn-lbl">العمل</span>
     </button>
     <button class="bn-item" id="tab-notif-btn" onclick="openNotifPanel()" style="position:relative">
-      <span class="bn-icon">🔔</span>
+      <i class="ti ti-bell bn-icon"></i>
       <span class="bn-lbl">تنبيهات</span>
       <span id="notifBadge" style="display:none;position:absolute;top:2px;left:calc(50% - 22px);background:#DC2626;color:#fff;font-size:10px;font-weight:800;min-width:16px;height:16px;border-radius:10px;display:flex;align-items:center;justify-content:center;padding:0 3px">0</span>
     </button>
     <button class="bn-item" id="tab-acc-btn" onclick="switchMainTab('acc',this)">
-      <span class="bn-icon">👤</span>
+      <i class="ti ti-user-circle bn-icon"></i>
       <span class="bn-lbl">الحساب</span>
     </button>
   </nav>
@@ -1597,13 +1614,12 @@ const SECTION_SCRIPTS = {
   campaigns: 'campaigns.js',
   separation: 'campaigns.js',
   draw: 'draw.js',
-  lab: 'lab.js',
+  virology: ['lab-shared.js', 'virology.js'],
+  classification: ['lab-shared.js', 'classification.js'],
   dashboard: 'dashboard.js',
   donors: 'donors.js',
-  globalsearch: 'donors.js',
-  search: 'search.js',
+  globalsearch: ['donors.js', 'search.js'],
   infected: 'infected-rejected.js',
-  rejected: 'infected-rejected.js',
   rare: 'rare.js',
   audit: 'audit.js',
   settings: ['sequences.js', 'settings.js', 'backup.js'],
@@ -2455,12 +2471,12 @@ const PERM_NAV = {
   add:        'navAdd',
   reception:  'navReception',
   draw:       'navDraw',
-  lab:        'navLab',
+  virology:   'navVirology',
+  classification: 'navClassification',
   supply:     'navSupply',
   donors:     'navDonors',
-  search:     'navSearch',
+  globalsearch: 'navSearch',
   infected:   'navInfected',
-  rejected:   'navRejected',
   rare:       'navRare',
   stats:      'navStats',
   audit:      'navAudit',
@@ -2470,8 +2486,8 @@ const PERM_NAV = {
 
 const PERM_SCREEN = {
   dashboard:'dashboard', reception:'reception', draw:'draw',
-  lab:'lab', supply:'supply', donors:'donors', search:'search',
-  barcode:'barcode', infected:'infected', rejected:'rejected',
+  virology:'virology', classification:'classification', supply:'supply', donors:'donors', globalsearch:'globalsearch',
+  barcode:'barcode', infected:'infected',
   rare:'rare', stats:'stats', audit:'audit', settings:'settings', users:'users'
 };
 
@@ -2495,13 +2511,13 @@ function setupNavVisibility(isAdmin, perms){
     // Show/hide workflow section
     const wf = G('navWorkflow');
     if(wf){
-      const hasWF = actualAdmin || ['reception','draw','lab','supply'].some(p=>perms.includes(p));
+      const hasWF = actualAdmin || ['reception','draw','virology','classification','supply'].some(p=>perms.includes(p));
       wf.style.display = hasWF ? 'block' : 'none';
     }
     // For admin: ensure all items explicitly shown
     if(actualAdmin){
-      ['navDashboard','navAdd','navReception','navDraw','navLab','navSupply',
-       'navDonors','navSearch','navInfected','navRejected',
+      ['navDashboard','navAdd','navReception','navDraw','navVirology','navClassification','navSupply',
+       'navDonors','navSearch','navInfected',
        'navRare','navStats','navAudit','navSettings','navUsers'].forEach(id=>{
         const el=G(id); if(el) el.style.display='flex';
       });
@@ -2539,6 +2555,10 @@ async function showApp(){
     G('tab-home-btn')?.classList.add('on');
   }
   await nav(targetPage, G(PERM_NAV[targetPage]) || G('navDashboard'));
+  // Expired-but-still-marked-in_stock bottles must be moved to 'damaged' BEFORE counting
+  // "expiring soon" — otherwise this first count includes some that a later automatic pass
+  // (inside loadSupply) removes moments later, making the badge appear then shrink/vanish.
+  await autoMarkExpiredDamaged();
   refreshExpiryNotifications();
 }
 
@@ -2571,8 +2591,10 @@ async function nav(name, el){
     case 'globalsearch': showGlobalSearchPlaceholder(); break;
     case 'campaigns':  loadCampaigns(); break;
     case 'separation': loadSeparationBoard(); break;
-    case 'infected':await loadInfected('', document.querySelector('.tab')); break;
-    case 'rejected':await loadRejected(); break;
+    case 'infected':
+      switchInfRejMode('infected');
+      await loadInfected('', document.querySelector('#infectedPane .tab'));
+      break;
     case 'rare':    await loadRareGrid(); break;
     case 'add':     await loadNextBN(); break;
     case 'audit':    await loadAudit(); break;
@@ -2580,7 +2602,8 @@ async function nav(name, el){
     case 'users':      await loadUsers(); break;
     case 'reception':  setupReception(); break;
     case 'draw':       await loadDraw(); break;
-    case 'lab':        await loadLab(); break;
+    case 'virology':       await loadVirology(); break;
+    case 'classification': await loadClassification(); break;
     case 'supply':     await loadSupply(); break;
     case 'barcode': G('bcRes').style.display='none'; break;
   }
@@ -2744,9 +2767,6 @@ function printForm(){
 .page-title-bar{display:flex;align-items:center;justify-content:space-between;padding:9px 16px 7px;background:#fff;border-bottom:1px solid #EEF2F6;flex-shrink:0}
 .ptb-title{font-size:13.5px;font-weight:700;color:#1E293B}
 
-/* 3-TAB BOTTOM NAV */
-.bn-icon{font-size:24px;display:block;line-height:1}
-.bn-lbl{font-size:10px;display:block;margin-top:3px;font-weight:600}
 
 /* WORK HOME GRID */
 .work-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
@@ -2982,9 +3002,6 @@ function printBC(type){
 .page-title-bar{display:flex;align-items:center;justify-content:space-between;padding:9px 16px 7px;background:#fff;border-bottom:1px solid #EEF2F6;flex-shrink:0}
 .ptb-title{font-size:13.5px;font-weight:700;color:#1E293B}
 
-/* 3-TAB BOTTOM NAV */
-.bn-icon{font-size:24px;display:block;line-height:1}
-.bn-lbl{font-size:10px;display:block;margin-top:3px;font-weight:600}
 
 /* WORK HOME GRID */
 .work-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
@@ -3217,6 +3234,7 @@ async function refreshExpiryNotifications(){
 }
 
 function openNotifPanel(){
+  const badge=G('notifBadge'); if(badge) badge.style.display='none'; // seen — dismiss until next refresh
   const list=window._EXPIRY_NOTIFS||[];
   const today=new Date(); today.setHours(0,0,0,0);
   const groups={};
@@ -3584,14 +3602,13 @@ const WORK_CARDS = [
   {key:'reception', icon:'➕', name:'إضافة متبرع',  desc:'تسجيل متبرع جديد'},
   {key:'campaigns', icon:'🚐', name:'حملات التبرع',  desc:'حجز تسلسلات ومتابعة الحملات'},
   {key:'draw',      icon:'💉', name:'السحب',        desc:'وحدة سحب الدم'},
-  {key:'lab',       icon:'🔬', name:'المختبر',      desc:'نتائج الفحوصات'},
+  {key:'virology',      icon:'🧪', name:'وحدة الفيروسات', desc:'فحص العينات'},
+  {key:'classification',icon:'🩸', name:'وحدة التصنيف',  desc:'تحديد فصيلة القناني'},
   {key:'separation',icon:'🧬', name:'الفصل',        desc:'متابعة القناني من السحب لحد الفصل'},
   {key:'supply',    icon:'📦', name:'التجهيز',      desc:'الخزين والصرف'},
   {key:'donors',    icon:'👥', name:'المتبرعون',    desc:'سجل التبرعات'},
-  {key:'search',    icon:'🔍', name:'البحث',        desc:'بحث متقدم'},
-  {key:'globalsearch', icon:'🗂️', name:'الأرشيف الشامل', desc:'بحث بكل شي دفعة وحدة'},
-  {key:'infected',  icon:'⚠️', name:'المصابون',    desc:'الحالات الإيجابية'},
-  {key:'rejected',  icon:'🚫', name:'المرفوضون',   desc:'المرفوضون مؤقتاً'},
+  {key:'globalsearch', icon:'🔍', name:'البحث والأرشيف', desc:'بحث سريع أو متقدم بكل البيانات'},
+  {key:'infected',  icon:'⚠️', name:'المصابون والمرفوضون', desc:'الحالات الإيجابية والمرفوضون مؤقتاً'},
   {key:'rare',      icon:'💎', name:'الفصائل النادرة', desc:'O− و AB−'},
   {key:'stats',     icon:'📈', name:'الإحصائيات',  desc:'تقارير وطباعة'},
 ];
@@ -4145,57 +4162,84 @@ if('serviceWorker' in navigator){
 </div>
 
 <!-- LAB MODAL -->
-<div class="overlay" id="labModal">
+<div class="overlay" id="vmModal">
   <div class="modal">
-    <div class="modal-title"><i class="ti ti-microscope"></i> فحص العينة</div>
+    <div class="modal-title"><i class="ti ti-microscope"></i> فحص الفيروسات</div>
     <div class="modal-body">
-      <input type="hidden" id="lm-id">
+      <input type="hidden" id="vm-id">
       <div style="background:#FFF1F2;border:1.5px solid #FECDD3;border-radius:12px;padding:14px;margin-bottom:14px;text-align:center">
-        <div id="lm-donor-name" style="font-weight:800;font-size:20px;color:#1a1a1a;line-height:1.3"></div>
+        <div id="vm-donor-name" style="font-weight:800;font-size:20px;color:#1a1a1a;line-height:1.3"></div>
         <div style="display:flex;justify-content:center;gap:18px;margin-top:8px">
           <div>
             <div style="font-size:11px;color:#757575">رقم القنينة</div>
-            <div id="lm-bnum-big" style="font-size:24px;font-weight:800;color:#BE123C">—</div>
+            <div id="vm-bnum-big" style="font-size:24px;font-weight:800;color:#BE123C">—</div>
           </div>
           <div style="width:1px;background:#FECDD3"></div>
           <div>
             <div style="font-size:11px;color:#757575">تاريخ السحب</div>
-            <div id="lm-draw-date" style="font-size:16px;font-weight:700;color:#1a1a1a;margin-top:2px">—</div>
+            <div id="vm-draw-date" style="font-size:16px;font-weight:700;color:#1a1a1a;margin-top:2px">—</div>
           </div>
         </div>
       </div>
-      <div class="fgrid">
-        <div class="fgrp s2"><label>فصيلة الدم *</label><select id="lm-bt"><option value="">اختر...</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select></div>
-      </div>
-      <div style="margin-top:14px">
+      <div>
         <label style="font-size:13px;color:#616161;font-weight:700;display:block;margin-bottom:8px">نتيجة الفحوصات *</label>
         <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #BBF7D0;background:#F0FDF4;border-radius:10px;margin-bottom:8px;cursor:pointer">
-          <input type="checkbox" id="lm-allneg" onchange="lmAllNegChange()" style="width:18px;height:18px">
+          <input type="checkbox" id="vm-allneg" onchange="vmAllNegChange()" style="width:18px;height:18px">
           <span style="font-weight:700;color:#166534">All-Negative — كل الفحوصات سالبة</span>
         </label>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #FECACA;background:#FEF2F2;border-radius:10px;cursor:pointer">
-            <input type="checkbox" class="lm-dis" value="HBsAg" onchange="lmDiseaseChange()" style="width:18px;height:18px"><span style="font-weight:600;color:#991B1B">HBsAg</span>
+            <input type="checkbox" class="vm-dis" value="HBsAg" onchange="vmDiseaseChange()" style="width:18px;height:18px"><span style="font-weight:600;color:#991B1B">HBsAg</span>
           </label>
           <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #FECACA;background:#FEF2F2;border-radius:10px;cursor:pointer">
-            <input type="checkbox" class="lm-dis" value="HCV" onchange="lmDiseaseChange()" style="width:18px;height:18px"><span style="font-weight:600;color:#991B1B">HCV</span>
+            <input type="checkbox" class="vm-dis" value="HCV" onchange="vmDiseaseChange()" style="width:18px;height:18px"><span style="font-weight:600;color:#991B1B">HCV</span>
           </label>
           <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #FECACA;background:#FEF2F2;border-radius:10px;cursor:pointer">
-            <input type="checkbox" class="lm-dis" value="Anti-HBc" onchange="lmDiseaseChange()" style="width:18px;height:18px"><span style="font-weight:600;color:#991B1B">Anti-HBc</span>
+            <input type="checkbox" class="vm-dis" value="Anti-HBc" onchange="vmDiseaseChange()" style="width:18px;height:18px"><span style="font-weight:600;color:#991B1B">Anti-HBc</span>
           </label>
           <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #FECACA;background:#FEF2F2;border-radius:10px;cursor:pointer">
-            <input type="checkbox" class="lm-dis" value="HIV" onchange="lmDiseaseChange()" style="width:18px;height:18px"><span style="font-weight:600;color:#991B1B">HIV</span>
+            <input type="checkbox" class="vm-dis" value="HIV" onchange="vmDiseaseChange()" style="width:18px;height:18px"><span style="font-weight:600;color:#991B1B">HIV</span>
           </label>
           <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #FECACA;background:#FEF2F2;border-radius:10px;cursor:pointer;grid-column:1/3">
-            <input type="checkbox" class="lm-dis" value="Syphilis" onchange="lmDiseaseChange()" style="width:18px;height:18px"><span style="font-weight:600;color:#991B1B">Syphilis</span>
+            <input type="checkbox" class="vm-dis" value="Syphilis" onchange="vmDiseaseChange()" style="width:18px;height:18px"><span style="font-weight:600;color:#991B1B">Syphilis</span>
           </label>
         </div>
       </div>
     </div>
     <div class="modal-foot">
-      <button class="btn" onclick="G('labModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
-      <button class="btn btn-p" onclick="saveLab()"><i class="ti ti-device-floppy"></i> حفظ النتيجة</button>
+      <button class="btn" onclick="G('vmModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
+      <button class="btn btn-p" onclick="saveVirology()"><i class="ti ti-device-floppy"></i> حفظ النتيجة</button>
+    </div>
+  </div>
+</div>
 
+<!-- CLASSIFICATION MODAL -->
+<div class="overlay" id="cmModal">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-droplet"></i> تصنيف الفصيلة</div>
+    <div class="modal-body">
+      <input type="hidden" id="cm-id">
+      <div style="background:#FFF1F2;border:1.5px solid #FECDD3;border-radius:12px;padding:14px;margin-bottom:14px;text-align:center">
+        <div id="cm-donor-name" style="font-weight:800;font-size:20px;color:#1a1a1a;line-height:1.3"></div>
+        <div style="display:flex;justify-content:center;gap:18px;margin-top:8px">
+          <div>
+            <div style="font-size:11px;color:#757575">رقم القنينة</div>
+            <div id="cm-bnum-big" style="font-size:24px;font-weight:800;color:#BE123C">—</div>
+          </div>
+          <div style="width:1px;background:#FECDD3"></div>
+          <div>
+            <div style="font-size:11px;color:#757575">تاريخ السحب</div>
+            <div id="cm-draw-date" style="font-size:16px;font-weight:700;color:#1a1a1a;margin-top:2px">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="fgrid">
+        <div class="fgrp s2"><label>فصيلة الدم *</label><select id="cm-bt"><option value="">اختر...</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="G('cmModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
+      <button class="btn btn-p" onclick="saveClassification()"><i class="ti ti-device-floppy"></i> حفظ التصنيف</button>
     </div>
   </div>
 </div>
@@ -4328,24 +4372,39 @@ if('serviceWorker' in navigator){
 </div>
 
 <!-- BULK LAB MODAL -->
-<div class="overlay" id="bulkLabModal">
+<div class="overlay" id="bulkVmModal">
   <div class="modal">
-    <div class="modal-title"><i class="ti ti-microscope"></i> فحص جماعي</div>
+    <div class="modal-title"><i class="ti ti-microscope"></i> فحص جماعي — فيروسات</div>
     <div class="modal-body">
-      <input type="hidden" id="blm-ids">
-      <div id="blm-info" style="margin-bottom:10px;font-size:13px;color:#757575"></div>
-      <div class="fgrp"><label>فصيلة الدم (اختياري — تُطبّق على الكل إذا حُددت)</label>
-        <select id="blm-bt"><option value="">بدون تحديد</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select>
-      </div>
-      <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #BBF7D0;background:#F0FDF4;border-radius:10px;margin-top:10px;cursor:pointer">
-        <input type="checkbox" id="blm-allneg" style="width:18px;height:18px">
+      <input type="hidden" id="bvm-ids">
+      <div id="bvm-info" style="margin-bottom:10px;font-size:13px;color:#757575"></div>
+      <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #BBF7D0;background:#F0FDF4;border-radius:10px;cursor:pointer">
+        <input type="checkbox" id="bvm-allneg" style="width:18px;height:18px">
         <span style="font-weight:700;color:#166534">All-Negative — كل الفحوصات سالبة للمحدد بالكامل</span>
       </label>
       <div style="font-size:11.5px;color:#94A3B8;margin-top:8px">لحالة الإصابة (Positive)، افحص القنينة لحالها من القائمة العادية.</div>
     </div>
     <div class="modal-foot">
-      <button class="btn" onclick="G('bulkLabModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
-      <button class="btn btn-p" onclick="confirmBulkLab()"><i class="ti ti-check"></i> تأكيد للكل</button>
+      <button class="btn" onclick="G('bulkVmModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
+      <button class="btn btn-p" onclick="confirmBulkVirology()"><i class="ti ti-check"></i> تأكيد للكل</button>
+    </div>
+  </div>
+</div>
+
+<!-- BULK CLASSIFICATION MODAL -->
+<div class="overlay" id="bulkCmModal">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-droplet"></i> تصنيف جماعي</div>
+    <div class="modal-body">
+      <input type="hidden" id="bcm-ids">
+      <div id="bcm-info" style="margin-bottom:10px;font-size:13px;color:#757575"></div>
+      <div class="fgrp"><label>فصيلة الدم — تُطبّق على كل المحدد *</label>
+        <select id="bcm-bt"><option value="">اختر...</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="G('bulkCmModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
+      <button class="btn btn-p" onclick="confirmBulkClassification()"><i class="ti ti-check"></i> تأكيد للكل</button>
     </div>
   </div>
 </div>

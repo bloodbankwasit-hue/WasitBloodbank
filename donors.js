@@ -13,6 +13,15 @@ function showGlobalSearchPlaceholder(){
 // Searches across donors/donations AND the rejected-donors list in one pass — the "شامل"
 // archive search. Donor identity fields are matched on the donors table itself first (see the
 // note in loadDonors about why PostgREST's or() can't reference an embedded table directly).
+// The two search modes were separate screens before ("الأرشيف الشامل" and "البحث المتقدم")
+// — merged into one, switched by this tab toggle, since they served nearly the same purpose.
+function switchSearchMode(mode){
+  G('gsModeQuick').classList.toggle('on', mode==='quick');
+  G('gsModeAdvanced').classList.toggle('on', mode==='advanced');
+  G('quickSearchPane').style.display = mode==='quick' ? 'block' : 'none';
+  G('advancedSearchPane').style.display = mode==='advanced' ? 'block' : 'none';
+}
+
 async function runGlobalSearch(){
   const raw=(G('gsQuery')?.value||'').trim();
   if(!raw){ toast('يرجى كتابة كلمة بحث','error'); return; }

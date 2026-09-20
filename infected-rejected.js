@@ -1,8 +1,18 @@
 // ================================================================
-// INFECTED
+// INFECTED + REJECTED — merged into one screen with a mode switcher (both lists
+// serve the same purpose: donors currently excluded from donating, one
+// permanently for a confirmed infection, the other temporarily for other reasons).
 // ================================================================
+function switchInfRejMode(mode){
+  G('irModeInfected').classList.toggle('on', mode==='infected');
+  G('irModeRejected').classList.toggle('on', mode==='rejected');
+  G('infectedPane').style.display = mode==='infected' ? 'block' : 'none';
+  G('rejectedPane').style.display = mode==='rejected' ? 'block' : 'none';
+  if(mode==='rejected') loadRejected();
+}
+
 async function loadInfected(type, tabEl){
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('#infectedPane .tab').forEach(t=>t.classList.remove('on'));
   if(tabEl) tabEl.classList.add('on');
   load(true);
   let q=db.from('blood_donations')
