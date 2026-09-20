@@ -36,7 +36,7 @@ async function doSearch(){
         <td><span class="pill ${r.donation_type==='طوعي'?'pg':'py'}">${r.donation_type}</span></td>
         <td>${fd(r.donation_date)}</td><td>${fd(r.expiry_date)}</td>
         <td><span class="pill ${(['in_stock','dispatched','rejected_positive'].includes(r.status)&&r.serology_result)?r.serology_result==='Negative'?'pg':'pr':'py'}">${(['in_stock','dispatched','rejected_positive'].includes(r.status)&&r.serology_result)?r.serology_result==='Negative'?'سالبة ✅':'موجبة ⚠️':'لم يُفحص'}</span></td>
-        <td><button class="ibtn" onclick="openBC(${r.bottle_number})"><i class="ti ti-barcode"></i></button></td>
+        <td><button class="ibtn" onclick="loadSectionScript('barcode').then(()=>openBC(${r.bottle_number}))"><i class="ti ti-barcode"></i></button></td>
       </tr>`).join('')}</tbody></table></div>`;
     } else {
       G('srRes').innerHTML='<div class="empty"><i class="ti ti-search"></i><p>لا توجد نتائج مطابقة</p></div>';

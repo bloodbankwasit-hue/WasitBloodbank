@@ -1,0 +1,313 @@
+// ================================================================
+// DONOR AUTOCOMPLETE — Smooth & Auto-fill
+// ================================================================
+let _acTimer = null;
+
+async function donorSearch(field, val){
+  const listId = 'ac-'+field;
+  const list   = G(listId);
+  if(!list) return;
+  // Hide other lists
+  ['ac-name','ac-nid','ac-mob'].filter(id=>id!==listId)
+    .forEach(id=>{ const e=G(id); if(e) e.classList.remove('show'); });
+
+  const minLen = {name:3, nid:6, mob:7}[field]||3;
+  if(!val||val.trim().length<minLen){ list.classList.remove('show'); return; }
+
+  clearTimeout(_acTimer);
+  _acTimer = setTimeout(async()=>{
+    try{
+      let q = db.from('donors')
+        .select('id,full_name,birth_year,gender,mother_name,national_id,mobile,address,occupation,donor_number')
+        .eq('is_deleted',false).limit(6);
+      if(field==='name') q=q.ilike('full_name','%'+val.trim().replace(/ة/g,'ه')+'%');
+      if(field==='nid')  q=q.eq('national_id',val.trim());
+      if(field==='mob')  q=q.eq('mobile',val.trim());
+
+      const{data}=await q;
+      if(!data||!data.length){ list.classList.remove('show'); return; }
+
+      // Auto-fill immediately if single match (NID or mobile)
+      if(data.length===1 && (field==='nid'||field==='mob')){
+        fillDonor(data[0]); return;
+      }
+
+      // Show compact list for multiple matches or name search
+      list.innerHTML = data.map(d=>`
+        <div class="ac-item" onmousedown="fillDonor(${JSON.stringify(d).replace(/"/g,'&quot;')})">
+          <div class="ac-av">${esc(d.full_name.charAt(0))}</div>
+          <div class="ac-info">
+            <div class="ac-name">${esc(d.full_name)}</div>
+            <div class="ac-sub">${esc(d.mobile||'—')} | ${esc(d.national_id||'—')}</div>
+          </div>
+        </div>`).join('');
+      list.classList.add('show');
+    }catch(e){ list.classList.remove('show'); }
+  }, 250);
+}
+
+function fillDonor(d){
+  if(G('rc-name'))  G('rc-name').value = d.full_name||'';
+  if(G('rc-by'))    G('rc-by').value   = d.birth_year||'';
+  if(G('rc-gen'))   G('rc-gen').value  = d.gender||'ذكر';
+  if(G('rc-mom'))   G('rc-mom').value  = d.mother_name||'';
+  if(G('rc-nid'))   G('rc-nid').value  = d.national_id||'';
+  if(G('rc-mob'))   G('rc-mob').value  = d.mobile||'';
+  if(G('rc-addr'))  G('rc-addr').value = d.address||'';
+  if(G('rc-job'))   G('rc-job').value  = d.occupation||'';
+  if(G('rc-donornum')) G('rc-donornum').value = d.donor_number||'تلقائي';
+  calcRcAge();
+
+  // Mark as returning donor
+  const form=G('s-reception');
+  if(form) form.dataset.existingDonorId=d.id;
+
+  // Show filled banner with blood type if known
+  const banner=G('rcFilledBanner');
+  const txt=G('rcFilledText');
+  if(banner&&txt){
+    const btLabel = d.blood_type ? ` | فصيلة: ${d.blood_type}` : '';
+    txt.textContent='✅ متبرع معروف: '+d.full_name+btLabel;
+    banner.classList.add('show');
+  }
+
+  // Close all lists
+  ['ac-name','ac-nid','ac-mob'].forEach(id=>{ const e=G(id); if(e) e.classList.remove('show'); });
+  setTimeout(()=>checkRejectedName(),100);
+  // Check donation interval
+  setTimeout(async()=>{
+    const iw=G('intervalWarn');
+    if(!d.id||!iw) return;
+    const result = await checkDonationInterval(d.id);
+    if(result && !result.allowed){
+      const remaining = result.required - result.diffDays;
+      G('intervalWarnTitle').textContent = '⛔ لا يمكن التبرع — آخر تبرع منذ '+result.diffDays+' يوم فقط';
+      G('intervalWarnReason').textContent = 'المدة الدنيا بين التبرعات '+result.required+' يوماً — يتبقى '+remaining+' يوم للتمكن من التبرع (آخر تبرع: '+result.lastDate+')';
+      iw.style.display='flex';
+      iw.dataset.blocked='1';
+    } else {
+      iw.style.display='none';
+      iw.dataset.blocked='';
+    }
+  },200);
+}
+
+function clearDonorFill(){
+  const form=G('s-reception');
+  if(form) delete form.dataset.existingDonorId;
+  const banner=G('rcFilledBanner');
+  if(banner) banner.classList.remove('show');
+  if(G('rc-donornum')) fetchNextDonorNumberPreview();
+  ['ac-name','ac-nid','ac-mob'].forEach(id=>{ const e=G(id); if(e) e.classList.remove('show'); });
+}
+
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.ac-wrap'))
+    ['ac-name','ac-nid','ac-mob'].forEach(id=>{ const e2=G(id); if(e2) e2.classList.remove('show'); });
+});
+
+function newDonor(){
+  G('rcPrintArea').style.display='none';
+  G('rcSaveBtn').style.display='flex';
+  resetReception();
+  _lastDonation = null;
+}
+
+// WORKFLOW — RECEPTION (الاستقبال)
+// ================================================================
+function setupReception(){
+  if(G('rc-date')) G('rc-date').value=fd(new Date().toISOString().split('T')[0]);
+  if(G('rc-time')) G('rc-time').value=new Date().toTimeString().substring(0,5);
+  fetchNextDonorNumberPreview();
+}
+
+// Preview-only: shows the donor sequence number this NEW donor will likely get (based on the
+// highest donor_number currently on file). The real, final number is always assigned by the
+// database sequence at the moment of saving — this is just a live estimate for the employee to see.
+async function fetchNextDonorNumberPreview(){
+  const el=G('rc-donornum');
+  if(!el) return;
+  if(G('s-reception')?.dataset?.existingDonorId) return; // an existing donor's real number is already shown
+  try{
+    const{data}=await db.from('donors').select('donor_number').order('donor_number',{ascending:false}).limit(1);
+    const next=(data && data.length && data[0].donor_number) ? data[0].donor_number+1 : 1;
+    el.value=next;
+  }catch(e){ /* preview only — ignore failures */ }
+}
+
+function toggleRcPat(){
+  const isTaw = G('rc-dtype').value==='طوعي';
+  ['rc-pat-grp','rc-hosp-grp'].forEach(id=>{
+    const e=G(id); if(e) e.style.display=isTaw?'none':'flex';
+  });
+}
+
+function calcRcAge(){
+  const by=parseInt(G('rc-by').value);
+  if(by>1900&&by<2010) G('rc-age').value=(new Date().getFullYear()-by)+' سنة';
+}
+
+async function checkRejectedName(){
+  const nm  = G('rc-name').value.trim();
+  const nid = G('rc-nid')?.value.trim()||'';
+  const mob = G('rc-mob')?.value.trim()||'';
+  const w   = G('rejWarn');
+  if(nm.length<3 && nid.length<5 && mob.length<7){ w.classList.remove('show'); return; }
+
+  let hit = null;
+  if(IS_ONLINE){
+    // Online: check from Supabase
+    const filters = [];
+    if(nm.length>2)   filters.push(`full_name.ilike.%${nm}%`);
+    if(nid.length>5)  filters.push(`national_id.eq.${nid}`);
+    if(mob.length>6)  filters.push(`mobile.eq.${mob}`);
+    const{data}=await db.from('rejected_donors')
+      .select('full_name,rejection_reason,rejection_type,national_id,mobile')
+      .or(filters.join(','))
+      .eq('is_deleted',false).limit(1);
+    hit = data&&data.length ? data[0] : null;
+  } else {
+    // Offline: check from IndexedDB cache
+    hit = await checkRejectedOffline(nm, nid, mob);
+  }
+
+  if(hit){
+    G('rejWarnTitle').textContent='⛔ '+hit.full_name+' — '+(hit.rejection_type||'مرفوض');
+    G('rejWarnReason').textContent='السبب: '+hit.rejection_reason;
+    w.classList.add('show');
+  } else {
+    w.classList.remove('show');
+  }
+}
+
+async function saveReception(){
+  if(G('rejWarn').classList.contains('show')){
+    toast('المتبرع مرفوض — لا يمكن المتابعة','error'); return;
+  }
+  // Block if 77-day interval not met (UI-detected case: donor picked from autocomplete)
+  const _iw=G('intervalWarn');
+  if(_iw && _iw.dataset.blocked==='1'){
+    showIntervalBlockModal('⛔ لا يمكن الحفظ — لم تمر 77 يوماً على آخر تبرع لهذا المتبرع.');
+    return;
+  }
+  const nm=G('rc-name').value.trim(), by=parseInt(G('rc-by').value);
+  if(!nm||!by){ toast('يرجى تعبئة الاسم وسنة التولد','error'); return; }
+  load(true);
+  // Safety net: re-check by national ID / mobile even if no autocomplete suggestion was picked
+  const _intervalBlock = await checkIntervalBeforeSave(G('rc-nid')?.value, G('rc-mob')?.value);
+  if(_intervalBlock){ load(false); showIntervalBlockModal(_intervalBlock.message); return; }
+  try{
+    const btype = G('rc-btype')?.value;
+    const bnum  = parseInt(G('rc-bnum')?.value)||null;
+    const seqId = G('rc-bnum')?.dataset?.seqId;
+    const poolId = G('rc-bnum')?.dataset?.poolId;
+    if(!btype){ toast('يرجى اختيار نوع القنينة','error'); load(false); return; }
+    if(!bnum){  toast('يرجى اختيار نوع القنينة للحصول على الرقم','error'); load(false); return; }
+
+    const payload = {
+      full_name:nm, birth_year:by, gender:G('rc-gen').value,
+      mother_name:G('rc-mom').value.trim()||null,
+      national_id:G('rc-nid').value.trim()||null,
+      mobile:G('rc-mob').value.trim()||null,
+      address:G('rc-addr').value.trim()||null,
+      occupation:G('rc-job').value.trim()||null,
+      donation_type:G('rc-dtype').value,
+      patient_name:G('rc-pat').value.trim()||null,
+      hospital_name:G('rc-hosp').value.trim()||null,
+      donation_date:new Date().toISOString().split('T')[0],
+      donation_time:new Date().toTimeString().substring(0,5),
+      bottle_type:btype,
+      bottle_number:bnum,
+      seq_id:seqId,
+      pool_id:poolId,
+      created_by:SES?.user?.id
+    };
+
+    if(!IS_ONLINE){
+      // Offline: save to queue
+      await enqueueOp('reception', payload);
+      const q = await getPendingQueue();
+      updateOfflineBar('offline', q.length+' عملية معلّقة');
+      toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً عند عودة الإنترنت','warning',5000);
+      resetReception();
+    } else {
+      // Online: send directly
+      // Check if existing donor selected via autocomplete
+      const existingId = G('s-reception')?.dataset?.existingDonorId;
+      let dn;
+      if(existingId){
+        // Update existing donor with any newly filled fields
+        const updateFields = {};
+        if(payload.mother_name)  updateFields.mother_name  = payload.mother_name;
+        if(payload.national_id)  updateFields.national_id  = payload.national_id;
+        if(payload.mobile)       updateFields.mobile        = payload.mobile;
+        if(payload.address)      updateFields.address       = payload.address;
+        if(payload.occupation)   updateFields.occupation    = payload.occupation;
+        if(payload.birth_year)   updateFields.birth_year    = payload.birth_year;
+
+        if(Object.keys(updateFields).length > 0){
+          await db.from('donors').update(updateFields).eq('id', existingId);
+        }
+        dn = {id: existingId};
+      } else {
+        const{data:nd,error:de}=await db.from('donors').insert({
+          full_name:payload.full_name, birth_year:payload.birth_year, gender:payload.gender,
+          mother_name:payload.mother_name, national_id:payload.national_id,
+          mobile:payload.mobile, address:payload.address, occupation:payload.occupation,
+          created_by:payload.created_by
+        }).select().single();
+        if(de) throw de;
+        dn = nd;
+      }
+      const{data:don,error:doe}=await db.from('blood_donations').insert({
+        donor_id:dn.id, bottle_type:btype, bottle_number:bnum, donation_type:payload.donation_type,
+        patient_name:payload.patient_name, hospital_name:payload.hospital_name,
+        donation_date:payload.donation_date, donation_time:payload.donation_time,
+        status:'pending_draw', created_by:payload.created_by
+      }).select().single();
+      if(doe) throw doe;
+      await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'INSERT',table_name:'blood_donations',record_id:don.id,new_values:{donor:nm,status:'pending_draw',bottle:bnum}});
+      // Consume the bottle number: from the reuse pool if that's where it came from,
+      // otherwise advance the main sequence.
+      if(payload.pool_id){
+        await db.from('bottle_number_pool').delete().eq('id', payload.pool_id);
+      } else if(payload.seq_id){
+        await db.from('bottle_sequences')
+          .update({current_number: bnum+1})
+          .eq('id', payload.seq_id);
+      }
+      // Store for printing
+      _lastDonation = {
+        donor_name:nm, bottle_number:bnum,
+        bottle_type:btype,
+        donation_date:payload.donation_date,
+        donation_time:payload.donation_time,
+        birth_year:by,
+        gender:G('rc-gen').value,
+        mobile:G('rc-mob').value.trim(),
+        national_id:G('rc-nid').value.trim(),
+        address:G('rc-addr').value.trim(),
+        donation_type:G('rc-dtype').value,
+        expiry_date:'', // will calculate from bottle type
+      };
+      // Show print options instead of reset
+      G('rcPrintArea').style.display='block';
+      G('rcSaveBtn').style.display='none';
+      toast('✅ تم الحفظ — رقم القنينة: '+bnum,'success',4000);
+    }
+  }catch(e){toast('خطأ: '+e.message,'error');}
+  finally{load(false);}
+}
+
+function resetReception(){
+  ['rc-name','rc-by','rc-age','rc-mom','rc-nid','rc-mob','rc-addr','rc-job','rc-pat','rc-hosp'].forEach(id=>{const e=G(id);if(e)e.value='';});
+  if(G('rc-date')){ const t=new Date().toISOString().split('T')[0]; G('rc-date').value=fd(t); }
+  if(G('rc-time')){ G('rc-time').value=new Date().toTimeString().substring(0,5); }
+  fetchNextDonorNumberPreview();
+  if(G('rc-btype')) G('rc-btype').value='';
+  if(G('rc-bnum'))  { G('rc-bnum').value=''; G('rc-bnum').dataset.seqId=''; G('rc-bnum').dataset.poolId=''; }
+  const iw2=G('intervalWarn'); if(iw2){ iw2.style.display='none'; iw2.dataset.blocked=''; }
+  G('rc-dtype').value='تعويضي';
+  G('rejWarn').classList.remove('show');
+  toggleRcPat();
+}
