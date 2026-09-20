@@ -4,18 +4,22 @@
 const ALL_PERMS = [
   {key:'dashboard',  label:'🏠 لوحة التحكم'},
   {key:'reception',  label:'➕ إضافة متبرع'},
-  {key:'draw',       label:'🩸 السحب'},
+  {key:'campaigns',  label:'🚐 حملات التبرع'},
+  {key:'draw',       label:'💉 السحب'},
   {key:'lab',        label:'🔬 المختبر'},
+  {key:'separation', label:'🧬 الفصل'},
   {key:'supply',     label:'📦 التجهيز'},
   {key:'donors',     label:'👥 سجل المتبرعين'},
   {key:'search',     label:'🔍 البحث المتقدم'},
+  {key:'globalsearch', label:'🗂️ الأرشيف الشامل'},
   {key:'barcode',    label:'📊 الباركود والطباعة'},
   {key:'infected',   label:'⚠️ المصابون'},
   {key:'rejected',   label:'🚫 المرفوضون'},
-  {key:'rare',       label:'💉 الفصائل النادرة'},
+  {key:'rare',       label:'💎 الفصائل النادرة'},
   {key:'stats',      label:'📈 الإحصائيات'},
   {key:'audit',      label:'🔒 سجل التتبع'},
   {key:'settings',   label:'⚙️ الإعدادات'},
+  {key:'users',      label:'👥 إدارة الحسابات'},
 ];
 
 function renderPermCheckboxes(containerId, selected=[]){
