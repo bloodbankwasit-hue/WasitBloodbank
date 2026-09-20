@@ -1583,7 +1583,9 @@ function G(id){ return document.getElementById(id); }
 // from the mobile tabs, the sidebar, or a desktop popup.
 const SECTION_SCRIPTS = {
   campaigns: 'campaigns.js',
-  separation: 'campaigns.js'
+  separation: 'campaigns.js',
+  draw: 'draw.js',
+  lab: 'lab.js'
 };
 const _loadedSectionScripts = {};
 function loadSectionScript(key){
@@ -3866,8 +3868,22 @@ function filterRare(){
     return;
   }
 
-  G('rareList').innerHTML = filtered.map(d=>`
+  const bar=`<div id="rareBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+    <span id="rareBulkCount">0 محدد</span>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn" style="background:#16A34A;color:#fff;border:none;font-size:12px" onclick="openWaQueue('notice')">📱 إعلام بالتسجيل — للمحدد</button>
+      <button class="btn" style="background:#0369A1;color:#fff;border:none;font-size:12px" onclick="openWaQueue('invite')">📱 دعوة للتبرع — للمحدد</button>
+      <button class="btn" style="background:#374151;color:#fff;border:none;font-size:12px" onclick="document.querySelectorAll('.rare-chk').forEach(c=>c.checked=false);updateRareBulkBar()">إلغاء التحديد</button>
+    </div>
+  </div>
+  <label style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:12.5px;color:#374151;cursor:pointer">
+    <input type="checkbox" id="rareSelAll" onchange="document.querySelectorAll('.rare-chk').forEach(c=>c.checked=this.checked);updateRareBulkBar()">
+    تحديد كل النتائج المعروضة (${filtered.length})
+  </label>`;
+
+  G('rareList').innerHTML = bar + filtered.map(d=>`
     <div class="rare-row">
+      <input type="checkbox" class="rare-chk" value="${esc(d.full_name||'')}" data-name="${esc(d.full_name||'—')}" data-mobile="${esc(normIraqiMobile(d.mobile)||'')}" onchange="updateRareBulkBar()" style="width:18px;height:18px;flex-shrink:0;align-self:flex-start;margin-top:4px">
       <div class="rare-av" style="width:44px;height:44px;font-size:13px">${d.blood_type||'?'}</div>
       <div class="rare-info">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -3885,7 +3901,52 @@ function filterRare(){
         </div>`:''}
       </div>
     </div>`).join('');
+  updateRareBulkBar();
 }
+
+function updateRareBulkBar(){
+  const n=document.querySelectorAll('.rare-chk:checked').length;
+  const bar=G('rareBulkBar'); if(!bar) return;
+  bar.style.display=n?'flex':'none';
+  if(n) G('rareBulkCount').textContent=n+' محدد';
+}
+
+// WhatsApp has no paid-free "send to everyone at once" option (that needs WhatsApp Business
+// API, a separate paid service) — this is the best achievable alternative: a queue that steps
+// through the selected donors one by one, each just one tap away from a pre-filled chat, with
+// progress tracked so nothing gets missed or repeated.
+let _waQueue=[], _waQueueIdx=0, _waQueueTemplate='notice';
+function openWaQueue(templateKey){
+  const checked=[...document.querySelectorAll('.rare-chk:checked')]
+    .map(c=>({name:c.dataset.name, mobile:c.dataset.mobile}))
+    .filter(d=>d.mobile);
+  if(!checked.length){ toast('يرجى تحديد متبرع واحد على الأقل (وله رقم هاتف)','error'); return; }
+  _waQueue=checked; _waQueueIdx=0; _waQueueTemplate=templateKey;
+  G('waQueueTotal').textContent=_waQueue.length;
+  renderWaQueueStep();
+  G('waQueueModal').classList.add('on');
+}
+function renderWaQueueStep(){
+  if(_waQueueIdx>=_waQueue.length){
+    G('waQueueBody').innerHTML='<div class="empty"><i class="ti ti-check"></i><p>✅ خلصت القائمة كلها</p></div>';
+    G('waQueueOpenBtn').style.display='none';
+    return;
+  }
+  const cur=_waQueue[_waQueueIdx];
+  G('waQueuePos').textContent=(_waQueueIdx+1);
+  G('waQueueBody').innerHTML=`
+    <div style="text-align:center;padding:10px 0">
+      <div style="font-size:17px;font-weight:800;color:#1a1a1a">${esc(cur.name)}</div>
+      <div style="font-size:14px;color:#757575;margin-top:4px">${esc(cur.mobile)}</div>
+    </div>`;
+  G('waQueueOpenBtn').style.display='flex';
+  G('waQueueOpenBtn').href=waLink(cur.mobile, WA_TEMPLATES[_waQueueTemplate]);
+}
+function waQueueNext(){
+  _waQueueIdx++;
+  renderWaQueueStep();
+}
+function waQueueSkip(){ waQueueNext(); }
 
 
 async function exportRarePDF(){
@@ -4521,431 +4582,7 @@ function resetReception(){
   toggleRcPat();
 }
 
-// ================================================================
-// WORKFLOW — DRAW (السحب)
-// ================================================================
-async function loadDraw(){
-  load(true);
-  const{data}=await db.from('blood_donations')
-    .select('id,donation_type,donation_date,donation_time,bottle_number,bottle_type,donors(full_name,birth_year,gender,mobile)')
-    .eq('status','pending_draw').eq('is_deleted',false)
-    .order('created_at',{ascending:true});
-  load(false);
-  if(data&&data.length){
-    const bar=`<div id="drawBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:8px">
-      <span id="drawBulkCount">0 محدد</span>
-      <div style="display:flex;gap:6px">
-        <button class="btn" style="background:#BE123C;color:#fff;border:none" onclick="openBulkDrawModal()"><i class="ti ti-check"></i> تأكيد السحب للكل</button>
-        <button class="btn" style="background:#374151;color:#fff;border:none" onclick="document.querySelectorAll('.dr-chk').forEach(c=>c.checked=false);updateDrawBulkBar()">إلغاء التحديد</button>
-      </div>
-    </div>`;
-    G('drawList').innerHTML=bar+data.map(r=>{
-      const isTrima=r.bottle_type==='تريما';
-      return `<div class="flow-card">
-      ${isTrima?'<span style="width:18px"></span>':`<input type="checkbox" class="dr-chk" value="${r.id}" onclick="updateDrawBulkBar()" style="width:18px;height:18px;flex-shrink:0">`}
-      <div class="fc-av">🩸</div>
-      <div style="flex:1">
-        <div class="fc-name">${esc(r.donors?.full_name||'—')}</div>
-        <div class="fc-sub">قنينة: ${r.bottle_number||'—'} (${r.bottle_type||'—'}) | ${r.donation_type}</div>
-      </div>
-      <div class="fc-act">
-        <button class="btn btn-p" onclick="openDrawModal('${r.id}','${sq(r.donors?.full_name)}','${r.donation_type}','${r.bottle_number||''}','${r.bottle_type||''}')">
-          <i class="ti ti-droplet"></i> سحب
-        </button>
-      </div>
-    </div>`;}).join('');
-  } else {
-    G('drawList').innerHTML='<div class="empty"><i class="ti ti-check"></i><p>لا يوجد متبرعون في الانتظار</p></div>';
-  }
-}
-
-function updateDrawBulkBar(){
-  const n=document.querySelectorAll('.dr-chk:checked').length;
-  const bar=G('drawBulkBar'); if(!bar) return;
-  bar.style.display=n?'flex':'none';
-  if(n) G('drawBulkCount').textContent=n+' محدد';
-}
-function openBulkDrawModal(){
-  const ids=[...document.querySelectorAll('.dr-chk:checked')].map(c=>c.value);
-  if(!ids.length){ toast('يرجى تحديد متبرع واحد على الأقل','error'); return; }
-  G('bdm-ids').value=ids.join(',');
-  G('bdm-info').textContent=ids.length+' متبرع محدد — سيُسجَّل نجاح السحب للكل بنفس التاريخ (لا يشمل قناني التريما)';
-  G('bdm-date').value=new Date().toISOString().split('T')[0];
-  G('bulkDrawModal').classList.add('on');
-}
-async function confirmBulkDraw(){
-  const ids=G('bdm-ids').value.split(',').filter(Boolean);
-  const draw=G('bdm-date').value;
-  if(!draw){ toast('يرجى تحديد التاريخ','error'); return; }
-  load(true);
-  try{
-    for(const id of ids){
-      const{data:row}=await db.from('blood_donations').select('bottle_type').eq('id',id).single();
-      const days=WHOLE_BLOOD_DAYS[row?.bottle_type] ?? 45;
-      const e=new Date(draw); e.setDate(e.getDate()+days);
-      await db.from('blood_donations').update({draw_date:draw,expiry_date:e.toISOString().split('T')[0],status:'pending_lab'}).eq('id',id);
-    }
-    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:ids[0],new_values:{status:'pending_lab',bulk_count:ids.length}});
-    toast('✅ تم تأكيد السحب لـ'+ids.length+' متبرع','success',4000);
-    G('bulkDrawModal').classList.remove('on');
-    await loadDraw();
-  }catch(e){ toast('خطأ: '+e.message,'error'); }
-  finally{ load(false); }
-}
-
-// Bottle type & number are fixed at RECEPTION (not draw's responsibility) — this modal only
-// displays them, prominently, alongside the donor's name.
-async function openDrawModal(id,name,dtype,bn,btyp){
-  G('dm-id').value=id;
-  G('dm-btyp-val').value=btyp;
-  G('dm-donor-name').textContent=name;
-  G('dm-bnum-big').textContent=bn||'—';
-  G('dm-btyp-sub').textContent=btyp||'—';
-  G('dm-draw').value=new Date().toISOString().split('T')[0];
-  G('dm-med-reason').value='سكري';
-  G('dm-med-other').value='';
-  G('dm-med-other-grp').style.display='none';
-  toggleDmMedSection(false);
-  const isTrima = btyp==='تريما';
-  const trimaSec=G('dm-trima-section'); if(trimaSec) trimaSec.style.display=isTrima?'block':'none';
-  const expGrp=G('dm-exp-grp'); if(expGrp) expGrp.style.display=isTrima?'none':'block';
-  if(G('dm-trima-blood')) G('dm-trima-blood').checked=false;
-  if(G('dm-trima-plt'))   G('dm-trima-plt').checked=false;
-  calcDmExpiry();
-  G('drawModal').classList.add('on');
-}
-
-function toggleDmMedSection(show){
-  G('dm-med-section').style.display = show?'block':'none';
-  G('dm-normal-actions').style.display = show?'none':'flex';
-  G('dm-med-actions').style.display = show?'flex':'none';
-}
-
-function calcDmExpiry(){
-  const draw=G('dm-draw').value; if(!draw) return;
-  const bt=G('dm-btyp-val').value;
-  if(bt==='تريما') return; // trima's expiry depends on which output is chosen — see confirmDrawSuccess
-  const days=WHOLE_BLOOD_DAYS[bt] ?? 45;
-  const e=new Date(draw); e.setDate(e.getDate()+days);
-  G('dm-exp').value=e.toISOString().split('T')[0];
-}
-
-// Outcome 1: normal successful draw. Bottle type & number were already fixed at RECEPTION —
-// draw only records that the draw actually happened (date, expiry) and forwards to the lab.
-// Trima is a special case: the machine produces its output(s) directly at draw time (no later
-// "separation" step), so the draw employee marks which of the two outputs were actually taken,
-// and each becomes its own row heading to the lab — the original pending_draw row is marked
-// 'separated' just like a normal post-lab separation would.
-async function confirmDrawSuccess(){
-  const id=G('dm-id').value, draw=G('dm-draw').value;
-  if(!draw){ toast('يرجى تحديد تاريخ السحب','error'); return; }
-  const btyp=G('dm-btyp-val').value;
-
-  if(btyp==='تريما'){
-    const wantBlood=G('dm-trima-blood').checked;
-    const wantPlt=G('dm-trima-plt').checked;
-    if(!wantBlood && !wantPlt){ toast('يرجى تحديد ناتج واحد على الأقل (دم مضغوط أو صفائح)','error'); return; }
-    load(true);
-    try{
-      const{data:parent,error:pe}=await db.from('blood_donations')
-        .select('donor_id,bottle_number,bottle_type,donation_type,created_by')
-        .eq('id',id).single();
-      if(pe) throw pe;
-      const rows=[];
-      TRIMA_OUTPUTS.forEach(o=>{
-        if((o.type==='دم مضغوط' && !wantBlood) || (o.type==='صفائح دموية' && !wantPlt)) return;
-        const e=new Date(draw); e.setDate(e.getDate()+o.days);
-        rows.push({
-          donor_id:parent.donor_id, bottle_number:parent.bottle_number, bottle_type:parent.bottle_type,
-          donation_type:parent.donation_type, component_type:o.type, parent_donation_id:id,
-          draw_date:draw, donation_date:draw, expiry_date:e.toISOString().split('T')[0],
-          status:'pending_lab', created_by:SES?.user?.id
-        });
-      });
-      const{error:ie}=await db.from('blood_donations').insert(rows);
-      if(ie) throw ie;
-      const{error:ue}=await db.from('blood_donations').update({draw_date:draw,status:'separated'}).eq('id',id);
-      if(ue) throw ue;
-      await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'separated',components:rows.map(r=>r.component_type).join(', ')}});
-      toast('✅ تم تسجيل سحب التريما — '+rows.length+' مكوّن أُرسل للمختبر','success',4500);
-      G('drawModal').classList.remove('on');
-      await loadDraw();
-    }catch(e){ toast('خطأ: '+e.message,'error'); }
-    finally{ load(false); }
-    return;
-  }
-
-  load(true);
-  try{
-    const exp=G('dm-exp').value;
-    const{error}=await db.from('blood_donations').update({
-      draw_date:draw, expiry_date:exp, status:'pending_lab'
-    }).eq('id',id);
-    if(error) throw error;
-    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'pending_lab'}});
-    toast('✅ تم تسجيل السحب — أُرسل للمختبر','success',4000);
-    G('drawModal').classList.remove('on');
-    const{data:don}=await db.from('blood_donations').select('*,donors(full_name,donor_number)').eq('id',id).single();
-    if(don){ BCDATA=don; setTimeout(()=>printBC('full'),300); }
-    await loadDraw();
-  }catch(e){ toast('خطأ: '+e.message,'error'); }
-  finally{ load(false); }
-}
-
-// Outcome 2: the bottle itself was damaged during the draw. Its number was already assigned
-// at reception and stays consumed (a real, physically-labeled bottle was spoiled — it's never
-// reused). The donor is not penalized with the full 77-day wait — checkDonationInterval()
-// grants a 14-day window instead whenever the donor's most recent donation has status 'damaged'.
-async function confirmDamagedBottle(){
-  const id=G('dm-id').value, draw=G('dm-draw').value;
-  if(!draw){ toast('يرجى تحديد تاريخ السحب','error'); return; }
-  if(!confirm('تأكيد: القنينة تالفة؟ يُسمح لهذا المتبرع بالتبرع مجدداً بعد أسبوعين بدل 77 يوماً.')) return;
-  load(true);
-  try{
-    const{error}=await db.from('blood_donations').update({
-      draw_date:draw, status:'damaged'
-    }).eq('id',id);
-    if(error) throw error;
-    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'damaged'}});
-    toast('⚠️ سُجّلت القنينة كتالفة — يُسمح بالتبرع مجدداً بعد أسبوعين','warning',5500);
-    G('drawModal').classList.remove('on');
-    await loadDraw();
-  }catch(e){ toast('خطأ: '+e.message,'error'); }
-  finally{ load(false); }
-}
-
-// Outcome 3: the donor turns out to be medically ineligible (discovered by the draw staff's
-// questioning, e.g. diabetes/hypertension) before any blood was actually drawn. Unlike the
-// other two outcomes, a bottle number WAS already consumed at reception (before this was
-// known) — since no blood was ever taken, we release it back into a reuse pool
-// (bottle_number_pool) instead of wasting it or risking a duplicate by rewinding the shared
-// sequence counter. The next donor of the same bottle type gets this number first, and the
-// main sequence continues untouched from wherever it currently is.
-async function confirmMedicalReject(){
-  const id=G('dm-id').value;
-  const reasonSel=G('dm-med-reason').value;
-  const other=G('dm-med-other').value.trim();
-  if(reasonSel==='أخرى' && !other){ toast('يرجى توضيح السبب','error'); return; }
-  const reason = reasonSel==='أخرى' ? other : reasonSel;
-  if(!confirm('تأكيد رفض المتبرع مؤقتاً — السبب: '+reason+'؟')) return;
-  load(true);
-  try{
-    const{data:d}=await db.from('blood_donations').select('donor_id,bottle_number,bottle_type,donors(full_name)').eq('id',id).single();
-    const donorName = d?.donors?.full_name || '';
-    await db.from('rejected_donors').insert({
-      full_name:donorName, rejection_reason:reason,
-      rejection_date:new Date().toISOString().split('T')[0], rejection_type:'مؤقت',
-      created_by:SES?.user?.id
-    });
-    // Release the already-reserved bottle number back into the reuse pool
-    if(d?.bottle_number && d?.bottle_type){
-      await db.from('bottle_number_pool').insert({
-        bottle_type:d.bottle_type, bottle_number:d.bottle_number, created_by:SES?.user?.id
-      });
-    }
-    const{error}=await db.from('blood_donations').update({is_deleted:true}).eq('id',id);
-    if(error) throw error;
-    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'rejected_medical',reason,released_bottle:d?.bottle_number}});
-    await cacheRejectedDonors();
-    toast('⛔ تم رفض المتبرع مؤقتاً — رقم القنينة '+(d?.bottle_number||'')+' أُعيد لإعادة الاستخدام','warning',5500);
-    G('drawModal').classList.remove('on');
-    await loadDraw();
-  }catch(e){ toast('خطأ: '+e.message,'error'); }
-  finally{ load(false); }
-}
-
-// ================================================================
-// WORKFLOW — LAB (المختبر)
-// ================================================================
-async function loadLab(){
-  load(true);
-  const{data}=await db.from('blood_donations')
-    .select('id,blood_type,bottle_number,bottle_type,donor_id,donation_date,draw_date,donors(full_name,birth_year,gender)')
-    .eq('status','pending_lab').eq('is_deleted',false)
-    .order('created_at',{ascending:true});
-  load(false);
-  // A single draw can produce more than one pending-lab row sharing the same donor + bottle
-  // number (trima's two outputs) — the test is done once for the whole draw, so only one card
-  // is shown per (donor, bottle number); testing it resolves every row behind it (see saveLab).
-  const seen=new Set();
-  const dedup=(data||[]).filter(r=>{
-    const key=r.donor_id+'|'+r.bottle_number;
-    if(seen.has(key)) return false;
-    seen.add(key); return true;
-  });
-  if(dedup.length){
-    const bar=`<div id="labBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:8px">
-      <span id="labBulkCount">0 محدد</span>
-      <div style="display:flex;gap:6px">
-        <button class="btn" style="background:#166534;color:#fff;border:none" onclick="openBulkLabModal()"><i class="ti ti-check"></i> فحص جماعي</button>
-        <button class="btn" style="background:#374151;color:#fff;border:none" onclick="document.querySelectorAll('.lb-chk').forEach(c=>c.checked=false);updateLabBulkBar()">إلغاء التحديد</button>
-      </div>
-    </div>`;
-    G('labList').innerHTML=bar+dedup.map(r=>`<div class="flow-card">
-      <input type="checkbox" class="lb-chk" value="${r.id}" onclick="updateLabBulkBar()" style="width:18px;height:18px;flex-shrink:0">
-      <div class="fc-av">🔬</div>
-      <div style="flex:1">
-        <div class="fc-name">${esc(r.donors?.full_name||'—')}</div>
-        <div class="fc-sub">قنينة: ${r.bottle_number||'—'} | ${r.bottle_type}</div>
-      </div>
-      <div class="fc-act">
-        <button class="btn btn-p" onclick="openLabModal('${r.id}','${sq(r.donors?.full_name)}','${r.bottle_number||''}','${r.draw_date||''}')">
-          <i class="ti ti-microscope"></i> فحص
-        </button>
-      </div>
-    </div>`).join('');
-  } else {
-    G('labList').innerHTML='<div class="empty"><i class="ti ti-check"></i><p>لا توجد عينات في الانتظار</p></div>';
-  }
-}
-
-function updateLabBulkBar(){
-  const n=document.querySelectorAll('.lb-chk:checked').length;
-  const bar=G('labBulkBar'); if(!bar) return;
-  bar.style.display=n?'flex':'none';
-  if(n) G('labBulkCount').textContent=n+' محدد';
-}
-function openBulkLabModal(){
-  const ids=[...document.querySelectorAll('.lb-chk:checked')].map(c=>c.value);
-  if(!ids.length){ toast('يرجى تحديد قنينة واحدة على الأقل','error'); return; }
-  G('blm-ids').value=ids.join(',');
-  G('blm-info').textContent=ids.length+' قنينة محددة';
-  G('blm-bt').value='';
-  G('blm-allneg').checked=false;
-  G('bulkLabModal').classList.add('on');
-}
-// Bulk lab only supports the All-Negative case (matching the common real scenario of testing
-// a batch that's all clear) — a bulk Positive result isn't offered, since disease selection
-// needs to be verified per bottle individually.
-async function confirmBulkLab(){
-  const ids=G('blm-ids').value.split(',').filter(Boolean);
-  const bt=G('blm-bt').value;
-  const allNeg=G('blm-allneg').checked;
-  if(!bt && !allNeg){ toast('يرجى تحديد فصيلة أو تفعيل All-Negative على الأقل','error'); return; }
-  load(true);
-  try{
-    for(const id of ids){
-      const{data:cur}=await db.from('blood_donations').select('blood_type,serology_result,donor_id,bottle_number').eq('id',id).single();
-      const effBt=bt||cur?.blood_type||null;
-      const effSer=allNeg?'Negative':(cur?.serology_result||null);
-      const complete=!!effBt&&!!effSer;
-      const payload={};
-      if(bt) payload.blood_type=bt;
-      if(allNeg) payload.serology_result='Negative';
-      if(complete) payload.status='in_stock';
-      await db.from('blood_donations').update(payload).eq('id',id);
-      if(complete && cur?.donor_id && cur?.bottle_number){
-        await db.from('blood_donations').update({blood_type:effBt,serology_result:'Negative',status:'in_stock'})
-          .eq('donor_id',cur.donor_id).eq('bottle_number',cur.bottle_number).eq('status','pending_lab').neq('id',id);
-      }
-    }
-    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:ids[0],new_values:{bulk_lab_count:ids.length,blood_type:bt,all_negative:allNeg}});
-    toast('✅ تم تحديث '+ids.length+' قنينة','success',4000);
-    G('bulkLabModal').classList.remove('on');
-    await loadLab();
-  }catch(e){ toast('خطأ: '+e.message,'error'); }
-  finally{ load(false); }
-}
-
-async function openLabModal(id,name,bn,drawDate){
-  G('lm-id').value=id;
-  G('lm-donor-name').textContent=name;
-  G('lm-bnum-big').textContent=bn||'—';
-  G('lm-draw-date').textContent=drawDate?fd(drawDate):'—';
-  G('lm-bt').value='';
-  G('lm-allneg').checked=false;
-  document.querySelectorAll('.lm-dis').forEach(c=>c.checked=false);
-  G('labModal').classList.add('on');
-  // Pre-fill with whatever a previous employee may have already saved (blood type
-  // and test results can be entered by two different employees, in either order).
-  try{
-    const{data}=await db.from('blood_donations').select('blood_type,serology_result,serology_type').eq('id',id).single();
-    if(data){
-      if(data.blood_type) G('lm-bt').value=data.blood_type;
-      if(data.serology_result==='Negative') G('lm-allneg').checked=true;
-      else if(data.serology_result==='Positive' && data.serology_type){
-        const parts=data.serology_type.split(',').map(s=>s.trim());
-        document.querySelectorAll('.lm-dis').forEach(c=>{ if(parts.includes(c.value)) c.checked=true; });
-      }
-    }
-  }catch(e){ /* pre-fill is a convenience only — ignore failures */ }
-}
-
-function lmAllNegChange(){
-  if(G('lm-allneg').checked) document.querySelectorAll('.lm-dis').forEach(c=>c.checked=false);
-}
-function lmDiseaseChange(){
-  if([...document.querySelectorAll('.lm-dis')].some(c=>c.checked)) G('lm-allneg').checked=false;
-}
-
-// Blood type and test results don't have to be entered by the same employee in the same
-// visit — one employee may save just the type, another the tests, in either order. The
-// donation only leaves 'pending_lab' once BOTH pieces are known (either just entered, or
-// already saved earlier by someone else).
-async function saveLab(){
-  const id=G('lm-id').value, bt=G('lm-bt').value;
-  const diseases=[...document.querySelectorAll('.lm-dis:checked')].map(c=>c.value);
-  const allNeg=G('lm-allneg').checked;
-  const testsGiven = allNeg || diseases.length>0;
-  if(!bt && !testsGiven){ toast('يرجى تحديد الفصيلة أو نتيجة الفحوصات على الأقل','error'); return; }
-  if(!IS_ONLINE){ toast('هذه الخطوة تحتاج اتصال بالإنترنت','error'); return; }
-  load(true);
-  try{
-    const{data:cur}=await db.from('blood_donations').select('blood_type,serology_result,serology_type,donor_id,bottle_number').eq('id',id).single();
-    const effBt = bt || cur?.blood_type || null;
-    let effSer, effSerType;
-    if(testsGiven){
-      effSer = diseases.length ? 'Positive' : 'Negative';
-      effSerType = diseases.length ? diseases.join(', ') : null;
-    } else {
-      effSer = cur?.serology_result || null;
-      effSerType = cur?.serology_type || null;
-    }
-    const complete = !!effBt && !!effSer;
-    const newStatus = complete ? (effSer==='Positive'?'rejected_positive':'in_stock') : 'pending_lab';
-
-    const updatePayload={};
-    if(bt) updatePayload.blood_type=bt;
-    if(testsGiven){ updatePayload.serology_result=effSer; updatePayload.serology_type=effSerType; }
-    if(complete) updatePayload.status=newStatus;
-
-    const{error}=await db.from('blood_donations').update(updatePayload).eq('id',id);
-    if(error) throw error;
-
-    if(complete){
-      // One draw event can produce more than one pending-lab row sharing the same bottle
-      // number (e.g. trima's two outputs) — the test is done once, and the result applies
-      // to every sibling still awaiting testing, linked by donor + bottle number.
-      if(cur?.donor_id && cur?.bottle_number){
-        await db.from('blood_donations').update({
-          blood_type:effBt, serology_result:effSer, serology_type:effSerType, status:newStatus
-        }).eq('donor_id',cur.donor_id).eq('bottle_number',cur.bottle_number).eq('status','pending_lab').neq('id',id);
-      }
-      if(effSer==='Positive'){
-        const{data:don}=await db.from('blood_donations').select('donors(full_name)').eq('id',id).single();
-        if(don?.donors?.full_name){
-          await db.from('rejected_donors').insert({
-            full_name:don.donors.full_name, rejection_reason:'إصابة: '+effSerType,
-            rejection_date:new Date().toISOString().split('T')[0], rejection_type:'دائم',
-            created_by:SES?.user?.id
-          });
-          await cacheRejectedDonors();
-        }
-        toast('⚠️ نتيجة موجبة — تم نقل المتبرع للمرفوضين دائماً','warning',5000);
-      } else {
-        toast('✅ اكتمل الفحص — القنينة أُضيفت للخزين','success',4000);
-      }
-    } else if(bt){
-      toast('✅ تم حفظ الفصيلة — بانتظار نتيجة الفحوصات','success',4000);
-    } else {
-      toast('✅ تم حفظ نتيجة الفحوصات — بانتظار تحديد الفصيلة','success',4000);
-    }
-    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:updatePayload});
-    G('labModal').classList.remove('on');
-    await loadLab();
-  }catch(e){toast('خطأ: '+e.message,'error');}
-  finally{load(false);}
-}
+// [السحب: js/draw.js] [المختبر: js/lab.js] — يُحمّلون عند فتح القسم لأول مرة
 
 // ================================================================
 // EXPIRY NOTIFICATIONS — bottles expiring within 5 days, or already expired
@@ -6328,6 +5965,20 @@ if('serviceWorker' in navigator){
     <div class="modal-foot">
       <button class="btn" onclick="G('bulkLabModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
       <button class="btn btn-p" onclick="confirmBulkLab()"><i class="ti ti-check"></i> تأكيد للكل</button>
+    </div>
+  </div>
+</div>
+
+<!-- WHATSAPP BULK QUEUE -->
+<div class="overlay" id="waQueueModal">
+  <div class="modal" style="text-align:center">
+    <div class="modal-title" style="justify-content:center"><i class="ti ti-brand-whatsapp"></i> قائمة التواصل عبر واتساب</div>
+    <div style="font-size:12.5px;color:#757575;margin-bottom:12px"><span id="waQueuePos">1</span> من <span id="waQueueTotal">0</span></div>
+    <div id="waQueueBody"></div>
+    <div class="modal-foot" style="justify-content:center;flex-wrap:wrap">
+      <a id="waQueueOpenBtn" href="#" target="_blank" onclick="setTimeout(waQueueNext,300)" class="btn btn-p" style="text-decoration:none;justify-content:center"><i class="ti ti-brand-whatsapp"></i> فتح واتساب وإرسال</a>
+      <button class="btn" onclick="waQueueSkip()"><i class="ti ti-player-skip-forward"></i> تخطي</button>
+      <button class="btn" onclick="G('waQueueModal').classList.remove('on')"><i class="ti ti-x"></i> إغلاق</button>
     </div>
   </div>
 </div>
