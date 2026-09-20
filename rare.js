@@ -273,6 +273,49 @@ async function exportRarePDF(){
   }
 }
 
+// Genuine Excel-openable export (no external library needed): an HTML table saved with an
+// .xls extension — Excel recognizes and opens this natively, with correct Arabic/RTL text
+// (UTF-8 BOM) and real columns (unlike a flat CSV, this keeps header styling too).
+function exportRareExcel(){
+  const data = window._RARE_DATA||[];
+  const q    = (G('rareSearch')?.value||'').trim().toLowerCase();
+  const bg   = G('rareBGFilter')?.value||'';
+  const qN = normalizeAr(q);
+  const filtered = data.filter(d=>{
+    const matchBG = !bg || d.blood_type===bg;
+    const matchQ  = !qN ||
+      normalizeAr(d.full_name).includes(qN)||
+      (d.mobile||'').includes(qN)||
+      normalizeAr(d.address).includes(qN);
+    return matchBG && matchQ;
+  });
+  if(!filtered.length){ toast('لا توجد بيانات للتصدير','error'); return; }
+
+  const rows = filtered.map(d=>`<tr>
+    <td>${esc(d.full_name||'—')}</td>
+    <td>${esc(d.blood_type||'—')}</td>
+    <td>${esc(normIraqiMobile(d.mobile)||'—')}</td>
+    <td>${esc(d.address||'—')}</td>
+    <td>${d.last_donation?fd(d.last_donation):'—'}</td>
+    <td>${d.eligible?'يمكنه التبرع الآن':'بانتظار الأهلية'}</td>
+  </tr>`).join('');
+
+  const html = `<html dir="rtl"><head><meta charset="UTF-8"></head><body>
+    <table border="1">
+      <tr style="background:#BE123C;color:#fff;font-weight:bold">
+        <th>الاسم</th><th>الفصيلة</th><th>الهاتف</th><th>العنوان</th><th>آخر تبرع</th><th>الحالة</th>
+      </tr>
+      ${rows}
+    </table>
+  </body></html>`;
+
+  const blob = new Blob(['\uFEFF'+html], {type:'application/vnd.ms-excel;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `الفصائل_النادرة_${new Date().toISOString().split('T')[0]}.xls`;
+  a.click();
+  toast('✅ تم تصدير '+filtered.length+' سجل لإكسل','success',3500);
+}
 
 async function loadRareList(bt){
   load(true);

@@ -1186,7 +1186,11 @@ tbody tr:hover td{background:#fafafa}
               </select>
               <button onclick="filterRare();exportRarePDF()"
                 style="padding:9px;background:#1E293B;color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer">
-                📤 تصدير
+                📄 PDF
+              </button>
+              <button onclick="filterRare();exportRareExcel()"
+                style="padding:9px;background:#166534;color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer">
+                📊 Excel
               </button>
             </div>
             <div style="display:flex;align-items:center;gap:6px">
@@ -1243,10 +1247,18 @@ tbody tr:hover td{background:#fafafa}
             <div class="setc-t">إدارة المستخدمين</div>
             <div class="setc-d">إضافة / تعطيل الحسابات وتعيين الأدوار الوظيفية لكل موظف</div>
           </div>
-          <div class="setc" onclick="exportBackup()">
+          <div class="setc" onclick="exportFullBackup()">
             <div class="setc-ico"><i class="ti ti-cloud-download"></i></div>
             <div class="setc-t">تصدير نسخة احتياطية كاملة</div>
-            <div class="setc-d">تصدير جميع البيانات بصيغة CSV محلياً كنسخة احتياطية إضافية</div>
+            <div class="setc-d">تحميل كل بيانات النظام (متبرعون، تبرعات، حملات، مستخدمون...) بملف واحد على الحاسبة</div>
+          </div>
+          <div class="setc" style="border-color:#BAE6FD" onclick="event.stopPropagation()">
+            <div class="setc-ico" style="background:#F0F9FF"><i class="ti ti-cloud-upload" style="color:#0369A1"></i></div>
+            <div class="setc-t">استعادة من نسخة احتياطية</div>
+            <div class="setc-d" style="margin-bottom:8px">يضيف أو يحدّث البيانات من الملف — لا يحذف أي شيء موجود حالياً. لمدير النظام فقط.</div>
+            <input type="file" id="restoreFileInput" accept=".json" onchange="handleRestoreFileSelect(this)" style="font-size:11px;margin-bottom:6px">
+            <div id="restoreFileName" style="font-size:11px;color:#757575;margin-bottom:8px">لم يتم اختيار ملف</div>
+            <button class="btn" style="width:100%;justify-content:center;border-color:#0369A1;color:#0369A1" onclick="importFullBackup()"><i class="ti ti-database-import"></i> استعادة الآن</button>
           </div>
           <div class="setc" onclick="toast('تصدير SQL يتم من: Supabase Dashboard → Database → Backups','info',5000)">
             <div class="setc-ico"><i class="ti ti-database-export"></i></div>
@@ -1594,17 +1606,14 @@ const SECTION_SCRIPTS = {
   rejected: 'infected-rejected.js',
   rare: 'rare.js',
   audit: 'audit.js',
-  account: 'settings.js',
-  settings: 'sequences.js',
+  settings: ['sequences.js', 'settings.js', 'backup.js'],
   users: 'users.js',
   reception: 'reception.js',
   barcode: 'barcode.js',
   stats: 'stats.js'
 };
 const _loadedSectionScripts = {};
-function loadSectionScript(key){
-  const src = SECTION_SCRIPTS[key];
-  if(!src) return Promise.resolve(); // already in the main file
+function loadOneScript(src){
   if(_loadedSectionScripts[src]) return _loadedSectionScripts[src];
   _loadedSectionScripts[src] = new Promise((resolve, reject)=>{
     const s=document.createElement('script');
@@ -1614,6 +1623,12 @@ function loadSectionScript(key){
     document.head.appendChild(s);
   });
   return _loadedSectionScripts[src];
+}
+function loadSectionScript(key){
+  const src = SECTION_SCRIPTS[key];
+  if(!src) return Promise.resolve(); // already in the main file
+  const list = Array.isArray(src) ? src : [src];
+  return Promise.all(list.map(loadOneScript));
 }
 
 // Pressing Enter moves focus to the next field, same as Tab (skips hidden/readonly/disabled
