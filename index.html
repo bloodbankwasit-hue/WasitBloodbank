@@ -14,6 +14,10 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js" async></script>
@@ -1466,6 +1470,14 @@ tbody tr:hover td{background:#fafafa}
             <div class="fgrp s2" id="rc-pat-grp"><label>اسم المريض</label><input type="text" id="rc-pat" placeholder="اسم المريض"></div>
             <div class="fgrp s2" id="rc-hosp-grp"><label>اسم المستشفى</label><input type="text" id="rc-hosp" placeholder="المستشفى"></div>
           </div>
+          <div style="font-size:12.5px;font-weight:700;color:#374151;margin:14px 0 8px">العلامات الحيوية (اختياري)</div>
+          <div class="fgrid">
+            <div class="fgrp"><label>ضغط الدم</label><input type="text" id="rc-bp" placeholder="مثال: 120/80"></div>
+            <div class="fgrp"><label>النبض</label><input type="number" id="rc-pulse" placeholder="نبضة/دقيقة"></div>
+            <div class="fgrp"><label>درجة الحرارة</label><input type="number" step="0.1" id="rc-temp" placeholder="°م"></div>
+            <div class="fgrp"><label>الوزن</label><input type="number" step="0.1" id="rc-weight" placeholder="كغم"></div>
+            <div class="fgrp"><label>الهيموغلوبين</label><input type="number" step="0.1" id="rc-hgb" placeholder="g/dL"></div>
+          </div>
         </div>
         <div id="rcPrintArea" style="display:none;margin-bottom:10px">
           <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:12px;padding:12px 14px;margin-bottom:10px">
@@ -1890,108 +1902,96 @@ async function shareOrDownloadFile(blob, filename, mimeType){
   URL.revokeObjectURL(url);
 }
 
+// Rebuilt to match the actual paper form exactly (field-for-field), with a real scannable
+// barcode (Code128, encodes the donor number) and the Amiri typeface — printed the same
+// reliable way as the rest of the app's other printouts (a real window + window.print()),
+// rather than hand-drawn canvas text, since Arabic shaping renders correctly that way.
 async function exportDonorFormPDF(){
   const d = _lastDonation;
   if(!d){ toast('لا توجد بيانات','error'); return; }
-  toast('⏳ جاري تجهيز الملف...','warning',3000);
-  try{
-    const {jsPDF} = window.jspdf;
-    const W=595, H=842, sc=2;
-    const cv = document.createElement('canvas');
-    cv.width=W*sc; cv.height=H*sc;
-    const x = cv.getContext('2d');
-    x.scale(sc,sc);
+  const age = d.birth_year ? (new Date().getFullYear()-d.birth_year) : '';
+  const donorNum = d.donor_number!=null ? String(d.donor_number) : '';
+  const N=v=>v?esc(String(v)):'';
 
-    // Background
-    x.fillStyle='#fff'; x.fillRect(0,0,W,H);
-    // Border
-    x.strokeStyle='#000'; x.lineWidth=1.5; x.strokeRect(10,10,W-20,H-20);
+  const w=window.open('','_blank','width=850,height=1000');
+  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>استمارة التبرع</title>
+  <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Amiri',serif;direction:rtl;padding:22px;color:#000}
+    .frame{border:2px solid #000;padding:14px 16px}
+    .hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #BE123C;padding-bottom:10px;margin-bottom:12px}
+    .hdr .dept{text-align:left;font-size:13px;font-weight:700;line-height:1.6}
+    .hdr .titles{text-align:center;flex:1}
+    .hdr .titles h1{font-size:19px;font-weight:700}
+    .hdr .titles h2{font-size:13px;font-weight:400;margin-top:2px}
+    .barcoderow{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-bottom:12px}
+    .barcoderow .num{font-size:15px;font-weight:700;font-family:monospace}
+    table.f{width:100%;border-collapse:collapse;margin-bottom:2px}
+    table.f td{border:1px solid #000;padding:7px 10px;font-size:14px;vertical-align:middle}
+    table.f td.lbl{background:#EDEDED;font-weight:700;width:26%;text-align:center}
+    table.f td.val{width:24%}
+    .section-hdr{background:#EDEDED;text-align:center;font-weight:700;font-size:13.5px;padding:6px;border:1px solid #000;border-top:none}
+    .vitals td.lbl{width:20%}
+    .vitals td.val{width:20%;text-align:center}
+    @media print{@page{margin:10mm}}
+  </style></head>
+  <body>
+    <div class="frame">
+      <div class="hdr">
+        <div class="dept">دائرة صحة واسط<br>مصرف الدم الرئيسي في واسط</div>
+        <div class="titles">
+          <h1>استمارة التبرع بالدم ومشتقاته</h1>
+          <h2>Blood Donor Questionnaire</h2>
+        </div>
+        <div style="width:90px"></div>
+      </div>
 
-    // Header
-    x.fillStyle='#BE123C'; x.fillRect(10,10,W-20,40);
-    x.fillStyle='#fff'; x.font='bold 14px Arial'; x.textAlign='center';
-    x.fillText('شعبة مصرف الدم الرئيسي — واسط',W/2,35);
-    x.font='10px Arial';
-    x.fillText('وزارة الصحة / دائرة صحة واسط / قسم الأمور الفنية',W/2,50);
+      <div class="barcoderow">
+        <div style="text-align:center">
+          <svg id="bc"></svg>
+          <div class="num">رقم الاستمارة: ${N(donorNum)}</div>
+        </div>
+      </div>
 
-    // Subtitle
-    x.fillStyle='#000'; x.font='bold 11px Arial';
-    x.fillText('Blood Donor Questionnaire — استمارة المتبرع',W/2,70);
+      <table class="f">
+        <tr><td class="lbl">نوع القنينة</td><td class="val">${N(d.bottle_type)}</td><td class="lbl">الاسم الرباعي</td><td class="val">${N(d.donor_name)}</td></tr>
+        <tr><td class="lbl">رقم القنينة</td><td class="val">${N(d.bottle_number)}</td><td class="lbl">اسم الأم</td><td class="val">${N(d.mother_name)}</td></tr>
+        <tr><td class="lbl">المهنة</td><td class="val">${N(d.occupation)}</td><td class="lbl">رقم هوية الأحوال الشخصية</td><td class="val">${N(d.national_id)}</td></tr>
+        <tr><td class="lbl">الجنس</td><td class="val">${N(d.gender)}</td><td class="lbl">العمر / سنة الولادة</td><td class="val">${N(age)} / ${N(d.birth_year)}</td></tr>
+        <tr><td class="lbl">رقم الموبايل</td><td class="val" colspan="3">${N(d.mobile)}</td></tr>
+        <tr><td class="lbl">عنوان السكن</td><td class="val" colspan="3">${N(d.address)}</td></tr>
+        <tr><td class="lbl">نوع التبرع</td><td class="val">${N(d.donation_type)}</td><td class="lbl">تاريخ التبرع</td><td class="val">${N(d.donation_date)} ${N(d.donation_time)}</td></tr>
+        <tr><td class="lbl">اسم المريض</td><td class="val">${N(d.patient_name)}</td><td class="lbl">اسم المستشفى</td><td class="val">${N(d.hospital_name)}</td></tr>
+      </table>
+      <div class="section-hdr">صنف الدم والعامل الرئيسي</div>
+      <table class="f"><tr><td class="val" style="width:100%;height:26px"></td></tr></table>
 
-    // Bottle number box
-    x.strokeStyle='#BE123C'; x.lineWidth=2; x.strokeRect(W-120,15,105,45);
-    x.fillStyle='#BE123C'; x.font='bold 18px monospace'; x.textAlign='center';
-    x.fillText(String(d.bottle_number||'—'),W-67,42);
-    x.fillStyle='#555'; x.font='8px Arial'; x.fillText('رقم القنينة',W-67,55);
-
-    // Info grid
-    const fields = [
-      ['الاسم الكامل', d.donor_name||'—', 'نوع القنينة', d.bottle_type||'—'],
-      ['تاريخ التبرع', d.donation_date||'—', 'الوقت', d.donation_time||'—'],
-      ['سنة الميلاد', String(d.birth_year||'—'), 'العمر', d.birth_year?String(new Date().getFullYear()-d.birth_year)+' سنة':'—'],
-      ['الجنس', d.gender||'—', 'نوع التبرع', d.donation_type||'—'],
-      ['رقم الهاتف', d.mobile||'—', 'رقم البطاقة', d.national_id||'—'],
-      ['فصيلة الدم', d.blood_type||'—', 'العنوان', d.address||'—'],
-    ];
-    let ry=85; const cw=(W-20)/2;
-    x.textAlign='right';
-    fields.forEach(row=>{
-      // Left col
-      x.strokeStyle='#e2e8f0'; x.lineWidth=0.5;
-      x.strokeRect(10,ry,cw,22); x.strokeRect(10+cw,ry,cw,22);
-      x.fillStyle='#94A3B8'; x.font='bold 8px Arial';
-      x.fillText(row[0]+':',10+cw-5,ry+8);
-      x.fillStyle='#1E293B'; x.font='10px Arial';
-      x.fillText(row[1],10+cw-60,ry+17);
-      x.fillStyle='#94A3B8'; x.font='bold 8px Arial';
-      x.fillText(row[2]+':',W-15,ry+8);
-      x.fillStyle='#1E293B'; x.font='10px Arial';
-      x.fillText(row[3],W-60,ry+17);
-      ry+=22;
-    });
-
-    // Questionnaire
-    ry+=6;
-    x.fillStyle='#f1f5f9'; x.fillRect(10,ry,W-20,16);
-    x.fillStyle='#1E293B'; x.font='bold 9px Arial'; x.textAlign='center';
-    x.fillText('استبيان ما قبل التبرع — Pre-Donation Questionnaire',W/2,ry+11);
-    ry+=18;
-    const qs=['هل أنت بصحة جيدة اليوم؟','هل نمت جيداً الليلة الماضية؟','هل تناولت وجبة قبل التبرع؟','هل تعاني من مرض مزمن؟','هل تناولت أدوية خلال الأسبوع الماضي؟','هل سبق لك التبرع بالدم؟','هل تبرعت خلال الثلاثة أشهر الماضية؟','هل لديك أعراض حالية؟'];
-    qs.forEach((q,i)=>{
-      x.strokeStyle='#e2e8f0'; x.lineWidth=0.5;
-      x.strokeRect(10,ry,W-20,18);
-      x.fillStyle='#1E293B'; x.font='9px Arial'; x.textAlign='right';
-      x.fillText(q,W-18,ry+12);
-      // Checkboxes
-      x.strokeStyle='#000'; x.lineWidth=0.8;
-      x.strokeRect(50,ry+3,11,11); x.fillStyle='#333'; x.font='8px Arial'; x.textAlign='right';
-      x.fillText('نعم',80,ry+12);
-      x.strokeRect(90,ry+3,11,11);
-      x.fillText('لا',115,ry+12);
-      ry+=18;
-    });
-
-    // Signatures
-    ry+=8;
-    x.strokeStyle='#000'; x.lineWidth=0.8;
-    x.beginPath(); x.moveTo(10,ry); x.lineTo(W-10,ry); x.stroke();
-    ['توقيع المتبرع','توقيع الموظف','الختم الرسمي'].forEach((s,i)=>{
-      const sx=10+i*(W/3);
-      x.fillStyle='#555'; x.font='8px Arial'; x.textAlign='right';
-      x.fillText(s,sx+(W/3)-5,ry+12);
-      x.strokeRect(sx+5,ry+16,W/3-10,28);
-    });
-
-    const img = cv.toDataURL('image/jpeg',0.92);
-    const doc = new jsPDF({orientation:'portrait',unit:'pt',format:'a4',compress:true});
-    doc.addImage(img,'JPEG',0,0,595,842);
-    const blob = doc.output('blob');
-    await shareOrDownloadFile(blob,'استمارة_'+( d.donor_name||'متبرع')+'_'+( d.donation_date||'')+'.pdf','application/pdf');
-    toast('✅ تم تصدير الاستمارة','success');
-  }catch(e){
-    console.error(e);
-    toast('خطأ: '+e.message,'error');
-  }
+      <div class="section-hdr" style="margin-top:2px">العلامات الحيوية</div>
+      <table class="f vitals">
+        <tr>
+          <td class="lbl">ضغط الدم</td><td class="val">${N(d.blood_pressure)}</td>
+          <td class="lbl">النبض</td><td class="val">${N(d.pulse)}</td>
+          <td class="lbl">الهيموغلوبين</td>
+        </tr>
+        <tr>
+          <td class="lbl">درجة الحرارة</td><td class="val">${N(d.temperature)}</td>
+          <td class="lbl">الوزن</td><td class="val">${N(d.weight)}</td>
+          <td class="val">${N(d.hemoglobin)}</td>
+        </tr>
+      </table>
+    </div>
+    <script>
+      window.onload = function(){
+        try{
+          JsBarcode("#bc", ${JSON.stringify(donorNum||'0')}, {format:"CODE128", displayValue:false, height:40, width:1.6, margin:0});
+        }catch(e){}
+        setTimeout(function(){ window.print(); }, 350);
+      };
+    <\/script>
+  </body></html>`);
+  w.document.close();
 }
 
 async function exportBottleStickerPDF(){

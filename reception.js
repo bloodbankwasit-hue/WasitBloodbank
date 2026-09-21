@@ -263,6 +263,11 @@ async function saveReception(){
         donor_id:dn.id, bottle_type:btype, bottle_number:bnum, donation_type:payload.donation_type,
         patient_name:payload.patient_name, hospital_name:payload.hospital_name,
         donation_date:payload.donation_date, donation_time:payload.donation_time,
+        blood_pressure:G('rc-bp').value.trim()||null,
+        pulse:parseInt(G('rc-pulse').value)||null,
+        temperature:parseFloat(G('rc-temp').value)||null,
+        weight:parseFloat(G('rc-weight').value)||null,
+        hemoglobin:parseFloat(G('rc-hgb').value)||null,
         status:'pending_draw', created_by:payload.created_by
       }).select().single();
       if(doe) throw doe;
@@ -276,18 +281,35 @@ async function saveReception(){
           .update({current_number: bnum+1})
           .eq('id', payload.seq_id);
       }
+      // donor_number ("رقم الاستمارة") — the insert above returns it for a brand-new donor;
+      // for an existing donor picked via autocomplete, dn only has {id}, so fetch it.
+      let donorNumber = dn.donor_number;
+      if(donorNumber==null){
+        const{data:dRow}=await db.from('donors').select('donor_number').eq('id',dn.id).single();
+        donorNumber = dRow?.donor_number ?? null;
+      }
       // Store for printing
       _lastDonation = {
         donor_name:nm, bottle_number:bnum,
         bottle_type:btype,
+        donor_number:donorNumber,
         donation_date:payload.donation_date,
         donation_time:payload.donation_time,
         birth_year:by,
         gender:G('rc-gen').value,
         mobile:G('rc-mob').value.trim(),
         national_id:G('rc-nid').value.trim(),
+        mother_name:G('rc-mom').value.trim(),
         address:G('rc-addr').value.trim(),
+        occupation:G('rc-job').value.trim(),
         donation_type:G('rc-dtype').value,
+        patient_name:G('rc-pat').value.trim(),
+        hospital_name:G('rc-hosp').value.trim(),
+        blood_pressure:G('rc-bp').value.trim(),
+        pulse:G('rc-pulse').value,
+        temperature:G('rc-temp').value,
+        weight:G('rc-weight').value,
+        hemoglobin:G('rc-hgb').value,
         expiry_date:'', // will calculate from bottle type
       };
       // Show print options instead of reset
@@ -300,7 +322,7 @@ async function saveReception(){
 }
 
 function resetReception(){
-  ['rc-name','rc-by','rc-age','rc-mom','rc-nid','rc-mob','rc-addr','rc-job','rc-pat','rc-hosp'].forEach(id=>{const e=G(id);if(e)e.value='';});
+  ['rc-name','rc-by','rc-age','rc-mom','rc-nid','rc-mob','rc-addr','rc-job','rc-pat','rc-hosp','rc-bp','rc-pulse','rc-temp','rc-weight','rc-hgb'].forEach(id=>{const e=G(id);if(e)e.value='';});
   if(G('rc-date')){ const t=new Date().toISOString().split('T')[0]; G('rc-date').value=fd(t); }
   if(G('rc-time')){ G('rc-time').value=new Date().toTimeString().substring(0,5); }
   fetchNextDonorNumberPreview();
