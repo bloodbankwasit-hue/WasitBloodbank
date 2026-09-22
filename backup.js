@@ -16,6 +16,7 @@ const BACKUP_RESTORE_ORDER = [
 ];
 
 async function exportFullBackup(){
+  if(UPROF?.role!=='admin'){ toast('تصدير النسخة الاحتياطية متاح لمدير النظام فقط','error'); return; }
   if(!confirm('سيتم تصدير كل بيانات النظام (المتبرعون، التبرعات، الحملات، المستخدمون، سجل التتبع...) بملف واحد. متابعة؟')) return;
   load(true);
   try{
@@ -23,7 +24,11 @@ async function exportFullBackup(){
     for(const t of BACKUP_TABLES){
       let all=[], from=0, pageSize=1000, hasMore=true;
       while(hasMore){
-        const{data,error}=await db.from(t).select('*').range(from, from+pageSize-1);
+        // A stable order is REQUIRED for range-based pagination to be correct — without it,
+        // Postgres/PostgREST doesn't guarantee the same row order across separate page
+        // requests, which can silently duplicate some rows across two pages and skip others
+        // entirely. Ordering by the primary key makes each page's slice deterministic.
+        const{data,error}=await db.from(t).select('*').order('id',{ascending:true}).range(from, from+pageSize-1);
         if(error) throw new Error(t+': '+error.message);
         all=all.concat(data||[]);
         hasMore=(data||[]).length===pageSize;
@@ -68,8 +73,15 @@ async function importFullBackup(){
 
     let totalRestored=0, skippedTables=[];
     for(const t of BACKUP_RESTORE_ORDER){
-      const rows = backup.tables[t];
+      let rows = backup.tables[t];
       if(!rows || !rows.length) continue;
+      // blood_donations has a self-reference (a separated component's parent_donation_id
+      // points at another row in this SAME table) — the backup's row order isn't guaranteed
+      // to have every parent before its children (ids are random UUIDs, not chronological),
+      // so a child could land in an earlier batch than its parent and fail on the foreign
+      // key. Sorting by creation time first guarantees parents are always restored first,
+      // since a bottle always exists before anything separates it.
+      if(t==='blood_donations') rows = [...rows].sort((a,b)=> new Date(a.created_at||0) - new Date(b.created_at||0));
       let tableOk=true;
       for(let i=0;i<rows.length;i+=500){
         const batch=rows.slice(i,i+500);
