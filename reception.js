@@ -162,8 +162,12 @@ async function checkRejectedName(){
   let hit = null;
   if(IS_ONLINE){
     // Online: check from Supabase
+    // NOTE: inside .or()'s string filter syntax, PostgREST requires "*" as the ilike wildcard,
+    // not "%" — "%" is a literal character here, so a "%name%" pattern would only ever match a
+    // name that literally contains a percent sign, silently matching nothing for every normal
+    // name. This is why a rejected donor could exist in the table and still never be caught here.
     const filters = [];
-    if(nm.length>2)   filters.push(`full_name.ilike.%${nm}%`);
+    if(nm.length>2)   filters.push(`full_name.ilike.*${nm}*`);
     if(nid.length>5)  filters.push(`national_id.eq.${nid}`);
     if(mob.length>6)  filters.push(`mobile.eq.${mob}`);
     const{data}=await db.from('rejected_donors')

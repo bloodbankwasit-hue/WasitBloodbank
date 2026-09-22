@@ -39,7 +39,7 @@ const RARE_TYPES = ['A-','B-','O-','AB-','A+','AB+'];
 // Reads straight from donors_with_last_donation (a view that computes each donor's most recent
 // donation date server-side — see the SQL that ships with this change), so "آخر تبرع" never
 // requires pulling the donations table to the device either.
-async function _rareFilteredData(){
+async function _rareFilteredData(forExport){
   const q  = (G('rareSearch')?.value||'').trim();
   const bg = G('rareBGFilter')?.value||'';
   const df = G('rareDateFrom')?.value||'';
@@ -54,10 +54,27 @@ async function _rareFilteredData(){
   }
   if(df) query = query.gte('last_donation_date', df);
   if(dt) query = query.lte('last_donation_date', dt);
-  query = query.order('blood_type').order('full_name').limit(200);
+  // The 200 cap is a SCREEN-display limit only (keeps the interactive list fast/scrollable).
+  // An export is a deliberate, one-off action, not a page that reloads constantly — cutting it
+  // off at the same 200 would silently drop real donors from a PDF/Excel someone relies on, so
+  // exports fetch every matching row instead (paginated in 1000-row pages, no upper bound).
+  query = query.order('blood_type').order('full_name');
 
-  const{data,error} = await query;
-  if(error){ toast('خطأ: '+error.message,'error'); return []; }
+  let data=[];
+  if(forExport){
+    let from=0, hasMore=true;
+    while(hasMore){
+      const{data:page,error}=await query.range(from, from+999);
+      if(error){ toast('خطأ: '+error.message,'error'); return []; }
+      data=data.concat(page||[]);
+      hasMore=(page||[]).length===1000;
+      from+=1000;
+    }
+  } else {
+    const{data:d,error} = await query.limit(200);
+    if(error){ toast('خطأ: '+error.message,'error'); return []; }
+    data=d||[];
+  }
 
   // All donors stay in the staff-facing list — each is just tagged with whether they're
   // currently eligible to donate again (77 days normally, 14 days if their last donation
@@ -66,7 +83,7 @@ async function _rareFilteredData(){
   // the normal 77-day rule — close enough for a contact list; the exact rule is still enforced
   // by checkDonationInterval() at the reception desk itself, which IS status-aware.)
   const today=new Date(); today.setHours(0,0,0,0);
-  return (data||[]).map(d=>{
+  return data.map(d=>{
     let eligible=true, eligibleDate=null;
     if(d.last_donation_date){
       const last=new Date(d.last_donation_date); last.setHours(0,0,0,0);
@@ -191,7 +208,7 @@ function waQueueSkip(){ waQueueNext(); }
 
 async function exportRarePDF(){
   const bg = G('rareBGFilter')?.value||'';
-  const filtered = await _rareFilteredData();
+  const filtered = await _rareFilteredData(true);
 
   if(!filtered.length){ toast('لا توجد بيانات للتصدير','error'); return; }
   toast('⏳ جاري تجهيز القائمة...','warning',3000);
@@ -256,7 +273,7 @@ async function exportRarePDF(){
 // .xls extension — Excel recognizes and opens this natively, with correct Arabic/RTL text
 // (UTF-8 BOM) and real columns (unlike a flat CSV, this keeps header styling too).
 async function exportRareExcel(){
-  const filtered = await _rareFilteredData();
+  const filtered = await _rareFilteredData(true);
   if(!filtered.length){ toast('لا توجد بيانات للتصدير','error'); return; }
 
   const rows = filtered.map(d=>`<tr>
