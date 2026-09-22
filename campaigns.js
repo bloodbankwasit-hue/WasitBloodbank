@@ -1,10 +1,11 @@
 // ================================================================
 // WORKFLOW — SEPARATION BOARD (الفصل) — 2-level drill-down: bottle type (مفلتر/رباعي/...) →
-// list of that type's bottles, from draw through lab clearance to separation itself.
+// list of that type's bottles. Going back a level is handled by the top "رجوع" button (goBack()).
 // ================================================================
-let _sepSelectedType = null;
+let _sepSelectedType = null, _sepLevel = 1;
 
 function _sepShowLevel(n){
+  _sepLevel = n;
   const g1=G('sepTypeGrid'), g3=G('sepBoardList');
   if(g1) g1.style.display = n===1 ? '' : 'none';
   if(g3) g3.style.display = n===2 ? '' : 'none';
@@ -47,16 +48,13 @@ async function loadSeparationList(bottleType){
     .order('created_at',{ascending:true});
   load(false);
   const list=data||[];
-  const backBtn=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div style="font-size:16px;font-weight:700;color:#BE123C">${bottleType} — ${list.length} قنينة</div>
-      <button class="btn" style="font-size:13px;padding:7px 12px" onclick="loadSeparationBoard()"><i class="ti ti-arrow-right"></i> رجوع</button>
-    </div>`;
+  const titleBar=`<div style="font-size:18px;font-weight:700;color:#BE123C;margin-bottom:10px">${bottleType} — ${list.length} قنينة</div>`;
   if(!list.length){
-    G('sepBoardList').innerHTML=backBtn+'<div class="empty"><i class="ti ti-dna"></i><p>لا توجد قناني من هذا النوع بمرحلة ما بعد السحب حالياً</p></div>';
+    G('sepBoardList').innerHTML=titleBar+'<div class="empty"><i class="ti ti-dna"></i><p>لا توجد قناني من هذا النوع بمرحلة ما بعد السحب حالياً</p></div>';
     _sepShowLevel(2);
     return;
   }
-  G('sepBoardList').innerHTML=backBtn+list.map(r=>{
+  G('sepBoardList').innerHTML=titleBar+list.map(r=>{
     const name=r.donors?.full_name?esc(r.donors.full_name):(r.campaign_name?'🚐 '+esc(r.campaign_name):'—');
     const tested=r.status==='in_stock'||r.status==='pending_release';
     const isWhole=r.component_type==='دم كامل' || !r.component_type;
@@ -75,7 +73,7 @@ async function loadSeparationList(bottleType){
       </div>
       <div class="fc-act">
         ${canSeparate
-          ? `<button class="btn btn-p" style="font-size:13px;padding:8px 10px" onclick="openSeparateModalBulk(['${r.id}'],'${r.bottle_type}','${r.bottle_number}')"><i class="ti ti-git-fork"></i> فصل</button>`
+          ? `<button class="btn btn-p" style="font-size:15px;padding:8px 10px" onclick="openSeparateModalBulk(['${r.id}'],'${r.bottle_type}','${r.bottle_number}')"><i class="ti ti-git-fork"></i> فصل</button>`
           : ''}
       </div>
     </div>`;
@@ -151,10 +149,10 @@ async function loadPendingRelease(){
         </div>
       </div>
       <div class="fc-act" style="display:flex;gap:6px;flex-wrap:wrap">
-        ${canSeparate?`<button class="btn" style="font-size:13px;padding:8px 10px;border-color:#0369A1;color:#0369A1" onclick="openSeparateModalBulk(['${r.id}'],'${r.bottle_type}','${r.bottle_number}')"><i class="ti ti-git-fork"></i> فصل</button>`:''}
+        ${canSeparate?`<button class="btn" style="font-size:15px;padding:8px 10px;border-color:#0369A1;color:#0369A1" onclick="openSeparateModalBulk(['${r.id}'],'${r.bottle_type}','${r.bottle_number}')"><i class="ti ti-git-fork"></i> فصل</button>`:''}
         ${infected
-          ? `<button class="btn" style="font-size:13px;padding:8px 10px;border-color:#7F1D1D;color:#7F1D1D" onclick="openDamageModal(['${r.id}'])"><i class="ti ti-trash"></i> تلف</button>`
-          : complete ? `<button class="btn btn-p" style="font-size:13px;padding:8px 10px" onclick="confirmRelease('${r.id}')"><i class="ti ti-check"></i> تأكيد</button>` : ''}
+          ? `<button class="btn" style="font-size:15px;padding:8px 10px;border-color:#7F1D1D;color:#7F1D1D" onclick="openDamageModal(['${r.id}'])"><i class="ti ti-trash"></i> تلف</button>`
+          : complete ? `<button class="btn btn-p" style="font-size:15px;padding:8px 10px" onclick="confirmRelease('${r.id}')"><i class="ti ti-check"></i> تأكيد</button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -323,7 +321,7 @@ async function refreshCampaignSlots(){
   const list=data||[];
   const cnt={reserved:0,drawn:0,damaged:0,returned:0};
   list.forEach(s=>cnt[s.status]=(cnt[s.status]||0)+1);
-  G('campTrackSummary').innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:13.5px">
+  G('campTrackSummary').innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:15.5px">
     <span class="pill py">بانتظار: ${cnt.reserved}</span>
     <span class="pill pg">نجح: ${cnt.drawn}</span>
     <span class="pill pr">تالف: ${cnt.damaged}</span>

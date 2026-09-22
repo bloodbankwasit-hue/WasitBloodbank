@@ -25,7 +25,7 @@ async function doSearch(){
       (!mom||r.donors?.mother_name?.includes(mom))
     );
     if(SRDATA.length){
-      G('srRes').innerHTML=`<div style="margin-bottom:8px;font-size:13px;color:#757575">عدد النتائج: <strong>${SRDATA.length}</strong></div>
+      G('srRes').innerHTML=`<div style="margin-bottom:8px;font-size:15px;color:#757575">عدد النتائج: <strong>${SRDATA.length}</strong></div>
       <div class="tw"><table><thead><tr>
         <th>رقم المتبرع</th><th>الاسم</th><th>الفصيلة</th><th>نوع القنينة</th><th>رقم القنينة</th>
         <th>نوع التبرع</th><th>تاريخ التبرع</th><th>تاريخ النفاد</th><th>الفحوصات</th><th></th>

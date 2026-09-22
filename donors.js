@@ -58,7 +58,7 @@ async function runGlobalSearch(){
 
     const sections=[];
     if(donationRows.length){
-      sections.push(`<div class="sh-t" style="font-size:15px;margin:14px 0 8px"><i class="ti ti-droplet"></i> تبرعات (${donationRows.length})</div>` +
+      sections.push(`<div class="sh-t" style="font-size:17px;margin:14px 0 8px"><i class="ti ti-droplet"></i> تبرعات (${donationRows.length})</div>` +
         donationRows.map(r=>`<div class="flow-card">
           <div class="fc-av">🩸</div>
           <div style="flex:1">
@@ -68,7 +68,7 @@ async function runGlobalSearch(){
         </div>`).join(''));
     }
     if(rejectedRows.length){
-      sections.push(`<div class="sh-t" style="font-size:15px;margin:14px 0 8px"><i class="ti ti-ban"></i> قائمة المرفوضين (${rejectedRows.length})</div>` +
+      sections.push(`<div class="sh-t" style="font-size:17px;margin:14px 0 8px"><i class="ti ti-ban"></i> قائمة المرفوضين (${rejectedRows.length})</div>` +
         rejectedRows.map(r=>`<div class="flow-card">
           <div class="fc-av">⛔</div>
           <div style="flex:1">

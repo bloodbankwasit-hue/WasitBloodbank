@@ -114,7 +114,7 @@ function filterRare(){
   const hasQuery = qN || bg;
   if(!hasQuery){
     G('rareList').innerHTML=`<div class="empty" style="padding:24px 0">
-      <p style="font-size:15px;color:#94A3B8">ابحث بالاسم أو الهاتف أو اختر فصيلة لعرض النتائج</p>
+      <p style="font-size:17px;color:#94A3B8">ابحث بالاسم أو الهاتف أو اختر فصيلة لعرض النتائج</p>
     </div>`;
     return;
   }
@@ -122,12 +122,12 @@ function filterRare(){
   const bar=`<div id="rareBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
     <span id="rareBulkCount">0 محدد</span>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
-      <button class="btn" style="background:#16A34A;color:#fff;border:none;font-size:13px" onclick="openWaQueue('notice')">📱 إعلام بالتسجيل — للمحدد</button>
-      <button class="btn" style="background:#0369A1;color:#fff;border:none;font-size:13px" onclick="openWaQueue('invite')">📱 دعوة للتبرع — للمحدد</button>
-      <button class="btn" style="background:#374151;color:#fff;border:none;font-size:13px" onclick="document.querySelectorAll('.rare-chk').forEach(c=>c.checked=false);updateRareBulkBar()">إلغاء التحديد</button>
+      <button class="btn" style="background:#16A34A;color:#fff;border:none;font-size:15px" onclick="openWaQueue('notice')">📱 إعلام بالتسجيل — للمحدد</button>
+      <button class="btn" style="background:#0369A1;color:#fff;border:none;font-size:15px" onclick="openWaQueue('invite')">📱 دعوة للتبرع — للمحدد</button>
+      <button class="btn" style="background:#374151;color:#fff;border:none;font-size:15px" onclick="document.querySelectorAll('.rare-chk').forEach(c=>c.checked=false);updateRareBulkBar()">إلغاء التحديد</button>
     </div>
   </div>
-  <label style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:13.5px;color:#374151;cursor:pointer">
+  <label style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:15.5px;color:#374151;cursor:pointer">
     <input type="checkbox" id="rareSelAll" onchange="document.querySelectorAll('.rare-chk').forEach(c=>c.checked=this.checked);updateRareBulkBar()">
     تحديد كل النتائج المعروضة (${filtered.length})
   </label>`;
@@ -135,20 +135,20 @@ function filterRare(){
   G('rareList').innerHTML = bar + filtered.map(d=>`
     <div class="rare-row">
       <input type="checkbox" class="rare-chk" value="${esc(d.full_name||'')}" data-name="${esc(d.full_name||'—')}" data-mobile="${esc(normIraqiMobile(d.mobile)||'')}" onchange="updateRareBulkBar()" style="width:18px;height:18px;flex-shrink:0;align-self:flex-start;margin-top:4px">
-      <div class="rare-av" style="width:44px;height:44px;font-size:14px">${d.blood_type||'?'}</div>
+      <div class="rare-av" style="width:44px;height:44px;font-size:16px">${d.blood_type||'?'}</div>
       <div class="rare-info">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <div class="rare-name" style="font-size:16px">${esc(d.full_name||'—')}</div>
+          <div class="rare-name" style="font-size:18px">${esc(d.full_name||'—')}</div>
           ${d.eligible
-            ? `<span style="background:#DCFCE7;color:#166534;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:20px">✅ يمكنه التبرع الآن</span>`
-            : `<span style="background:#FEF3C7;color:#92400E;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:20px">⏳ يؤهَّل بتاريخ ${fd(d.eligible_date)}</span>`}
+            ? `<span style="background:#DCFCE7;color:#166534;font-size:13.5px;font-weight:700;padding:2px 8px;border-radius:20px">✅ يمكنه التبرع الآن</span>`
+            : `<span style="background:#FEF3C7;color:#92400E;font-size:13.5px;font-weight:700;padding:2px 8px;border-radius:20px">⏳ يؤهَّل بتاريخ ${fd(d.eligible_date)}</span>`}
         </div>
-        <div class="rare-mob" style="font-size:15px;margin-top:3px">${esc(normIraqiMobile(d.mobile)||'—')}</div>
-        <div class="rare-addr" style="font-size:13px;margin-top:2px">${esc(d.address||'—')}</div>
-        <div class="rare-date" style="font-size:13px;margin-top:2px;color:#757575">آخر تبرع: ${d.last_donation?fd(d.last_donation):'—'}</div>
+        <div class="rare-mob" style="font-size:17px;margin-top:3px">${esc(normIraqiMobile(d.mobile)||'—')}</div>
+        <div class="rare-addr" style="font-size:15px;margin-top:2px">${esc(d.address||'—')}</div>
+        <div class="rare-date" style="font-size:15px;margin-top:2px;color:#757575">آخر تبرع: ${d.last_donation?fd(d.last_donation):'—'}</div>
         ${d.mobile?`<div style="display:flex;gap:6px;margin-top:8px">
-          <a href="${waLink(d.mobile, WA_TEMPLATES.notice)}" target="_blank" style="background:#16A34A;color:#fff;border-radius:8px;padding:6px 10px;text-decoration:none;font-size:12px;font-weight:700">📱 إعلام بالتسجيل</a>
-          <a href="${waLink(d.mobile, WA_TEMPLATES.invite)}" target="_blank" style="background:#0369A1;color:#fff;border-radius:8px;padding:6px 10px;text-decoration:none;font-size:12px;font-weight:700">📱 دعوة للتبرع</a>
+          <a href="${waLink(d.mobile, WA_TEMPLATES.notice)}" target="_blank" style="background:#16A34A;color:#fff;border-radius:8px;padding:6px 10px;text-decoration:none;font-size:14px;font-weight:700">📱 إعلام بالتسجيل</a>
+          <a href="${waLink(d.mobile, WA_TEMPLATES.invite)}" target="_blank" style="background:#0369A1;color:#fff;border-radius:8px;padding:6px 10px;text-decoration:none;font-size:14px;font-weight:700">📱 دعوة للتبرع</a>
         </div>`:''}
       </div>
     </div>`).join('');
@@ -187,8 +187,8 @@ function renderWaQueueStep(){
   G('waQueuePos').textContent=(_waQueueIdx+1);
   G('waQueueBody').innerHTML=`
     <div style="text-align:center;padding:10px 0">
-      <div style="font-size:18px;font-weight:800;color:#1a1a1a">${esc(cur.name)}</div>
-      <div style="font-size:15px;color:#757575;margin-top:4px">${esc(cur.mobile)}</div>
+      <div style="font-size:20px;font-weight:800;color:#1a1a1a">${esc(cur.name)}</div>
+      <div style="font-size:17px;color:#757575;margin-top:4px">${esc(cur.mobile)}</div>
     </div>`;
   G('waQueueOpenBtn').style.display='flex';
   G('waQueueOpenBtn').href=waLink(cur.mobile, WA_TEMPLATES[_waQueueTemplate]);
@@ -325,7 +325,7 @@ async function loadRareList(bt){
     .order('donation_date',{ascending:false}).limit(100);
   load(false);
   if(data&&data.length){
-    G('rareTbl').innerHTML=`<div style="margin-bottom:8px;font-size:13px;font-weight:700;color:#BE123C">فصيلة ${bt} — ${data.length} سجل</div>
+    G('rareTbl').innerHTML=`<div style="margin-bottom:8px;font-size:15px;font-weight:700;color:#BE123C">فصيلة ${bt} — ${data.length} سجل</div>
     <div class="tw"><table><thead><tr>
       <th>رقم المتبرع</th><th>اسم المتبرع</th><th>الفصيلة</th><th>رقم الموبايل</th><th>تاريخ التبرع</th><th>عنوان السكن</th>
     </tr></thead><tbody>${data.map(r=>`<tr>

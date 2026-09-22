@@ -27,12 +27,12 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden}
 #loginPage ~ .bottom-nav, #loginPage:not([style*="none"]) ~ * .bottom-nav{display:none !important}
-body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:16px;direction:rtl;background:#F1F5F9;color:#1E293B;-webkit-tap-highlight-color:transparent}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:18px;direction:rtl;background:#F1F5F9;color:#1E293B;-webkit-tap-highlight-color:transparent}
 html{-webkit-text-size-adjust:100%}
 
 /* ===== TOAST ===== */
 #toastBox{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:7px;pointer-events:none;min-width:260px}
-.toast{padding:10px 16px;border-radius:8px;font-size:13px;display:flex;align-items:center;gap:8px;animation:tin .2s ease;pointer-events:all;color:#fff}
+.toast{padding:10px 16px;border-radius:8px;font-size:15px;display:flex;align-items:center;gap:8px;animation:tin .2s ease;pointer-events:all;color:#fff}
 .toast.success{background:#2e7d32}.toast.error{background:#BE123C}.toast.warning{background:#e65100}.toast.info{background:#1565c0}
 @keyframes tin{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 
@@ -44,9 +44,14 @@ html{-webkit-text-size-adjust:100%}
 
 /* ===== MODAL ===== */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:7700;display:none;align-items:center;justify-content:center}
+/* The desktop section popup hosts a whole screen (list, form...) and must always sit BELOW any
+   action modal (test/separate/damage/bottle-detail...) opened from within it — otherwise its own
+   translucent backdrop can paint over a same-z-index modal that happens to be earlier in the DOM,
+   making the new popup look like it opened "underneath" the list instead of on top of it. */
+#sectionPopup{z-index:7690}
 .overlay.on{display:flex}
 .modal{background:#fff;border-radius:12px;padding:22px;width:500px;max-width:96vw;max-height:90vh;overflow-y:auto}
-.modal-title{font-size:15px;font-weight:700;color:#1a1a1a;margin-bottom:14px;display:flex;align-items:center;gap:7px}
+.modal-title{font-size:17px;font-weight:700;color:#1a1a1a;margin-bottom:14px;display:flex;align-items:center;gap:7px}
 .modal-title i{color:#BE123C}
 .modal-foot{display:flex;gap:7px;justify-content:flex-end;padding:12px 22px 16px;border-top:1px solid #f0f0f0;background:#fff;flex-shrink:0}
 
@@ -55,24 +60,24 @@ html{-webkit-text-size-adjust:100%}
 .lcard{background:#fff;border:1px solid #e0e0e0;border-radius:16px;padding:32px 36px;width:400px;box-shadow:0 4px 24px rgba(0,0,0,.07)}
 .lbrand{text-align:center;margin-bottom:24px}
 .licon{width:68px;height:68px;background:#BE123C;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
-.licon i{font-size:31px;color:#fff}
-.lt1{font-size:16px;font-weight:700;color:#1a1a1a}
-.lt2{font-size:12px;color:#9e9e9e;margin-top:3px}
-.lerr{background:#FFF1F2;border:1px solid #FECDD3;color:#BE123C;font-size:13px;padding:8px 12px;border-radius:8px;margin-bottom:12px;display:none;align-items:center;gap:6px}
+.licon i{font-size:33px;color:#fff}
+.lt1{font-size:18px;font-weight:700;color:#1a1a1a}
+.lt2{font-size:14px;color:#9e9e9e;margin-top:3px}
+.lerr{background:#FFF1F2;border:1px solid #FECDD3;color:#BE123C;font-size:15px;padding:8px 12px;border-radius:8px;margin-bottom:12px;display:none;align-items:center;gap:6px}
 .lerr.on{display:flex}
 .fg{margin-bottom:14px}
-.fg label{display:block;font-size:12.5px;color:#616161;margin-bottom:5px;font-weight:600}
+.fg label{display:block;font-size:14.5px;color:#616161;margin-bottom:5px;font-weight:600}
 .fw{position:relative}
-.fg input{width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;background:#fafafa;color:#1a1a1a;font-size:14px;font-family:inherit;outline:none;transition:border .15s,box-shadow .15s}
+.fg input{width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;background:#fafafa;color:#1a1a1a;font-size:16px;font-family:inherit;outline:none;transition:border .15s,box-shadow .15s}
 .fg input:focus{border-color:#BE123C;box-shadow:0 0 0 3px rgba(198,40,40,.09);background:#fff}
-.eye{position:absolute;left:10px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;color:#9e9e9e;font-size:17px;padding:2px}
+.eye{position:absolute;left:10px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;color:#9e9e9e;font-size:19px;padding:2px}
 .eye:hover{color:#1a1a1a}
-.lbtn{width:100%;padding:11px;background:#BE123C;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;transition:background .15s}
+.lbtn{width:100%;padding:11px;background:#BE123C;color:#fff;border:none;border-radius:8px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;transition:background .15s}
 .lbtn:hover{background:#9F1239}
 .lbtn:disabled{opacity:.65;cursor:not-allowed}
 .lsec{display:flex;justify-content:center;gap:18px;margin-top:18px;padding-top:14px;border-top:1px solid #f0f0f0}
-.lsec span{display:flex;align-items:center;gap:4px;font-size:11px;color:#9e9e9e}
-.lsec i{font-size:13px;color:#2e7d32}
+.lsec span{display:flex;align-items:center;gap:4px;font-size:13px;color:#9e9e9e}
+.lsec i{font-size:15px;color:#2e7d32}
 
 /* ===== APP SHELL ===== */
 #app{display:none;height:100vh;flex-direction:row}
@@ -87,33 +92,33 @@ html{-webkit-text-size-adjust:100%}
 }
 .sb-logo{display:flex;align-items:center;gap:10px;padding:20px 14px 16px}
 .sb-dot{width:42px;height:42px;background:rgba(255,255,255,.2);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1.5px solid rgba(255,255,255,.3)}
-.sb-dot i{font-size:23px;color:#fff}
-.sb-name{font-size:14px;font-weight:700;color:#fff;line-height:1.3}
-.sb-org{font-size:11px;color:rgba(255,255,255,.7)}
+.sb-dot i{font-size:25px;color:#fff}
+.sb-name{font-size:16px;font-weight:700;color:#fff;line-height:1.3}
+.sb-org{font-size:13px;color:rgba(255,255,255,.7)}
 .sb-nav{flex:1;overflow-y:auto;padding:6px 0}
 .nb{margin-bottom:3px}
-.nl{font-size:10.5px;color:#bdbdbd;padding:10px 14px 3px;letter-spacing:.7px;font-weight:600;text-transform:uppercase}
-.ni{display:flex;align-items:center;gap:9px;padding:9px 14px;cursor:pointer;color:#616161;font-size:13.5px;border-right:3px solid transparent;transition:all .12s;user-select:none}
-.ni i{font-size:17px;width:17px;text-align:center;flex-shrink:0}
+.nl{font-size:12.5px;color:#bdbdbd;padding:10px 14px 3px;letter-spacing:.7px;font-weight:600;text-transform:uppercase}
+.ni{display:flex;align-items:center;gap:9px;padding:9px 14px;cursor:pointer;color:#616161;font-size:15.5px;border-right:3px solid transparent;transition:all .12s;user-select:none}
+.ni i{font-size:19px;width:17px;text-align:center;flex-shrink:0}
 .ni:hover{background:#fafafa;color:#1a1a1a}
 .ni.on{background:#FFF1F2;color:#BE123C;border-right-color:#BE123C;font-weight:700}
 .ni.on i{color:#BE123C}
-.nbadge{margin-right:auto;background:#BE123C;color:#fff;font-size:10px;padding:2px 6px;border-radius:10px}
+.nbadge{margin-right:auto;background:#BE123C;color:#fff;font-size:12px;padding:2px 6px;border-radius:10px}
 .sb-foot{padding:12px 14px 16px;border-top:1px solid #f0f0f0;background:#fafafa}
 .sf-user{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.sf-av{width:36px;height:36px;background:linear-gradient(135deg,#BE123C,#881337);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:700;flex-shrink:0;box-shadow:0 2px 8px rgba(198,40,40,.3)}
-.sf-name{font-size:13px;font-weight:700;color:#1a1a1a}
-.sf-role{font-size:11px;color:#9e9e9e;margin-top:1px}
-.btn-out{width:100%;padding:9px;background:#FFF1F2;border:1px solid #FECDD3;border-radius:10px;color:#BE123C;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px;transition:all .15s}
+.sf-av{width:36px;height:36px;background:linear-gradient(135deg,#BE123C,#881337);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px;font-weight:700;flex-shrink:0;box-shadow:0 2px 8px rgba(198,40,40,.3)}
+.sf-name{font-size:15px;font-weight:700;color:#1a1a1a}
+.sf-role{font-size:13px;color:#9e9e9e;margin-top:1px}
+.btn-out{width:100%;padding:9px;background:#FFF1F2;border:1px solid #FECDD3;border-radius:10px;color:#BE123C;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px;transition:all .15s}
 .btn-out:hover,.btn-out:active{background:#BE123C;color:#fff;border-color:#BE123C}
 
 /* ===== TOPBAR ===== */
 .content{flex:1;display:flex;flex-direction:column;overflow:hidden}
 .topbar{background:#fff;border-bottom:1px solid #eeeeee;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;min-height:52px}
-.tb-title{font-size:16px;font-weight:800;color:#1a1a1a}
+.tb-title{font-size:18px;font-weight:800;color:#1a1a1a}
 .tb-r{display:flex;align-items:center;gap:12px}
-.tb-date{font-size:12px;color:#9e9e9e}
-.tb-online{display:flex;align-items:center;gap:5px;font-size:12px;color:#2e7d32;font-weight:600}
+.tb-date{font-size:14px;color:#9e9e9e}
+.tb-online{display:flex;align-items:center;gap:5px;font-size:14px;color:#2e7d32;font-weight:600}
 .tb-online span{width:8px;height:8px;background:#2e7d32;border-radius:50%;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
 
@@ -125,44 +130,44 @@ html{-webkit-text-size-adjust:100%}
 /* ===== STATS GRID ===== */
 .sg{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
 .sc-card{background:#fff;border:1px solid #eeeeee;border-radius:10px;padding:14px 10px;text-align:center}
-.sc-ico{font-size:23px;margin-bottom:6px}
-.sc-val{font-size:23px;font-weight:700;color:#BE123C;line-height:1}
-.sc-lbl{font-size:11px;color:#9e9e9e;margin-top:4px;line-height:1.4}
+.sc-ico{font-size:25px;margin-bottom:6px}
+.sc-val{font-size:25px;font-weight:700;color:#BE123C;line-height:1}
+.sc-lbl{font-size:13px;color:#9e9e9e;margin-top:4px;line-height:1.4}
 
 /* ===== SECTION HEADER ===== */
 .sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;margin-top:4px}
-.sh-t{font-size:17px;font-weight:800;color:#1a1a1a;display:flex;align-items:center;gap:6px}
-.sh-t i{color:#BE123C;font-size:17px}
-.sh-a{font-size:13px;color:#BE123C;cursor:pointer;font-weight:600}
+.sh-t{font-size:19px;font-weight:800;color:#1a1a1a;display:flex;align-items:center;gap:6px}
+.sh-t i{color:#BE123C;font-size:19px}
+.sh-a{font-size:15px;color:#BE123C;cursor:pointer;font-weight:600}
 
 /* ===== TABLE ===== */
 .tw{background:#fff;border:1px solid #eeeeee;border-radius:10px;overflow:hidden;margin-bottom:12px}
-table{width:100%;border-collapse:collapse;font-size:13px}
-thead th{background:#fafafa;color:#757575;padding:9px 10px;text-align:right;font-size:13px;font-weight:700;border-bottom:1px solid #eeeeee}
-tbody td{padding:9px 10px;border-bottom:1px solid #f5f5f5;color:#1a1a1a;vertical-align:middle;font-size:14px}
+table{width:100%;border-collapse:collapse;font-size:15px}
+thead th{background:#fafafa;color:#757575;padding:9px 10px;text-align:right;font-size:15px;font-weight:700;border-bottom:1px solid #eeeeee}
+tbody td{padding:9px 10px;border-bottom:1px solid #f5f5f5;color:#1a1a1a;vertical-align:middle;font-size:16px}
 tbody tr:last-child td{border-bottom:none}
 tbody tr:hover td{background:#fafafa}
-.pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600}
+.pill{display:inline-block;font-size:13px;padding:2px 8px;border-radius:20px;font-weight:600}
 .pg{background:#e8f5e9;color:#2e7d32}
 .pb{background:#EFF6FF;color:#1D4ED8}
 .pr{background:#FFF1F2;color:#BE123C}
 .py{background:#fff8e1;color:#e65100}
 .pb{background:#e3f2fd;color:#1565c0}
-.ibtn{padding:4px 8px;background:none;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;color:#757575;font-size:14px;transition:all .12s}
+.ibtn{padding:4px 8px;background:none;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;color:#757575;font-size:16px;transition:all .12s}
 .ibtn:hover{background:#f5f5f5;color:#1a1a1a}
 
 /* ===== FORM ===== */
 .fsec{background:#fff;border:1px solid #eeeeee;border-radius:10px;padding:14px;margin-bottom:12px}
-.fst{font-size:16px;font-weight:700;color:#757575;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:5px}
-.fst i{color:#BE123C;font-size:15px}
+.fst{font-size:18px;font-weight:700;color:#757575;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:5px}
+.fst i{color:#BE123C;font-size:17px}
 .fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
 .fgrp{display:flex;flex-direction:column;gap:4px}
 .rc-row3{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;min-width:0}
 .rc-row3 .fgrp{min-width:0}
-.rc-row3 .fgrp label{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rc-row3 .fgrp input{width:100%;min-width:0;padding:8px 4px;font-size:12.5px;text-align:center}
-.fgrp label{font-size:14px;color:#616161;font-weight:600}
-.fgrp input,.fgrp select,.fgrp textarea{padding:10px 12px;border:1px solid #e0e0e0;border-radius:10px;background:#fafafa;color:#1a1a1a;font-size:15px;font-family:inherit;outline:none;transition:border .15s}
+.rc-row3 .fgrp label{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rc-row3 .fgrp input{width:100%;min-width:0;padding:8px 4px;font-size:14.5px;text-align:center}
+.fgrp label{font-size:16px;color:#616161;font-weight:600}
+.fgrp input,.fgrp select,.fgrp textarea{padding:10px 12px;border:1px solid #e0e0e0;border-radius:10px;background:#fafafa;color:#1a1a1a;font-size:17px;font-family:inherit;outline:none;transition:border .15s}
 .fgrp input:focus,.fgrp select:focus{border-color:#BE123C;background:#fff}
 .fgrp input.ro{background:#f5f5f5;color:#9e9e9e;cursor:not-allowed}
 .fgrp input.auto{background:#fff8f8;color:#BE123C;font-weight:700;cursor:not-allowed}
@@ -171,9 +176,9 @@ tbody tr:hover td{background:#fafafa}
 
 /* ===== BUTTONS ===== */
 .abar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-.btn{display:flex;align-items:center;gap:5px;padding:10px 16px;border-radius:10px;border:1px solid #e0e0e0;background:#fff;color:#1a1a1a;font-size:14px;cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .12s}
+.btn{display:flex;align-items:center;gap:5px;padding:10px 16px;border-radius:10px;border:1px solid #e0e0e0;background:#fff;color:#1a1a1a;font-size:16px;cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .12s}
 .btn:hover{background:#f5f5f5}
-.btn i{font-size:15px}
+.btn i{font-size:17px}
 .btn-p{background:#BE123C;color:#fff;border-color:#BE123C}
 .btn-p:hover{background:#9F1239}
 .btn-s{background:#2e7d32;color:#fff;border-color:#2e7d32}
@@ -183,43 +188,43 @@ tbody tr:hover td{background:#fafafa}
 .btg{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;margin-bottom:14px}
 .btc{background:#fff;border:2px solid #f0f0f0;border-radius:12px;padding:12px 5px;text-align:center;cursor:pointer;transition:all .15s;box-shadow:0 1px 4px rgba(0,0,0,.05)}
 .btc:hover,.btc.warn{border-color:#BE123C;background:#FFF1F2;transform:scale(1.04)}
-.btc-t{font-size:19px;font-weight:800;color:#BE123C}
-.btc-n{font-size:10px;color:#9e9e9e;margin-top:3px;font-weight:500}
+.btc-t{font-size:21px;font-weight:800;color:#BE123C}
+.btc-n{font-size:12px;color:#9e9e9e;margin-top:3px;font-weight:500}
 
 /* ===== PAGINATION ===== */
-.pag{display:flex;align-items:center;justify-content:space-between;padding:8px 0;font-size:12px;color:#757575}
+.pag{display:flex;align-items:center;justify-content:space-between;padding:8px 0;font-size:14px;color:#757575}
 .pag-btns{display:flex;gap:4px}
-.pbtn{padding:4px 10px;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;background:#fff;font-size:12px;transition:all .12s;font-family:inherit}
+.pbtn{padding:4px 10px;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;background:#fff;font-size:14px;transition:all .12s;font-family:inherit}
 .pbtn:hover{background:#f5f5f5}
 .pbtn.on{background:#BE123C;color:#fff;border-color:#BE123C}
 .pbtn:disabled{opacity:.4;cursor:not-allowed}
 
 /* ===== TABS ===== */
 .tabs{display:flex;gap:2px;background:#f5f5f5;border-radius:8px;padding:3px;margin-bottom:12px}
-.tab{padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer;color:#757575;transition:all .12s}
+.tab{padding:6px 14px;border-radius:6px;font-size:15px;cursor:pointer;color:#757575;transition:all .12s}
 .tab.on{background:#fff;color:#1a1a1a;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 
 /* ===== BARCODE CARD ===== */
 .bc-card{background:#fff;border:1px solid #eeeeee;border-radius:10px;padding:18px;max-width:480px;margin:0 auto}
 .bc-info{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
-.bcf label{font-size:11px;color:#9e9e9e;display:block;margin-bottom:2px}
-.bcf span{font-size:14px;font-weight:700;color:#1a1a1a}
+.bcf label{font-size:13px;color:#9e9e9e;display:block;margin-bottom:2px}
+.bcf span{font-size:16px;font-weight:700;color:#1a1a1a}
 .bcf.red span{color:#BE123C}
 .bc-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.bcbtn{padding:12px;border:1px solid #e0e0e0;border-radius:10px;background:#fafafa;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12.5px;color:#1a1a1a;font-family:inherit;transition:all .12s}
+.bcbtn{padding:12px;border:1px solid #e0e0e0;border-radius:10px;background:#fafafa;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:14.5px;color:#1a1a1a;font-family:inherit;transition:all .12s}
 .bcbtn:hover{border-color:#BE123C;background:#FFF1F2}
-.bcbtn i{font-size:23px;color:#BE123C}
+.bcbtn i{font-size:25px;color:#BE123C}
 
 /* ===== REPORT ===== */
 .rpt{background:#fff;border:1px solid #eeeeee;border-radius:10px;overflow:hidden}
 .rpt-hd{background:#BE123C;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:flex-start}
-.rh-t{font-size:14px;font-weight:700}
-.rh-s{font-size:11px;opacity:.75;margin-top:2px}
-.rh-en{text-align:left;font-size:11px;opacity:.65;line-height:1.6}
+.rh-t{font-size:16px;font-weight:700}
+.rh-s{font-size:13px;opacity:.75;margin-top:2px}
+.rh-en{text-align:left;font-size:13px;opacity:.65;line-height:1.6}
 .rpt-body{padding:14px}
 .rs{margin-bottom:14px}
-.rs-t{font-size:12px;font-weight:700;color:#757575;padding:5px 9px;background:#fafafa;border-radius:5px;margin-bottom:7px}
-.rr{display:flex;justify-content:space-between;padding:5px 9px;border-bottom:1px solid #f5f5f5;font-size:13px}
+.rs-t{font-size:14px;font-weight:700;color:#757575;padding:5px 9px;background:#fafafa;border-radius:5px;margin-bottom:7px}
+.rr{display:flex;justify-content:space-between;padding:5px 9px;border-bottom:1px solid #f5f5f5;font-size:15px}
 .rr:last-child{border-bottom:none}
 .rv{font-weight:700;color:#BE123C}
 
@@ -228,22 +233,22 @@ tbody tr:hover td{background:#fafafa}
 .setc{background:#fff;border:1px solid #eeeeee;border-radius:10px;padding:16px;cursor:pointer;transition:all .12s}
 .setc:hover{border-color:#BE123C;background:#fff8f8}
 .setc-ico{width:38px;height:38px;background:#FFF1F2;border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:10px}
-.setc-ico i{font-size:21px;color:#BE123C}
-.setc-t{font-size:14px;font-weight:700;color:#1a1a1a;margin-bottom:4px}
-.setc-d{font-size:12px;color:#9e9e9e;line-height:1.5}
+.setc-ico i{font-size:23px;color:#BE123C}
+.setc-t{font-size:16px;font-weight:700;color:#1a1a1a;margin-bottom:4px}
+.setc-d{font-size:14px;color:#9e9e9e;line-height:1.5}
 
 /* ===== SEARCH BAR ===== */
 .sbar{display:flex;gap:8px;margin-bottom:12px}
-.sinp{flex:1;padding:8px 12px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#1a1a1a;font-size:14px;font-family:inherit;outline:none}
+.sinp{flex:1;padding:8px 12px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#1a1a1a;font-size:16px;font-family:inherit;outline:none}
 .sinp:focus{border-color:#BE123C}
 
 /* ===== EMPTY STATE ===== */
 .empty{text-align:center;padding:36px 20px;color:#9e9e9e}
-.empty i{font-size:37px;display:block;margin-bottom:10px;opacity:.3}
-.empty p{font-size:13.5px}
+.empty i{font-size:39px;display:block;margin-bottom:10px;opacity:.3}
+.empty p{font-size:15.5px}
 
 /* ===== AUDIT TABLE ===== */
-.audit-row{display:flex;gap:10px;padding:8px 10px;border-bottom:1px solid #f5f5f5;font-size:12px;align-items:flex-start}
+.audit-row{display:flex;gap:10px;padding:8px 10px;border-bottom:1px solid #f5f5f5;font-size:14px;align-items:flex-start}
 .audit-row:last-child{border-bottom:none}
 .audit-row:hover{background:#fafafa}
 .a-time{color:#9e9e9e;white-space:nowrap;flex-shrink:0;width:120px}
@@ -263,7 +268,7 @@ tbody tr:hover td{background:#fafafa}
 .sb{box-shadow:2px 0 12px rgba(0,0,0,.08)}
 
 /* ===== HAMBURGER (mobile only) ===== */
-.ham{display:none;align-items:center;justify-content:center;width:40px;height:40px;background:#BE123C;border:none;border-radius:10px;cursor:pointer;color:#fff;font-size:21px;font-weight:700;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+.ham{display:none;align-items:center;justify-content:center;width:40px;height:40px;background:#BE123C;border:none;border-radius:10px;cursor:pointer;color:#fff;font-size:23px;font-weight:700;flex-shrink:0;-webkit-tap-highlight-color:transparent}
 .ham:active{background:#9F1239}
 .sb-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:4999;display:none}
 .sb-overlay.on{display:block}
@@ -293,11 +298,11 @@ tbody tr:hover td{background:#fafafa}
   /* Stats: 2 columns */
   .sg{grid-template-columns:repeat(2,1fr);gap:10px}
   .sg .sc-card:last-child{grid-column:span 2}
-  .sc-val{font-size:21px}
+  .sc-val{font-size:23px}
   
   /* Blood type: 4 cols */
   .btg{grid-template-columns:repeat(4,1fr);gap:6px}
-  .btc-t{font-size:15px}
+  .btc-t{font-size:17px}
   
   /* Form: single column */
   .fgrid{grid-template-columns:1fr !important}
@@ -322,7 +327,7 @@ tbody tr:hover td{background:#fafafa}
   .bc-card{max-width:100%;margin:0}
   
   /* Section headers */
-  .sh-t{font-size:13px}
+  .sh-t{font-size:15px}
   
   /* Login card */
   .lcard{width:95vw;padding:22px 18px;margin:0 10px}
@@ -377,7 +382,7 @@ tbody tr:hover td{background:#fafafa}
 .bn-item.on>*:first-child{transform:scale(1.15)}
 
 /* ===== WORKFLOW STATUS ===== */
-.sp{display:inline-block;font-size:12px;padding:3px 10px;border-radius:20px;font-weight:600}
+.sp{display:inline-block;font-size:14px;padding:3px 10px;border-radius:20px;font-weight:600}
 .sp-draw{background:#e3f2fd;color:#1565c0}
 .sp-lab{background:#fff8e1;color:#e65100}
 .sp-stock{background:#e8f5e9;color:#2e7d32}
@@ -387,30 +392,30 @@ tbody tr:hover td{background:#fafafa}
 /* ===== REJECTED WARNING ===== */
 .rej-warn{background:#FFF1F2;border:2px solid #FECDD3;border-radius:12px;padding:14px;margin-bottom:14px;display:none;gap:10px;align-items:flex-start}
 .rej-warn.show{display:flex}
-.rej-warn-t{font-size:16px;font-weight:700;color:#BE123C}
-.rej-warn-r{font-size:14px;color:#757575;margin-top:3px}
+.rej-warn-t{font-size:18px;font-weight:700;color:#BE123C}
+.rej-warn-r{font-size:16px;color:#757575;margin-top:3px}
 
 /* ===== FLOW CARDS ===== */
 .flow-card{background:#fff;border:1.5px solid #eeeeee;border-radius:14px;padding:14px 12px;margin-bottom:8px;display:flex;align-items:center;gap:12px;transition:all .15s;box-shadow:0 1px 6px rgba(0,0,0,.05)}
 .flow-card:hover{border-color:#BE123C;box-shadow:0 3px 14px rgba(198,40,40,.10)}
-.fc-av{width:44px;height:44px;background:#FFF1F2;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:23px;flex-shrink:0}
-.fc-name{font-size:15px;font-weight:700;color:#1a1a1a}
-.fc-sub{font-size:13px;color:#9e9e9e;margin-top:2px}
+.fc-av{width:44px;height:44px;background:#FFF1F2;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:25px;flex-shrink:0}
+.fc-name{font-size:17px;font-weight:700;color:#1a1a1a}
+.fc-sub{font-size:15px;color:#9e9e9e;margin-top:2px}
 .fc-act{margin-right:auto;flex-shrink:0}
 
 /* ===== STOCK GRID ===== */
 .stock-bt{background:#fff;border:2px solid #eeeeee;border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;transition:all .15s;box-shadow:0 1px 6px rgba(0,0,0,.05)}
 .stock-bt:hover{border-color:#BE123C;background:#FFF1F2}
 .stock-bt.empty-bt,.comp-stock-card.empty-bt{opacity:.45}
-.stock-bt-type{font-size:21px;font-weight:800;color:#BE123C}
-.stock-bt-count{font-size:14px;color:#757575;margin-top:4px;font-weight:600}
+.stock-bt-type{font-size:23px;font-weight:800;color:#BE123C}
+.stock-bt-count{font-size:16px;color:#757575;margin-top:4px;font-weight:600}
 
 /* ===== BOTTLE EXPIRY CARDS ===== */
 .bottle-cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:10px}
 .bottle-card{border-radius:12px;padding:10px 6px;text-align:center;cursor:pointer;transition:transform .1s;box-shadow:0 1px 5px rgba(0,0,0,.12)}
 .bottle-card:active{transform:scale(.96)}
-.bottle-card-num{font-size:18px;font-weight:800}
-.bottle-card-date{font-size:11.5px;margin-top:3px;opacity:.9}
+.bottle-card-num{font-size:20px;font-weight:800}
+.bottle-card-date{font-size:13.5px;margin-top:3px;opacity:.9}
 
 /* ===== BLOOD BAG CARDS ===== */
 .bb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:12px;margin-top:10px}
@@ -420,19 +425,19 @@ tbody tr:hover td{background:#fafafa}
 .bb-card:active{transform:scale(.96)}
 .bb-card:hover{box-shadow:0 6px 16px rgba(190,18,60,.12);transform:translateY(-2px)}
 .bb-svg{width:56px;height:80px;display:block;margin:0 auto}
-.bb-num{font-size:17px;font-weight:800;color:#1a1a1a;margin-top:4px}
-.bb-bt{font-size:12px;font-weight:700;color:#BE123C;margin-top:1px}
-.bb-dates{display:flex;flex-direction:column;gap:1px;font-size:10px;color:#757575;margin-top:4px}
+.bb-num{font-size:19px;font-weight:800;color:#1a1a1a;margin-top:4px}
+.bb-bt{font-size:14px;font-weight:700;color:#BE123C;margin-top:1px}
+.bb-dates{display:flex;flex-direction:column;gap:1px;font-size:12px;color:#757575;margin-top:4px}
 
 /* ===== STOCK-BY-COMPONENT-TYPE CARDS ===== */
 .comp-stock-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
 .comp-stock-card{background:#fff;border:1.5px solid #EEF2F6;border-radius:14px;padding:14px 8px;text-align:center;box-shadow:0 1px 5px rgba(0,0,0,.04)}
-.comp-stock-icon{font-size:23px;margin-bottom:4px}
-.comp-stock-name{font-size:12.5px;font-weight:700;color:#374151}
-.comp-stock-count{font-size:21px;font-weight:800;color:#BE123C;margin-top:2px}
+.comp-stock-icon{font-size:25px;margin-bottom:4px}
+.comp-stock-name{font-size:14.5px;font-weight:700;color:#374151}
+.comp-stock-count{font-size:23px;font-weight:800;color:#BE123C;margin-top:2px}
 
 /* ===== BIG ACTION BUTTON ===== */
-.btn-action{width:100%;padding:16px;background:#BE123C;color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;transition:background .15s}
+.btn-action{width:100%;padding:16px;background:#BE123C;color:#fff;border:none;border-radius:14px;font-size:19px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;transition:background .15s}
 .btn-action:hover{background:#9F1239}
 .btn-action:active{background:#881337}
 
@@ -445,24 +450,24 @@ tbody tr:hover td{background:#fafafa}
 .app-header{background:#fff;border-bottom:1px solid #EEF2F6;flex-shrink:0}
 .ah-top{display:flex;align-items:center;justify-content:space-between;padding:13px 16px 10px}
 .ah-brand{display:flex;align-items:center;gap:10px}
-.ah-name{font-size:14px;font-weight:700;color:#1E293B;line-height:1.35}
-.ah-sub{font-size:11px;color:#94A3B8;margin-top:1px}
-.ah-online{display:flex;align-items:center;gap:5px;font-size:11.5px;color:#16A34A;font-weight:600;flex-shrink:0}
+.ah-name{font-size:16px;font-weight:700;color:#1E293B;line-height:1.35}
+.ah-sub{font-size:13px;color:#94A3B8;margin-top:1px}
+.ah-online{display:flex;align-items:center;gap:5px;font-size:13.5px;color:#16A34A;font-weight:600;flex-shrink:0}
 .ah-online span{width:7px;height:7px;background:#22C55E;border-radius:50%;display:inline-block;animation:pulse 2s infinite}
 .ah-user{margin:0 16px 12px;background:#F8FAFC;border-radius:10px;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;border:1px solid #EEF2F6}
 .ah-user-l{display:flex;align-items:center;gap:9px}
-.ah-av{width:32px;height:32px;border-radius:50%;background:#BE123C;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:700;flex-shrink:0}
-.ah-uname{font-size:13.5px;font-weight:700;color:#1E293B}
-.ah-urole{font-size:11.5px;color:#64748B;margin-top:1px}
-.ah-dept{font-size:12px;font-weight:700;color:#BE123C;background:#FFF1F2;border:1px solid #FECDD3;padding:3px 11px;border-radius:20px;flex-shrink:0}
+.ah-av{width:32px;height:32px;border-radius:50%;background:#BE123C;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:700;flex-shrink:0}
+.ah-uname{font-size:15.5px;font-weight:700;color:#1E293B}
+.ah-urole{font-size:13.5px;color:#64748B;margin-top:1px}
+.ah-dept{font-size:14px;font-weight:700;color:#BE123C;background:#FFF1F2;border:1px solid #FECDD3;padding:3px 11px;border-radius:20px;flex-shrink:0}
 
 /* PAGE TITLE BAR */
 .page-title-bar{display:flex;align-items:center;justify-content:space-between;padding:9px 16px 7px;background:#fff;border-bottom:1px solid #EEF2F6;flex-shrink:0}
-.ptb-title{font-size:14.5px;font-weight:700;color:#1E293B}
+.ptb-title{font-size:16.5px;font-weight:700;color:#1E293B}
 
 /* 3-TAB BOTTOM NAV */
 .bn-icon{width:27px;height:27px;display:block;margin:0 auto}
-.bn-lbl{font-size:11px;display:block;margin-top:3px;font-weight:600}
+.bn-lbl{font-size:13px;display:block;margin-top:3px;font-weight:600}
 
 /* WORK HOME GRID */
 .work-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
@@ -470,29 +475,29 @@ tbody tr:hover td{background:#fafafa}
 .wcard:hover{border-color:#BE123C;background:#FFF8F8;transform:translateY(-1px);box-shadow:0 4px 14px rgba(190,18,60,.1)}
 .wcard:active{transform:scale(.97)}
 .wcard.primary{border-color:#BE123C;background:linear-gradient(135deg,#FFF1F2,#FFE4E8)}
-.wcard-icon{font-size:31px;display:block;margin-bottom:8px;line-height:1}
-.wcard-name{font-size:14px;font-weight:700;color:#1E293B}
-.wcard-desc{font-size:12px;color:#64748B;margin-top:2px}
-.wcard-badge{display:inline-block;font-size:11px;padding:2px 9px;border-radius:20px;margin-top:6px;font-weight:700}
+.wcard-icon{font-size:33px;display:block;margin-bottom:8px;line-height:1}
+.wcard-name{font-size:16px;font-weight:700;color:#1E293B}
+.wcard-desc{font-size:14px;color:#64748B;margin-top:2px}
+.wcard-badge{display:inline-block;font-size:13px;padding:2px 9px;border-radius:20px;margin-top:6px;font-weight:700}
 .wb-red{background:#FEE2E2;color:#991B1B}
 .wb-green{background:#DCFCE7;color:#166534}
 .wb-orange{background:#FEF3C7;color:#92400E}
 
 /* ACCOUNT SCREEN */
 .acc-profile{background:#fff;border-radius:16px;padding:22px;margin-bottom:12px;border:1px solid #EEF2F6;text-align:center}
-.acc-av-big{width:64px;height:64px;border-radius:50%;background:#BE123C;display:flex;align-items:center;justify-content:center;color:#fff;font-size:25px;font-weight:700;margin:0 auto 12px;border:3px solid #FECDD3}
-.acc-pname{font-size:18px;font-weight:800;color:#1E293B}
-.acc-psub{font-size:12px;color:#94A3B8;margin-top:4px}
-.acc-prole{display:inline-block;background:#FFF1F2;color:#BE123C;font-size:12.5px;padding:4px 14px;border-radius:20px;margin-top:8px;font-weight:700;border:1px solid #FECDD3}
+.acc-av-big{width:64px;height:64px;border-radius:50%;background:#BE123C;display:flex;align-items:center;justify-content:center;color:#fff;font-size:27px;font-weight:700;margin:0 auto 12px;border:3px solid #FECDD3}
+.acc-pname{font-size:20px;font-weight:800;color:#1E293B}
+.acc-psub{font-size:14px;color:#94A3B8;margin-top:4px}
+.acc-prole{display:inline-block;background:#FFF1F2;color:#BE123C;font-size:14.5px;padding:4px 14px;border-radius:20px;margin-top:8px;font-weight:700;border:1px solid #FECDD3}
 .acc-menu-list{background:#fff;border-radius:14px;border:1px solid #EEF2F6;overflow:hidden}
 .ami{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid #F8FAFC;cursor:pointer;transition:background .12s}
 .ami:last-child{border:none}
 .ami:hover{background:#F8FAFC}
-.ami-icon{width:36px;height:36px;border-radius:10px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.ami-icon{width:36px;height:36px;border-radius:10px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0}
 .ami-icon.danger{background:#FEE2E2}
-.ami-text{font-size:14px;font-weight:600;color:#1E293B}
-.ami-sub{font-size:12px;color:#94A3B8;margin-top:1px}
-.ami-arr{margin-right:auto;color:#CBD5E1;font-size:19px;flex-shrink:0}
+.ami-text{font-size:16px;font-weight:600;color:#1E293B}
+.ami-sub{font-size:14px;color:#94A3B8;margin-top:1px}
+.ami-arr{margin-right:auto;color:#CBD5E1;font-size:21px;flex-shrink:0}
 
 /* OVERRIDE: content background */
 .content{background:#F1F5F9 !important}
@@ -520,14 +525,14 @@ tbody tr:hover td{background:#fafafa}
   }
   @keyframes rcFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
   #s-reception .fst{
-    font-size:21px;font-weight:800;color:#BE123C;
+    font-size:23px;font-weight:800;color:#BE123C;
     border-bottom:2px solid #FFE4E9;padding-bottom:16px;margin-bottom:26px;gap:10px;
   }
-  #s-reception .fst i{font-size:24px}
+  #s-reception .fst i{font-size:26px}
   #s-reception .fgrid{grid-template-columns:repeat(3,1fr);gap:20px 22px}
-  #s-reception .fgrp label{font-size:14.5px;font-weight:700;color:#374151;margin-bottom:3px}
+  #s-reception .fgrp label{font-size:16.5px;font-weight:700;color:#374151;margin-bottom:3px}
   #s-reception .fgrp input,#s-reception .fgrp select{
-    padding:14px 16px;border-radius:13px;font-size:16px;border:1.5px solid #E5E7EB;
+    padding:14px 16px;border-radius:13px;font-size:18px;border:1.5px solid #E5E7EB;
     background:#F9FAFB;transition:all .18s;
   }
   #s-reception .fgrp input:hover,#s-reception .fgrp select:hover{border-color:#FBCFE8}
@@ -540,7 +545,7 @@ tbody tr:hover td{background:#fafafa}
     background:linear-gradient(135deg,#FFF1F2,#FFF7ED);border-color:#FBCFE8;font-weight:700;color:#BE123C;
   }
   #s-reception .btn-action{
-    max-width:920px;margin:10px auto 0;border-radius:15px;font-size:17px;padding:19px;
+    max-width:920px;margin:10px auto 0;border-radius:15px;font-size:19px;padding:19px;
     box-shadow:0 8px 22px rgba(190,18,60,.25);transition:transform .15s,box-shadow .15s;
   }
   #s-reception .btn-action:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(190,18,60,.32)}
@@ -560,9 +565,9 @@ tbody tr:hover td{background:#fafafa}
     border-radius:22px;padding:28px 32px;margin-bottom:26px;color:#fff;
     box-shadow:0 10px 30px rgba(190,18,60,.25);
   }
-  .dth-hero-icon{font-size:45px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.2))}
-  .dth-hero-title{font-size:23px;font-weight:800}
-  .dth-hero-sub{font-size:14.5px;opacity:.9;margin-top:4px}
+  .dth-hero-icon{font-size:47px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.2))}
+  .dth-hero-title{font-size:25px;font-weight:800}
+  .dth-hero-sub{font-size:16.5px;opacity:.9;margin-top:4px}
 
   .dth-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px}
   .dth-card{
@@ -576,11 +581,11 @@ tbody tr:hover td{background:#fafafa}
   }
   .dth-card:hover{transform:translateY(-4px);box-shadow:0 10px 24px rgba(190,18,60,.15);border-color:#FBCFE8}
   .dth-card:hover::before{opacity:1}
-  .dth-card-icon{font-size:35px;margin-bottom:10px}
-  .dth-card-name{font-size:15.5px;font-weight:800;color:#1a1a1a}
-  .dth-card-desc{font-size:12.5px;color:#94A3B8;margin-top:4px}
+  .dth-card-icon{font-size:37px;margin-bottom:10px}
+  .dth-card-name{font-size:17.5px;font-weight:800;color:#1a1a1a}
+  .dth-card-desc{font-size:14.5px;color:#94A3B8;margin-top:4px}
   .dth-card-badge{
-    position:absolute;top:10px;left:10px;background:#DC2626;color:#fff;font-size:11px;
+    position:absolute;top:10px;left:10px;background:#DC2626;color:#fff;font-size:13px;
     font-weight:700;border-radius:20px;padding:2px 8px;display:none;
   }
   .dth-card-badge.show{display:block}
@@ -594,10 +599,10 @@ tbody tr:hover td{background:#fafafa}
     display:flex;align-items:center;justify-content:space-between;
     background:#fff;padding:16px 24px;border-bottom:1px solid #EEF2F6;flex-shrink:0;
   }
-  .sec-popup-title{font-size:18px;font-weight:800;color:#BE123C}
+  .sec-popup-title{font-size:20px;font-weight:800;color:#BE123C}
   .sec-popup-close{
     background:#F1F5F9;border:none;border-radius:50%;width:36px;height:36px;cursor:pointer;
-    color:#616161;font-size:17px;transition:background .15s;
+    color:#616161;font-size:19px;transition:background .15s;
   }
   .sec-popup-close:hover{background:#FFE4E9;color:#BE123C}
   .sec-popup-body{padding:26px 28px;overflow-y:auto;flex:1}
@@ -605,54 +610,54 @@ tbody tr:hover td{background:#fafafa}
 
   /* ── General livelier desktop styling for everything opened inside a popup ── */
   .sec-popup-body .sh{margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #FFE4E9}
-  .sec-popup-body .sh-t{font-size:20px;font-weight:800;color:#BE123C;gap:9px}
-  .sec-popup-body .sh-t i{font-size:22px}
+  .sec-popup-body .sh-t{font-size:22px;font-weight:800;color:#BE123C;gap:9px}
+  .sec-popup-body .sh-t i{font-size:24px}
 
   .sec-popup-body .flow-card{
     padding:16px 18px;border-radius:16px;border-color:#F1F5F9;gap:14px;
     box-shadow:0 2px 10px rgba(0,0,0,.04);transition:transform .14s,box-shadow .14s,border-color .14s;
   }
   .sec-popup-body .flow-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(190,18,60,.1);border-color:#FBCFE8}
-  .sec-popup-body .fc-av{width:50px;height:50px;font-size:25px;background:linear-gradient(135deg,#FFF1F2,#FFE4E9)}
-  .sec-popup-body .fc-name{font-size:16.5px}
-  .sec-popup-body .fc-sub{font-size:13.5px}
+  .sec-popup-body .fc-av{width:50px;height:50px;font-size:27px;background:linear-gradient(135deg,#FFF1F2,#FFE4E9)}
+  .sec-popup-body .fc-name{font-size:18.5px}
+  .sec-popup-body .fc-sub{font-size:15.5px}
 
   .sec-popup-body .empty{padding:60px 20px}
-  .sec-popup-body .empty i{font-size:41px;color:#CBD5E1;margin-bottom:10px;display:block}
-  .sec-popup-body .empty p{font-size:15.5px}
+  .sec-popup-body .empty i{font-size:43px;color:#CBD5E1;margin-bottom:10px;display:block}
+  .sec-popup-body .empty p{font-size:17.5px}
 
   .sec-popup-body .tw{border-radius:14px;box-shadow:0 3px 14px rgba(0,0,0,.05);border-color:#F1F5F9}
   .sec-popup-body .tw table{width:100%;border-collapse:collapse}
-  .sec-popup-body .tw th{background:#FFF1F2;color:#BE123C;font-size:13.5px;font-weight:700;padding:12px 10px}
-  .sec-popup-body .tw td{padding:12px 10px;font-size:14.5px}
+  .sec-popup-body .tw th{background:#FFF1F2;color:#BE123C;font-size:15.5px;font-weight:700;padding:12px 10px}
+  .sec-popup-body .tw td{padding:12px 10px;font-size:16.5px}
   .sec-popup-body .tw tr:hover td{background:#FFFBFB}
 
   .sec-popup-body .stock-bt{padding:20px 10px;border-radius:16px}
   .sec-popup-body .stock-bt:hover{transform:translateY(-3px)}
-  .sec-popup-body .stock-bt-type{font-size:25px}
+  .sec-popup-body .stock-bt-type{font-size:27px}
 
   .sec-popup-body .bottle-cards-grid{grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:12px}
   .sec-popup-body .bb-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:16px}
   .sec-popup-body .bb-svg{width:68px;height:96px}
-  .sec-popup-body .bb-num{font-size:19px}
+  .sec-popup-body .bb-num{font-size:21px}
   .sec-popup-body .bottle-card{padding:14px 8px;border-radius:14px}
-  .sec-popup-body .bottle-card-num{font-size:20px}
+  .sec-popup-body .bottle-card-num{font-size:22px}
 
   .sec-popup-body .acc-menu-list{border-radius:16px;box-shadow:0 3px 14px rgba(0,0,0,.05)}
   .sec-popup-body .ami{padding:16px 20px;transition:background .14s}
   .sec-popup-body .ami:hover{background:#FFF7F8}
-  .sec-popup-body .ami-icon{width:42px;height:42px;font-size:21px;border-radius:12px}
-  .sec-popup-body .ami-text{font-size:15.5px}
+  .sec-popup-body .ami-icon{width:42px;height:42px;font-size:23px;border-radius:12px}
+  .sec-popup-body .ami-text{font-size:17.5px}
 
   .sec-popup-body .rare-row{padding:14px 16px;border-radius:12px;transition:background .14s}
   .sec-popup-body .rare-row:hover{background:#FFFBFB}
 
   .sec-popup-body .fsec{padding:26px 28px;border-radius:18px;border-color:#F1F5F9;box-shadow:0 4px 20px rgba(0,0,0,.05)}
-  .sec-popup-body .fst{font-size:18px;color:#BE123C;padding-bottom:14px;margin-bottom:20px}
+  .sec-popup-body .fst{font-size:20px;color:#BE123C;padding-bottom:14px;margin-bottom:20px}
   .sec-popup-body .fgrid{gap:16px 18px}
-  .sec-popup-body .fgrp label{font-size:14px;font-weight:700;color:#374151}
+  .sec-popup-body .fgrp label{font-size:16px;font-weight:700;color:#374151}
   .sec-popup-body .fgrp input,.sec-popup-body .fgrp select,.sec-popup-body .fgrp textarea{
-    padding:12px 14px;border-radius:11px;font-size:15.5px;border:1.5px solid #E5E7EB;background:#F9FAFB;
+    padding:12px 14px;border-radius:11px;font-size:17.5px;border:1.5px solid #E5E7EB;background:#F9FAFB;
   }
   .sec-popup-body .fgrp input:focus,.sec-popup-body .fgrp select:focus{
     border-color:#BE123C;background:#fff;box-shadow:0 0 0 4px rgba(190,18,60,.08);
@@ -668,14 +673,14 @@ tbody tr:hover td{background:#fafafa}
 
   .sec-popup-body .sc-card{padding:20px 12px;border-radius:16px;box-shadow:0 3px 14px rgba(0,0,0,.05);transition:transform .14s}
   .sec-popup-body .sc-card:hover{transform:translateY(-3px)}
-  .sec-popup-body .sc-ico{font-size:29px}
-  .sec-popup-body .sc-val{font-size:27px}
-  .sec-popup-body .sc-lbl{font-size:12.5px}
+  .sec-popup-body .sc-ico{font-size:31px}
+  .sec-popup-body .sc-val{font-size:29px}
+  .sec-popup-body .sc-lbl{font-size:14.5px}
 
   .modal{border-radius:20px;padding:28px;box-shadow:0 20px 50px rgba(0,0,0,.2)}
-  .modal-title{font-size:17px;color:#BE123C}
+  .modal-title{font-size:19px;color:#BE123C}
   .modal .fgrp input,.modal .fgrp select,.modal .fgrp textarea{
-    padding:12px 14px;border-radius:11px;font-size:15.5px;border:1.5px solid #E5E7EB;background:#F9FAFB;
+    padding:12px 14px;border-radius:11px;font-size:17.5px;border:1.5px solid #E5E7EB;background:#F9FAFB;
   }
   .modal .fgrp input:focus,.modal .fgrp select:focus{
     border-color:#BE123C;background:#fff;box-shadow:0 0 0 4px rgba(190,18,60,.08);
@@ -692,7 +697,7 @@ tbody tr:hover td{background:#fafafa}
 .offline-bar{
   position:fixed;top:0;left:0;right:0;z-index:9999;
   background:#92400E;color:#fff;
-  padding:9px 16px;font-size:14px;font-weight:600;
+  padding:9px 16px;font-size:16px;font-weight:600;
   display:none;align-items:center;justify-content:space-between;
   gap:10px;box-shadow:0 2px 12px rgba(0,0,0,.2);
 }
@@ -702,38 +707,38 @@ tbody tr:hover td{background:#fafafa}
 .ob-dot{width:8px;height:8px;border-radius:50%;background:#FCD34D;flex-shrink:0}
 .ob-dot.sync{background:#6EE7B7;animation:blink .8s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-.ob-badge{background:rgba(255,255,255,.25);border-radius:20px;padding:2px 10px;font-size:12px}
+.ob-badge{background:rgba(255,255,255,.25);border-radius:20px;padding:2px 10px;font-size:14px}
 
 .offline-btn-disabled{opacity:.45;cursor:not-allowed !important;pointer-events:none}
 .offline-queue-card{background:#FEF3C7;border:1px solid #FCD34D;border-radius:12px;padding:12px 14px;margin-bottom:8px}
-.oqc-title{font-size:14px;font-weight:700;color:#92400E}
-.oqc-sub{font-size:12px;color:#B45309;margin-top:3px}
-.oqc-count{background:#92400E;color:#fff;border-radius:20px;padding:2px 9px;font-size:12px;font-weight:700}
+.oqc-title{font-size:16px;font-weight:700;color:#92400E}
+.oqc-sub{font-size:14px;color:#B45309;margin-top:3px}
+.oqc-count{background:#92400E;color:#fff;border-radius:20px;padding:2px 9px;font-size:14px;font-weight:700}
 
 /* BACK BUTTON */
 .back-btn{
   display:none;align-items:center;gap:6px;
   background:none;border:none;cursor:pointer;
-  color:#BE123C;font-size:14px;font-weight:600;
+  color:#BE123C;font-size:16px;font-weight:600;
   padding:8px 16px 4px;font-family:inherit;
   -webkit-tap-highlight-color:transparent;
 }
 .back-btn.show{display:flex}
-.back-btn-icon{font-size:19px}
+.back-btn-icon{font-size:21px}
 
 /* ═══ BOTTLE SEQUENCES ═══ */
 .seq-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
 .seq-card{background:#fff;border-radius:14px;padding:14px;border:1.5px solid #EEF2F6;position:relative}
 .seq-card.active{border-color:#BE123C}
-.seq-type{font-size:13px;font-weight:700;color:#1E293B;margin-bottom:6px}
-.seq-num{font-size:23px;font-weight:800;color:#BE123C;line-height:1}
-.seq-range{font-size:11px;color:#94A3B8;margin-top:3px}
-.seq-remain{font-size:11px;font-weight:600;margin-top:4px}
+.seq-type{font-size:15px;font-weight:700;color:#1E293B;margin-bottom:6px}
+.seq-num{font-size:25px;font-weight:800;color:#BE123C;line-height:1}
+.seq-range{font-size:13px;color:#94A3B8;margin-top:3px}
+.seq-remain{font-size:13px;font-weight:600;margin-top:4px}
 .seq-remain.ok{color:#16A34A}
 .seq-remain.warn{color:#D97706}
 .seq-remain.danger{color:#DC2626}
-.seq-edit{position:absolute;top:8px;left:8px;background:#FFF1F2;border:none;border-radius:8px;padding:4px 8px;font-size:12px;color:#BE123C;cursor:pointer;font-family:inherit;font-weight:600}
-.seq-add-btn{width:100%;padding:12px;background:#BE123C;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px}
+.seq-edit{position:absolute;top:8px;left:8px;background:#FFF1F2;border:none;border-radius:8px;padding:4px 8px;font-size:14px;color:#BE123C;cursor:pointer;font-family:inherit;font-weight:600}
+.seq-add-btn{width:100%;padding:12px;background:#BE123C;color:#fff;border:none;border-radius:12px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px}
 .seq-add-btn:active{background:#9F1239}
 
 /* ═══ DONOR AUTOCOMPLETE ═══ */
@@ -752,9 +757,9 @@ tbody tr:hover td{background:#fafafa}
 }
 .ac-item:last-child{border-bottom:none;border-radius:0 0 10px 10px}
 .ac-item:active{background:#FFF1F2}
-.ac-av{width:32px;height:32px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#BE123C;flex-shrink:0}
-.ac-info .ac-name{font-size:14px;font-weight:700;color:#1E293B}
-.ac-info .ac-sub{font-size:11.5px;color:#94A3B8;margin-top:1px}
+.ac-av{width:32px;height:32px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#BE123C;flex-shrink:0}
+.ac-info .ac-name{font-size:16px;font-weight:700;color:#1E293B}
+.ac-info .ac-sub{font-size:13.5px;color:#94A3B8;margin-top:1px}
 
 /* Auto-filled indicator */
 .rc-filled-banner{
@@ -763,32 +768,32 @@ tbody tr:hover td{background:#fafafa}
   align-items:center;justify-content:space-between;gap:10px;
 }
 .rc-filled-banner.show{display:flex}
-.rc-filled-text{font-size:13.5px;color:#166534;font-weight:600}
-.rc-filled-clear{background:none;border:none;color:#DC2626;font-size:13px;cursor:pointer;font-weight:600;padding:2px 6px;font-family:inherit}
+.rc-filled-text{font-size:15.5px;color:#166534;font-weight:600}
+.rc-filled-clear{background:none;border:none;color:#DC2626;font-size:15px;cursor:pointer;font-weight:600;padding:2px 6px;font-family:inherit}
 
 /* ═══ RARE BLOOD TYPES ═══ */
 .rare-wrap{display:flex;flex-direction:column;gap:12px}
 .rare-search-bar{display:flex;gap:8px;align-items:center}
-.rare-search-bar input{flex:1;padding:10px 14px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:15px;direction:rtl}
-.rare-search-bar select{padding:10px 12px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:14px;background:#fff}
+.rare-search-bar input{flex:1;padding:10px 14px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:17px;direction:rtl}
+.rare-search-bar select{padding:10px 12px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:16px;background:#fff}
 .rare-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .rs-card{background:#fff;border-radius:12px;padding:10px 12px;text-align:center;border:1.5px solid #EEF2F6;cursor:pointer;transition:all .15s}
 .rs-card.active{border-color:#BE123C;background:#FFF1F2}
 .rs-card:active{transform:scale(.97)}
-.rs-type{font-size:16px;font-weight:800;color:#BE123C}
-.rs-count{font-size:12px;color:#94A3B8;margin-top:2px}
+.rs-type{font-size:18px;font-weight:800;color:#BE123C}
+.rs-count{font-size:14px;color:#94A3B8;margin-top:2px}
 .rare-list{background:#fff;border-radius:14px;overflow:hidden;border:1px solid #EEF2F6}
 .rare-row{display:flex;align-items:center;padding:11px 14px;border-bottom:1px solid #F8FAFC;gap:10px}
 .rare-row:last-child{border-bottom:none}
-.rare-av{width:36px;height:36px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#BE123C;flex-shrink:0}
+.rare-av{width:36px;height:36px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#BE123C;flex-shrink:0}
 .rare-info{flex:1;min-width:0}
-.rare-name{font-size:14px;font-weight:700;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rare-addr{font-size:12px;color:#94A3B8;margin-top:2px}
-.rare-mob{font-size:13px;color:#BE123C;font-weight:600}
-.rare-call{background:none;border:none;color:#16A34A;font-size:21px;cursor:pointer;padding:4px;flex-shrink:0}
-.rare-export-btn{width:100%;padding:12px;background:#1E293B;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px}
+.rare-name{font-size:16px;font-weight:700;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rare-addr{font-size:14px;color:#94A3B8;margin-top:2px}
+.rare-mob{font-size:15px;color:#BE123C;font-weight:600}
+.rare-call{background:none;border:none;color:#16A34A;font-size:23px;cursor:pointer;padding:4px;flex-shrink:0}
+.rare-export-btn{width:100%;padding:12px;background:#1E293B;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px}
 .rare-export-btn:active{background:#0F172A}
-.rare-count-badge{background:#BE123C;color:#fff;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:700;margin-right:auto}
+.rare-count-badge{background:#BE123C;color:#fff;border-radius:20px;padding:2px 10px;font-size:14px;font-weight:700;margin-right:auto}
 @media print{
   .sidebar,.topbar,.abar,.pag,#loader,#toastBox,.overlay{display:none!important}
   .content{overflow:visible}
@@ -800,23 +805,23 @@ tbody tr:hover td{background:#fafafa}
 <body>
 
 <div id="toastBox"></div>
-<div id="loader"><div class="spin"></div><span style="font-size:13px;color:#9e9e9e">جاري التحميل...</span></div>
+<div id="loader"><div class="spin"></div><span style="font-size:15px;color:#9e9e9e">جاري التحميل...</span></div>
 
 <!-- ===== PUBLIC RARE BLOOD REGISTRY (no login — reachable via ?public=rare) ===== -->
 <div id="publicRarePage" style="display:none;height:100vh;overflow-y:auto;-webkit-overflow-scrolling:touch;background:#F1F5F9;direction:rtl;font-family:inherit">
   <div style="background:linear-gradient(120deg,#BE123C,#E11D48);color:#fff;padding:14px 18px 12px;text-align:center">
-    <div style="font-size:27px;margin-bottom:2px">🩸</div>
-    <div style="font-size:18px;font-weight:800">سجل أصحاب الفصائل النادرة</div>
-    <div style="font-size:12.5px;opacity:.9;margin-top:2px">مصرف الدم الرئيسي — واسط</div>
-    <div style="font-size:11.5px;opacity:.85;margin-top:5px;max-width:480px;margin-left:auto;margin-right:auto;line-height:1.6">
+    <div style="font-size:29px;margin-bottom:2px">🩸</div>
+    <div style="font-size:20px;font-weight:800">سجل أصحاب الفصائل النادرة</div>
+    <div style="font-size:14.5px;opacity:.9;margin-top:2px">مصرف الدم الرئيسي — واسط</div>
+    <div style="font-size:13.5px;opacity:.85;margin-top:5px;max-width:480px;margin-left:auto;margin-right:auto;line-height:1.6">
       متاح للمواطنين المحتاجين للتواصل المباشر مع المتبرعين أصحاب الفصائل النادرة — بموافقتهم على نشر بياناتهم لهذا الغرض.
     </div>
   </div>
   <div style="max-width:560px;margin:0 auto;padding:14px 14px calc(60px + env(safe-area-inset-bottom, 0px))">
     <input type="text" id="pubSearch" placeholder="🔍 ابحث بالاسم..." oninput="filterPublicRare(1)"
-      style="width:100%;padding:13px 16px;border-radius:12px;border:1.5px solid #E5E7EB;font-size:16px;font-family:inherit;margin-bottom:10px">
+      style="width:100%;padding:13px 16px;border-radius:12px;border:1.5px solid #E5E7EB;font-size:18px;font-family:inherit;margin-bottom:10px">
     <select id="pubBGFilter" onchange="filterPublicRare(1)"
-      style="width:100%;padding:13px 16px;border-radius:12px;border:1.5px solid #E5E7EB;font-size:16px;font-weight:700;font-family:inherit;background:#fff;margin-bottom:14px">
+      style="width:100%;padding:13px 16px;border-radius:12px;border:1.5px solid #E5E7EB;font-size:18px;font-weight:700;font-family:inherit;background:#fff;margin-bottom:14px">
       <option value="">كل الفصائل النادرة</option>
       <option value="A+">A+</option><option value="A-">A-</option>
       <option value="B-">B-</option>
@@ -832,7 +837,7 @@ tbody tr:hover td{background:#fafafa}
 <div id="loginPage">
   <div class="lcard">
     <div class="lbrand">
-      <div class="licon" style="font-size:33px;display:flex;align-items:center;justify-content:center">🩸</div>
+      <div class="licon" style="font-size:35px;display:flex;align-items:center;justify-content:center">🩸</div>
       <div class="lt1">شعبة مصرف الدم الرئيسي — واسط</div>
       <div class="lt2">وزارة الصحة / دائرة صحة واسط / قسم الأمور الفنية</div>
     </div>
@@ -845,7 +850,7 @@ tbody tr:hover td{background:#fafafa}
       <label>كلمة المرور</label>
       <div class="fw">
         <input type="password" id="lpw" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
-        <button class="eye" onclick="togglePw()" type="button" id="eyeIco" style="font-size:19px">👁</button>
+        <button class="eye" onclick="togglePw()" type="button" id="eyeIco" style="font-size:21px">👁</button>
       </div>
     </div>
     <button class="lbtn" onclick="doLogin()" id="lbtn">🔐 دخول آمن</button>
@@ -871,7 +876,7 @@ tbody tr:hover td{background:#fafafa}
   <div class="sb">
     <div class="sb-head">
       <div class="sb-logo">
-        <div class="sb-dot" style="font-size:23px">🩸</div>
+        <div class="sb-dot" style="font-size:25px">🩸</div>
         <div><div class="sb-name">مصرف الدم الرئيسي</div><div class="sb-org">واسط — وزارة الصحة</div></div>
       </div>
     </div>
@@ -941,7 +946,7 @@ tbody tr:hover td{background:#fafafa}
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
-          <button class="back-btn" id="backBtnMob" onclick="goBack()" style="padding:4px 8px;font-size:13px">
+          <button class="back-btn" id="backBtnMob" onclick="goBack()" style="padding:4px 8px;font-size:15px">
             <span class="back-btn-icon">‹</span> رجوع
           </button>
           <div class="ah-dept" id="ahDept">—</div>
@@ -1039,7 +1044,7 @@ tbody tr:hover td{background:#fafafa}
           <div style="background:#fff;border-radius:14px;padding:12px;border:1px solid #EEF2F6;margin-bottom:10px">
             <input type="text" id="gsQuery" placeholder="🔍 ابحث بأي تفصيلة: اسم، هاتف، بطاقة وطنية، رقم قنينة، رقم متبرع، سبب رفض..."
               onkeydown="if(event.key==='Enter')runGlobalSearch()" autocomplete="off"
-              style="width:100%;padding:11px 13px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:15px;margin-bottom:8px">
+              style="width:100%;padding:11px 13px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:17px;margin-bottom:8px">
             <button class="btn btn-p" style="width:100%;justify-content:center" onclick="runGlobalSearch()"><i class="ti ti-search"></i> بحث شامل</button>
           </div>
           <div id="gsResults"></div>
@@ -1078,10 +1083,10 @@ tbody tr:hover td{background:#fafafa}
             <input type="text" class="sinp" id="dSrch"
               placeholder="🔍 اسم / هاتف / بطاقة وطنية / رقم قنينة..."
               onkeydown="if(event.key==='Enter')loadDonors(1)" autocomplete="off"
-              style="padding:10px 12px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:15px">
+              style="padding:10px 12px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:17px">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
               <select id="dBGFilter" onchange="loadDonors(1)"
-                style="padding:9px 10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:14px;background:#fff">
+                style="padding:9px 10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:16px;background:#fff">
                 <option value="">كل الفصائل</option>
                 <option value="A+">A+</option><option value="A-">A-</option>
                 <option value="B+">B+</option><option value="B-">B-</option>
@@ -1089,15 +1094,15 @@ tbody tr:hover td{background:#fafafa}
                 <option value="AB+">AB+</option><option value="AB-">AB-</option>
               </select>
               <select id="dTypeFilter" onchange="loadDonors(1)"
-                style="padding:9px 10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:14px;background:#fff">
+                style="padding:9px 10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:16px;background:#fff">
                 <option value="">كل التبرعات</option>
                 <option value="طوعي">طوعي</option>
                 <option value="تعويضي">تعويضي</option>
               </select>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              <div class="fgrp" style="margin:0"><label style="font-size:12px;color:#757575;display:block;margin-bottom:4px">من تاريخ</label><input type="date" id="dDateFrom" onchange="loadDonors(1)" style="width:100%;padding:9px 10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:14px"></div>
-              <div class="fgrp" style="margin:0"><label style="font-size:12px;color:#757575;display:block;margin-bottom:4px">إلى تاريخ</label><input type="date" id="dDateTo" onchange="loadDonors(1)" style="width:100%;padding:9px 10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:14px"></div>
+              <div class="fgrp" style="margin:0"><label style="font-size:14px;color:#757575;display:block;margin-bottom:4px">من تاريخ</label><input type="date" id="dDateFrom" onchange="loadDonors(1)" style="width:100%;padding:9px 10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:16px"></div>
+              <div class="fgrp" style="margin:0"><label style="font-size:14px;color:#757575;display:block;margin-bottom:4px">إلى تاريخ</label><input type="date" id="dDateTo" onchange="loadDonors(1)" style="width:100%;padding:9px 10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:16px"></div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
               <button class="btn btn-p" onclick="loadDonors(1)" style="justify-content:center">
@@ -1116,11 +1121,11 @@ tbody tr:hover td{background:#fafafa}
       <!-- BARCODE -->
       <div class="sc" id="s-barcode">
         <div class="bc-card">
-          <div style="font-size:14px;font-weight:700;color:#1a1a1a;margin-bottom:14px;display:flex;align-items:center;gap:6px">
+          <div style="font-size:16px;font-weight:700;color:#1a1a1a;margin-bottom:14px;display:flex;align-items:center;gap:6px">
             <i class="ti ti-barcode" style="color:#BE123C"></i> طباعة الباركود والكارتات
           </div>
           <div style="margin-bottom:14px">
-            <label style="font-size:12px;color:#757575;display:block;margin-bottom:5px;font-weight:600">بحث برقم القنينة</label>
+            <label style="font-size:14px;color:#757575;display:block;margin-bottom:5px;font-weight:600">بحث برقم القنينة</label>
             <div style="display:flex;gap:8px">
               <input type="text" id="bcSrch" class="sinp" placeholder="أدخل رقم القنينة..." onkeydown="if(event.key==='Enter')searchBC()">
               <button class="btn btn-p" onclick="searchBC()"><i class="ti ti-search"></i> بحث</button>
@@ -1188,10 +1193,10 @@ tbody tr:hover td{background:#fafafa}
               <div style="grid-column:1/-1">
                 <input type="text" id="rareSearch" placeholder="🔍 اسم / هاتف / عنوان..."
                   oninput="filterRare()" autocomplete="off"
-                  style="width:100%;padding:10px 12px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:15px;direction:rtl">
+                  style="width:100%;padding:10px 12px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:17px;direction:rtl">
               </div>
               <select id="rareBGFilter" onchange="filterRare()"
-                style="padding:9px 10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:14px;background:#fff">
+                style="padding:9px 10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:16px;background:#fff">
                 <option value="">كل الفصائل</option>
                 <option value="A-">A-</option>
                 <option value="B-">B-</option>
@@ -1201,16 +1206,16 @@ tbody tr:hover td{background:#fafafa}
                 <option value="AB+">AB+</option>
               </select>
               <button onclick="filterRare();exportRarePDF()"
-                style="padding:9px;background:#1E293B;color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer">
+                style="padding:9px;background:#1E293B;color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer">
                 📄 PDF
               </button>
               <button onclick="filterRare();exportRareExcel()"
-                style="padding:9px;background:#166534;color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer">
+                style="padding:9px;background:#166534;color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer">
                 📊 Excel
               </button>
             </div>
             <div style="display:flex;align-items:center;gap:6px">
-              <span style="font-size:12px;color:#94A3B8">النتائج:</span>
+              <span style="font-size:14px;color:#94A3B8">النتائج:</span>
               <span class="rare-count-badge" id="rareCountBadge">0</span>
             </div>
           </div>
@@ -1226,8 +1231,8 @@ tbody tr:hover td{background:#fafafa}
       <!-- STATS -->
       <div class="sc" id="s-stats">
         <div class="abar" style="margin-bottom:14px;align-items:flex-end">
-          <div class="fgrp"><label style="font-size:12px;color:#757575;font-weight:600">من تاريخ</label><input type="date" id="stFrom"></div>
-          <div class="fgrp"><label style="font-size:12px;color:#757575;font-weight:600">إلى تاريخ</label><input type="date" id="stTo"></div>
+          <div class="fgrp"><label style="font-size:14px;color:#757575;font-weight:600">من تاريخ</label><input type="date" id="stFrom"></div>
+          <div class="fgrp"><label style="font-size:14px;color:#757575;font-weight:600">إلى تاريخ</label><input type="date" id="stTo"></div>
           <button class="btn btn-p" onclick="loadStats()"><i class="ti ti-chart-bar"></i> توليد التقرير</button>
           <button class="btn" onclick="printStats()"><i class="ti ti-printer"></i> طباعة</button>
         </div>
@@ -1272,8 +1277,8 @@ tbody tr:hover td{background:#fafafa}
             <div class="setc-ico" style="background:#F0F9FF"><i class="ti ti-cloud-upload" style="color:#0369A1"></i></div>
             <div class="setc-t">استعادة من نسخة احتياطية</div>
             <div class="setc-d" style="margin-bottom:8px">يضيف أو يحدّث البيانات من الملف — لا يحذف أي شيء موجود حالياً. لمدير النظام فقط.</div>
-            <input type="file" id="restoreFileInput" accept=".json" onchange="handleRestoreFileSelect(this)" style="font-size:12px;margin-bottom:6px">
-            <div id="restoreFileName" style="font-size:12px;color:#757575;margin-bottom:8px">لم يتم اختيار ملف</div>
+            <input type="file" id="restoreFileInput" accept=".json" onchange="handleRestoreFileSelect(this)" style="font-size:14px;margin-bottom:6px">
+            <div id="restoreFileName" style="font-size:14px;color:#757575;margin-bottom:8px">لم يتم اختيار ملف</div>
             <button class="btn" style="width:100%;justify-content:center;border-color:#0369A1;color:#0369A1" onclick="importFullBackup()"><i class="ti ti-database-import"></i> استعادة الآن</button>
           </div>
           <div class="setc" onclick="toast('تصدير SQL يتم من: Supabase Dashboard → Database → Backups','info',5000)">
@@ -1358,7 +1363,7 @@ tbody tr:hover td{background:#fafafa}
         <div id="camp-archive-view">
           <div class="sh" style="display:flex;align-items:center;justify-content:space-between">
             <div class="sh-t"><i class="ti ti-bus"></i> أرشيف حملات التبرع</div>
-            <button class="btn btn-p" style="font-size:13px;padding:7px 12px" onclick="showAddCampaignForm()"><i class="ti ti-plus"></i> حملة جديدة</button>
+            <button class="btn btn-p" style="font-size:15px;padding:7px 12px" onclick="showAddCampaignForm()"><i class="ti ti-plus"></i> حملة جديدة</button>
           </div>
           <div id="campArchiveList"></div>
         </div>
@@ -1371,9 +1376,9 @@ tbody tr:hover td{background:#fafafa}
               <div class="fgrp"><label>تاريخ الحملة *</label><input type="date" id="camp-date"></div>
               <div class="fgrp"><label>المكان / الدائرة</label><input type="text" id="camp-location" placeholder="مثال: كلية الهندسة"></div>
             </div>
-            <div style="font-size:13.5px;font-weight:700;color:#374151;margin:14px 0 8px">حجز تسلسلات القناني</div>
+            <div style="font-size:15.5px;font-weight:700;color:#374151;margin:14px 0 8px">حجز تسلسلات القناني</div>
             <div id="campReserveRows"></div>
-            <button class="btn" style="font-size:13px;padding:7px 12px;margin-top:6px" onclick="addCampReserveRow()"><i class="ti ti-plus"></i> إضافة نوع قنينة</button>
+            <button class="btn" style="font-size:15px;padding:7px 12px;margin-top:6px" onclick="addCampReserveRow()"><i class="ti ti-plus"></i> إضافة نوع قنينة</button>
           </div>
           <div style="display:flex;gap:8px;margin-top:14px">
             <button class="btn" style="flex:1;justify-content:center" onclick="G('camp-add-view').style.display='none';G('camp-archive-view').style.display='block'"><i class="ti ti-x"></i> إلغاء</button>
@@ -1384,7 +1389,7 @@ tbody tr:hover td{background:#fafafa}
         <div id="camp-track-view" style="display:none">
           <div class="sh" style="display:flex;align-items:center;justify-content:space-between">
             <div class="sh-t"><i class="ti ti-list-check"></i> <span id="campTrackTitle">متابعة الحملة</span></div>
-            <button class="btn" style="font-size:13px;padding:7px 12px" onclick="G('camp-track-view').style.display='none';G('camp-archive-view').style.display='block';loadCampaigns()"><i class="ti ti-arrow-right"></i> رجوع للأرشيف</button>
+            <button class="btn" style="font-size:15px;padding:7px 12px" onclick="G('camp-track-view').style.display='none';G('camp-archive-view').style.display='block';loadCampaigns()"><i class="ti ti-arrow-right"></i> رجوع للأرشيف</button>
           </div>
           <div id="campTrackSummary" style="margin-bottom:10px"></div>
           <div id="campBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
@@ -1407,11 +1412,11 @@ tbody tr:hover td{background:#fafafa}
         </div>
 
         <div class="rej-warn" id="rejWarn">
-          <div style="font-size:29px">🚫</div>
+          <div style="font-size:31px">🚫</div>
           <div><div class="rej-warn-t" id="rejWarnTitle">مرفوض من التبرع</div><div class="rej-warn-r" id="rejWarnReason"></div></div>
         </div>
         <div class="rej-warn" id="intervalWarn" style="border-color:#FDE68A;background:#FFFBEB">
-          <div style="font-size:29px">⏳</div>
+          <div style="font-size:31px">⏳</div>
           <div><div class="rej-warn-t" id="intervalWarnTitle" style="color:#B45309"></div><div class="rej-warn-r" id="intervalWarnReason"></div></div>
         </div>
         <div class="fsec">
@@ -1484,7 +1489,7 @@ tbody tr:hover td{background:#fafafa}
               </select>
             </div>
             <div class="fgrp"><label>رقم القنينة (تلقائي)</label>
-              <input type="text" id="rc-bnum" class="ro" readonly placeholder="اختر النوع أولاً" style="background:#f0f9ff;color:#0F766E;font-weight:700;font-size:17px">
+              <input type="text" id="rc-bnum" class="ro" readonly placeholder="اختر النوع أولاً" style="background:#f0f9ff;color:#0F766E;font-weight:700;font-size:19px">
             </div>
 
             <div class="fgrp s2" id="rc-pat-grp"><label>اسم المريض</label><input type="text" id="rc-pat" placeholder="اسم المريض"></div>
@@ -1512,7 +1517,7 @@ tbody tr:hover td{background:#fafafa}
               <input type="text" id="rc-hosp-other" placeholder="اكتب اسم المستشفى" style="display:none;margin-top:6px">
             </div>
           </div>
-          <div style="font-size:13.5px;font-weight:700;color:#374151;margin:14px 0 8px">العلامات الحيوية (اختياري)</div>
+          <div style="font-size:15.5px;font-weight:700;color:#374151;margin:14px 0 8px">العلامات الحيوية (اختياري)</div>
           <div class="fgrid">
             <div class="fgrp"><label>ضغط الدم</label><input type="text" id="rc-bp" placeholder="مثال: 120/80"></div>
             <div class="fgrp"><label>النبض</label><input type="number" id="rc-pulse" placeholder="نبضة/دقيقة"></div>
@@ -1547,7 +1552,7 @@ tbody tr:hover td{background:#fafafa}
       <div class="sc" id="s-supply">
         <div class="sh" style="display:flex;align-items:center;justify-content:space-between">
           <div class="sh-t"><i class="ti ti-package"></i> خزين القناني</div>
-          <button id="viewDamagedBtn" class="btn" style="border-color:#7F1D1D;color:#7F1D1D;font-size:13px;padding:7px 12px" onclick="openDamagedList()">🗑️ القناني التالفة (0)</button>
+          <button id="viewDamagedBtn" class="btn" style="border-color:#7F1D1D;color:#7F1D1D;font-size:15px;padding:7px 12px" onclick="openDamagedList()">🗑️ القناني التالفة (0)</button>
         </div>
         <div id="supplyTypeGrid" class="comp-stock-grid" style="margin-bottom:16px"></div>
         <div class="btg" id="supplyGrid"></div>
@@ -1583,7 +1588,7 @@ tbody tr:hover td{background:#fafafa}
     <button class="bn-item" id="tab-notif-btn" onclick="openNotifPanel()" style="position:relative">
       <svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
       <span class="bn-lbl">تنبيهات</span>
-      <span id="notifBadge" style="display:none;position:absolute;top:2px;left:calc(50% - 22px);background:#DC2626;color:#fff;font-size:11px;font-weight:800;min-width:16px;height:16px;border-radius:10px;display:flex;align-items:center;justify-content:center;padding:0 3px">0</span>
+      <span id="notifBadge" style="display:none;position:absolute;top:2px;left:calc(50% - 22px);background:#DC2626;color:#fff;font-size:13px;font-weight:800;min-width:16px;height:16px;border-radius:10px;display:flex;align-items:center;justify-content:center;padding:0 3px">0</span>
     </button>
     <button class="bn-item" id="tab-acc-btn" onclick="switchMainTab('acc',this)">
       <svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 19a6 6 0 0 1 11 0"/></svg>
@@ -1596,7 +1601,7 @@ tbody tr:hover td{background:#fafafa}
 <!-- RECEPTION PRINT MODAL (shown centered after a successful save) -->
 <div class="overlay" id="rcPrintModal">
   <div class="modal" style="width:420px">
-    <div style="font-size:16px;font-weight:800;color:#166534;margin-bottom:14px;text-align:center">✅ تم الحفظ بنجاح — اختر ما تريد طباعته</div>
+    <div style="font-size:18px;font-weight:800;color:#166534;margin-bottom:14px;text-align:center">✅ تم الحفظ بنجاح — اختر ما تريد طباعته</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-p" onclick="exportDonorFormPDF()" style="flex:1;justify-content:center">
         📄 تصدير استمارة المتبرع
@@ -1643,7 +1648,7 @@ const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 // ================================================================
 // Safety check - if supabase CDN failed to load
 if(typeof supabase === 'undefined'){
-  document.body.innerHTML = '<div style="font-family:Arial;direction:rtl;text-align:center;padding:40px;background:#fff;min-height:100vh"><div style="font-size:61px;margin-bottom:20px">⚠️</div><h2 style="color:#BE123C;margin-bottom:12px">تعذّر تحميل التطبيق</h2><p style="color:#64748B;font-size:16px;margin-bottom:20px">تعذّر الاتصال بخادم Supabase.<br>تأكد من الاتصال بالإنترنت وأعد تحميل الصفحة.</p><button onclick="location.reload()" style="background:#BE123C;color:#fff;border:none;padding:14px 32px;border-radius:12px;font-size:17px;cursor:pointer;font-family:inherit">🔄 إعادة التحميل</button></div>';
+  document.body.innerHTML = '<div style="font-family:Arial;direction:rtl;text-align:center;padding:40px;background:#fff;min-height:100vh"><div style="font-size:63px;margin-bottom:20px">⚠️</div><h2 style="color:#BE123C;margin-bottom:12px">تعذّر تحميل التطبيق</h2><p style="color:#64748B;font-size:18px;margin-bottom:20px">تعذّر الاتصال بخادم Supabase.<br>تأكد من الاتصال بالإنترنت وأعد تحميل الصفحة.</p><button onclick="location.reload()" style="background:#BE123C;color:#fff;border:none;padding:14px 32px;border-radius:12px;font-size:19px;cursor:pointer;font-family:inherit">🔄 إعادة التحميل</button></div>';
   throw new Error('Supabase CDN not loaded');
 }
 const { createClient } = supabase;
@@ -1967,17 +1972,17 @@ async function exportDonorFormPDF(){
     body{font-family:'Amiri',serif;direction:rtl;padding:22px;color:#000}
     .frame{border:2px solid #000;padding:14px 16px}
     .hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #BE123C;padding-bottom:10px;margin-bottom:12px}
-    .hdr .dept{text-align:left;font-size:14px;font-weight:700;line-height:1.6}
+    .hdr .dept{text-align:left;font-size:16px;font-weight:700;line-height:1.6}
     .hdr .titles{text-align:center;flex:1}
-    .hdr .titles h1{font-size:20px;font-weight:700}
-    .hdr .titles h2{font-size:14px;font-weight:400;margin-top:2px}
+    .hdr .titles h1{font-size:22px;font-weight:700}
+    .hdr .titles h2{font-size:16px;font-weight:400;margin-top:2px}
     .barcoderow{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-bottom:12px}
-    .barcoderow .num{font-size:16px;font-weight:700;font-family:monospace}
+    .barcoderow .num{font-size:18px;font-weight:700;font-family:monospace}
     table.f{width:100%;border-collapse:collapse;margin-bottom:2px}
-    table.f td{border:1px solid #000;padding:7px 10px;font-size:15px;vertical-align:middle}
+    table.f td{border:1px solid #000;padding:7px 10px;font-size:17px;vertical-align:middle}
     table.f td.lbl{background:#EDEDED;font-weight:700;width:26%;text-align:center}
     table.f td.val{width:24%}
-    .section-hdr{background:#EDEDED;text-align:center;font-weight:700;font-size:14.5px;padding:6px;border:1px solid #000;border-top:none}
+    .section-hdr{background:#EDEDED;text-align:center;font-weight:700;font-size:16.5px;padding:6px;border:1px solid #000;border-top:none}
     .vitals td.lbl{width:20%}
     .vitals td.val{width:20%;text-align:center}
     @media print{@page{margin:10mm}}
@@ -2374,7 +2379,7 @@ async function renderPublicRarePage(){
   }catch(e){
     const msg = e?.message || e?.error?.message || JSON.stringify(e) || String(e);
     console.log('rare_donors_public fetch error:', e);
-    G('pubRareList').innerHTML='<div style="text-align:center;padding:40px 0;color:#BE123C;font-size:15px">تعذر تحميل السجل حالياً<br><span style="font-size:12px;opacity:.7">'+esc(msg)+'</span></div>';
+    G('pubRareList').innerHTML='<div style="text-align:center;padding:40px 0;color:#BE123C;font-size:17px">تعذر تحميل السجل حالياً<br><span style="font-size:14px;opacity:.7">'+esc(msg)+'</span></div>';
   }
 }
 function filterPublicRare(page){
@@ -2384,7 +2389,7 @@ function filterPublicRare(page){
     (!q || (d.full_name||'').toLowerCase().includes(q)) && (!bg || d.blood_type===bg)
   );
   if(!filtered.length){
-    G('pubRareList').innerHTML='<div style="text-align:center;padding:40px 0;color:#9e9e9e;font-size:18px">لا توجد نتائج</div>';
+    G('pubRareList').innerHTML='<div style="text-align:center;padding:40px 0;color:#9e9e9e;font-size:20px">لا توجد نتائج</div>';
     G('pubPag').innerHTML='';
     return;
   }
@@ -2399,22 +2404,22 @@ function filterPublicRare(page){
     const mob=normIraqiMobile(d.mobile);
     return `
     <div style="background:#fff;border:1px solid #F1F5F9;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 10px rgba(0,0,0,.06);display:flex;align-items:center;gap:12px">
-      <div style="background:#FFF1F2;color:#BE123C;font-weight:800;font-size:18px;border-radius:10px;padding:9px 13px;flex-shrink:0">${esc(d.blood_type||'—')}</div>
+      <div style="background:#FFF1F2;color:#BE123C;font-weight:800;font-size:20px;border-radius:10px;padding:9px 13px;flex-shrink:0">${esc(d.blood_type||'—')}</div>
       <div style="flex:1;min-width:0">
-        <div style="font-weight:700;font-size:16.5px;color:#1a1a1a">${esc(d.full_name||'—')}</div>
-        <div style="font-size:13.5px;color:#757575;margin-top:3px">${esc(d.address||'—')}</div>
+        <div style="font-weight:700;font-size:18.5px;color:#1a1a1a">${esc(d.full_name||'—')}</div>
+        <div style="font-size:15.5px;color:#757575;margin-top:3px">${esc(d.address||'—')}</div>
       </div>
-      ${mob?`<a href="tel:${esc(mob)}" style="background:#16A34A;color:#fff;border-radius:10px;padding:10px 14px;text-decoration:none;font-size:14px;font-weight:700;flex-shrink:0;white-space:nowrap">📞 اتصال</a>`:''}
+      ${mob?`<a href="tel:${esc(mob)}" style="background:#16A34A;color:#fff;border-radius:10px;padding:10px 14px;text-decoration:none;font-size:16px;font-weight:700;flex-shrink:0;white-space:nowrap">📞 اتصال</a>`:''}
     </div>`;
   }).join('');
 
   G('pubPag').innerHTML = `
     <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px">
-      <button onclick="filterPublicRare(${page-1})" ${page<=1?'disabled':''} style="padding:9px 14px;border-radius:10px;border:1.5px solid #E5E7EB;background:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer">→ السابق</button>
-      <span style="font-size:14px;font-weight:700;color:#374151">صفحة ${page} من ${tp}</span>
-      <button onclick="filterPublicRare(${page+1})" ${page>=tp?'disabled':''} style="padding:9px 14px;border-radius:10px;border:1.5px solid #E5E7EB;background:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer">التالي ←</button>
+      <button onclick="filterPublicRare(${page-1})" ${page<=1?'disabled':''} style="padding:9px 14px;border-radius:10px;border:1.5px solid #E5E7EB;background:#fff;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer">→ السابق</button>
+      <span style="font-size:16px;font-weight:700;color:#374151">صفحة ${page} من ${tp}</span>
+      <button onclick="filterPublicRare(${page+1})" ${page>=tp?'disabled':''} style="padding:9px 14px;border-radius:10px;border:1.5px solid #E5E7EB;background:#fff;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer">التالي ←</button>
     </div>
-    <div style="text-align:center;font-size:13px;color:#94A3B8;margin-top:8px">إجمالي: ${filtered.length} متبرع</div>`;
+    <div style="text-align:center;font-size:15px;color:#94A3B8;margin-top:8px">إجمالي: ${filtered.length} متبرع</div>`;
 }
 
 async function appInit(){
@@ -2787,16 +2792,16 @@ function printForm(){
   const vals={name:nm,by:G('f-by').value,gen:G('f-gen').value,mom:G('f-mom').value,nid:G('f-nid').value,mob:G('f-mob').value,addr:G('f-addr').value,job:G('f-job').value,dtyp:G('f-dtyp').value,btyp:G('f-btyp').value,bnum:G('f-bnum').value,pat:G('f-pat').value,hosp:G('f-hosp').value,ddate:G('f-ddate').value,dtime:G('f-dtime').value,bt:G('f-bt').value,bp:G('f-bp').value,wt:G('f-wt').value,pulse:G('f-pulse').value,hgb:G('f-hgb').value,ser:G('f-ser').value};
   const w=window.open('','_blank','width=800,height=700');
   w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>استمارة التبرع</title>
-  <style>body{font-family:'Segoe UI',Arial,sans-serif;direction:rtl;padding:20px;font-size:13px}
+  <style>body{font-family:'Segoe UI',Arial,sans-serif;direction:rtl;padding:20px;font-size:15px}
   .hdr{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #BE123C;padding-bottom:12px;margin-bottom:18px}
-  .tc{text-align:center}.tc h2{font-size:16px;color:#BE123C;margin-bottom:4px}.tc p{font-size:11px;color:#757575}
-  .en{font-size:11px;color:#757575;line-height:1.6}
-  .bn{border:2px solid #BE123C;padding:6px 14px;border-radius:8px;font-size:15px;font-weight:bold;color:#BE123C}
+  .tc{text-align:center}.tc h2{font-size:18px;color:#BE123C;margin-bottom:4px}.tc p{font-size:13px;color:#757575}
+  .en{font-size:13px;color:#757575;line-height:1.6}
+  .bn{border:2px solid #BE123C;padding:6px 14px;border-radius:8px;font-size:17px;font-weight:bold;color:#BE123C}
   .g2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
   .f{border:1px solid #ddd;border-radius:6px;padding:7px 10px}
-  .fl{font-size:11px;color:#9e9e9e;margin-bottom:2px}.fv{font-size:13px;font-weight:700;min-height:18px}
-  .sec{font-size:12px;font-weight:bold;background:#FFF1F2;color:#BE123C;padding:5px 10px;border-radius:4px;margin:12px 0 8px}
-  .sig{display:flex;justify-content:space-between;margin-top:30px;padding-top:14px;border-top:1px dashed #ddd;font-size:12px;color:#757575}
+  .fl{font-size:13px;color:#9e9e9e;margin-bottom:2px}.fv{font-size:15px;font-weight:700;min-height:18px}
+  .sec{font-size:14px;font-weight:bold;background:#FFF1F2;color:#BE123C;padding:5px 10px;border-radius:4px;margin:12px 0 8px}
+  .sig{display:flex;justify-content:space-between;margin-top:30px;padding-top:14px;border-top:1px dashed #ddd;font-size:14px;color:#757575}
   
 /* ═══════════════════════════════════════════════════
    NEW DESIGN SYSTEM — مصرف الدم الرئيسي
@@ -2807,20 +2812,20 @@ function printForm(){
 .app-header{background:#fff;border-bottom:1px solid #EEF2F6;flex-shrink:0}
 .ah-top{display:flex;align-items:center;justify-content:space-between;padding:13px 16px 10px}
 .ah-brand{display:flex;align-items:center;gap:10px}
-.ah-name{font-size:14px;font-weight:700;color:#1E293B;line-height:1.35}
-.ah-sub{font-size:11px;color:#94A3B8;margin-top:1px}
-.ah-online{display:flex;align-items:center;gap:5px;font-size:11.5px;color:#16A34A;font-weight:600;flex-shrink:0}
+.ah-name{font-size:16px;font-weight:700;color:#1E293B;line-height:1.35}
+.ah-sub{font-size:13px;color:#94A3B8;margin-top:1px}
+.ah-online{display:flex;align-items:center;gap:5px;font-size:13.5px;color:#16A34A;font-weight:600;flex-shrink:0}
 .ah-online span{width:7px;height:7px;background:#22C55E;border-radius:50%;display:inline-block;animation:pulse 2s infinite}
 .ah-user{margin:0 16px 12px;background:#F8FAFC;border-radius:10px;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;border:1px solid #EEF2F6}
 .ah-user-l{display:flex;align-items:center;gap:9px}
-.ah-av{width:32px;height:32px;border-radius:50%;background:#BE123C;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:700;flex-shrink:0}
-.ah-uname{font-size:13.5px;font-weight:700;color:#1E293B}
-.ah-urole{font-size:11.5px;color:#64748B;margin-top:1px}
-.ah-dept{font-size:12px;font-weight:700;color:#BE123C;background:#FFF1F2;border:1px solid #FECDD3;padding:3px 11px;border-radius:20px;flex-shrink:0}
+.ah-av{width:32px;height:32px;border-radius:50%;background:#BE123C;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:700;flex-shrink:0}
+.ah-uname{font-size:15.5px;font-weight:700;color:#1E293B}
+.ah-urole{font-size:13.5px;color:#64748B;margin-top:1px}
+.ah-dept{font-size:14px;font-weight:700;color:#BE123C;background:#FFF1F2;border:1px solid #FECDD3;padding:3px 11px;border-radius:20px;flex-shrink:0}
 
 /* PAGE TITLE BAR */
 .page-title-bar{display:flex;align-items:center;justify-content:space-between;padding:9px 16px 7px;background:#fff;border-bottom:1px solid #EEF2F6;flex-shrink:0}
-.ptb-title{font-size:14.5px;font-weight:700;color:#1E293B}
+.ptb-title{font-size:16.5px;font-weight:700;color:#1E293B}
 
 
 /* WORK HOME GRID */
@@ -2829,29 +2834,29 @@ function printForm(){
 .wcard:hover{border-color:#BE123C;background:#FFF8F8;transform:translateY(-1px);box-shadow:0 4px 14px rgba(190,18,60,.1)}
 .wcard:active{transform:scale(.97)}
 .wcard.primary{border-color:#BE123C;background:linear-gradient(135deg,#FFF1F2,#FFE4E8)}
-.wcard-icon{font-size:31px;display:block;margin-bottom:8px;line-height:1}
-.wcard-name{font-size:14px;font-weight:700;color:#1E293B}
-.wcard-desc{font-size:12px;color:#64748B;margin-top:2px}
-.wcard-badge{display:inline-block;font-size:11px;padding:2px 9px;border-radius:20px;margin-top:6px;font-weight:700}
+.wcard-icon{font-size:33px;display:block;margin-bottom:8px;line-height:1}
+.wcard-name{font-size:16px;font-weight:700;color:#1E293B}
+.wcard-desc{font-size:14px;color:#64748B;margin-top:2px}
+.wcard-badge{display:inline-block;font-size:13px;padding:2px 9px;border-radius:20px;margin-top:6px;font-weight:700}
 .wb-red{background:#FEE2E2;color:#991B1B}
 .wb-green{background:#DCFCE7;color:#166534}
 .wb-orange{background:#FEF3C7;color:#92400E}
 
 /* ACCOUNT SCREEN */
 .acc-profile{background:#fff;border-radius:16px;padding:22px;margin-bottom:12px;border:1px solid #EEF2F6;text-align:center}
-.acc-av-big{width:64px;height:64px;border-radius:50%;background:#BE123C;display:flex;align-items:center;justify-content:center;color:#fff;font-size:25px;font-weight:700;margin:0 auto 12px;border:3px solid #FECDD3}
-.acc-pname{font-size:18px;font-weight:800;color:#1E293B}
-.acc-psub{font-size:12px;color:#94A3B8;margin-top:4px}
-.acc-prole{display:inline-block;background:#FFF1F2;color:#BE123C;font-size:12.5px;padding:4px 14px;border-radius:20px;margin-top:8px;font-weight:700;border:1px solid #FECDD3}
+.acc-av-big{width:64px;height:64px;border-radius:50%;background:#BE123C;display:flex;align-items:center;justify-content:center;color:#fff;font-size:27px;font-weight:700;margin:0 auto 12px;border:3px solid #FECDD3}
+.acc-pname{font-size:20px;font-weight:800;color:#1E293B}
+.acc-psub{font-size:14px;color:#94A3B8;margin-top:4px}
+.acc-prole{display:inline-block;background:#FFF1F2;color:#BE123C;font-size:14.5px;padding:4px 14px;border-radius:20px;margin-top:8px;font-weight:700;border:1px solid #FECDD3}
 .acc-menu-list{background:#fff;border-radius:14px;border:1px solid #EEF2F6;overflow:hidden}
 .ami{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid #F8FAFC;cursor:pointer;transition:background .12s}
 .ami:last-child{border:none}
 .ami:hover{background:#F8FAFC}
-.ami-icon{width:36px;height:36px;border-radius:10px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.ami-icon{width:36px;height:36px;border-radius:10px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0}
 .ami-icon.danger{background:#FEE2E2}
-.ami-text{font-size:14px;font-weight:600;color:#1E293B}
-.ami-sub{font-size:12px;color:#94A3B8;margin-top:1px}
-.ami-arr{margin-right:auto;color:#CBD5E1;font-size:19px;flex-shrink:0}
+.ami-text{font-size:16px;font-weight:600;color:#1E293B}
+.ami-sub{font-size:14px;color:#94A3B8;margin-top:1px}
+.ami-arr{margin-right:auto;color:#CBD5E1;font-size:21px;flex-shrink:0}
 
 /* OVERRIDE: content background */
 .content{background:#F1F5F9 !important}
@@ -2874,7 +2879,7 @@ function printForm(){
 .offline-bar{
   position:fixed;top:0;left:0;right:0;z-index:9999;
   background:#92400E;color:#fff;
-  padding:9px 16px;font-size:14px;font-weight:600;
+  padding:9px 16px;font-size:16px;font-weight:600;
   display:none;align-items:center;justify-content:space-between;
   gap:10px;box-shadow:0 2px 12px rgba(0,0,0,.2);
 }
@@ -2884,38 +2889,38 @@ function printForm(){
 .ob-dot{width:8px;height:8px;border-radius:50%;background:#FCD34D;flex-shrink:0}
 .ob-dot.sync{background:#6EE7B7;animation:blink .8s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-.ob-badge{background:rgba(255,255,255,.25);border-radius:20px;padding:2px 10px;font-size:12px}
+.ob-badge{background:rgba(255,255,255,.25);border-radius:20px;padding:2px 10px;font-size:14px}
 
 .offline-btn-disabled{opacity:.45;cursor:not-allowed !important;pointer-events:none}
 .offline-queue-card{background:#FEF3C7;border:1px solid #FCD34D;border-radius:12px;padding:12px 14px;margin-bottom:8px}
-.oqc-title{font-size:14px;font-weight:700;color:#92400E}
-.oqc-sub{font-size:12px;color:#B45309;margin-top:3px}
-.oqc-count{background:#92400E;color:#fff;border-radius:20px;padding:2px 9px;font-size:12px;font-weight:700}
+.oqc-title{font-size:16px;font-weight:700;color:#92400E}
+.oqc-sub{font-size:14px;color:#B45309;margin-top:3px}
+.oqc-count{background:#92400E;color:#fff;border-radius:20px;padding:2px 9px;font-size:14px;font-weight:700}
 
 /* BACK BUTTON */
 .back-btn{
   display:none;align-items:center;gap:6px;
   background:none;border:none;cursor:pointer;
-  color:#BE123C;font-size:14px;font-weight:600;
+  color:#BE123C;font-size:16px;font-weight:600;
   padding:8px 16px 4px;font-family:inherit;
   -webkit-tap-highlight-color:transparent;
 }
 .back-btn.show{display:flex}
-.back-btn-icon{font-size:19px}
+.back-btn-icon{font-size:21px}
 
 /* ═══ BOTTLE SEQUENCES ═══ */
 .seq-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
 .seq-card{background:#fff;border-radius:14px;padding:14px;border:1.5px solid #EEF2F6;position:relative}
 .seq-card.active{border-color:#BE123C}
-.seq-type{font-size:13px;font-weight:700;color:#1E293B;margin-bottom:6px}
-.seq-num{font-size:23px;font-weight:800;color:#BE123C;line-height:1}
-.seq-range{font-size:11px;color:#94A3B8;margin-top:3px}
-.seq-remain{font-size:11px;font-weight:600;margin-top:4px}
+.seq-type{font-size:15px;font-weight:700;color:#1E293B;margin-bottom:6px}
+.seq-num{font-size:25px;font-weight:800;color:#BE123C;line-height:1}
+.seq-range{font-size:13px;color:#94A3B8;margin-top:3px}
+.seq-remain{font-size:13px;font-weight:600;margin-top:4px}
 .seq-remain.ok{color:#16A34A}
 .seq-remain.warn{color:#D97706}
 .seq-remain.danger{color:#DC2626}
-.seq-edit{position:absolute;top:8px;left:8px;background:#FFF1F2;border:none;border-radius:8px;padding:4px 8px;font-size:12px;color:#BE123C;cursor:pointer;font-family:inherit;font-weight:600}
-.seq-add-btn{width:100%;padding:12px;background:#BE123C;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px}
+.seq-edit{position:absolute;top:8px;left:8px;background:#FFF1F2;border:none;border-radius:8px;padding:4px 8px;font-size:14px;color:#BE123C;cursor:pointer;font-family:inherit;font-weight:600}
+.seq-add-btn{width:100%;padding:12px;background:#BE123C;color:#fff;border:none;border-radius:12px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px}
 .seq-add-btn:active{background:#9F1239}
 
 /* ═══ DONOR AUTOCOMPLETE ═══ */
@@ -2934,9 +2939,9 @@ function printForm(){
 }
 .ac-item:last-child{border-bottom:none;border-radius:0 0 10px 10px}
 .ac-item:active{background:#FFF1F2}
-.ac-av{width:32px;height:32px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#BE123C;flex-shrink:0}
-.ac-info .ac-name{font-size:14px;font-weight:700;color:#1E293B}
-.ac-info .ac-sub{font-size:11.5px;color:#94A3B8;margin-top:1px}
+.ac-av{width:32px;height:32px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#BE123C;flex-shrink:0}
+.ac-info .ac-name{font-size:16px;font-weight:700;color:#1E293B}
+.ac-info .ac-sub{font-size:13.5px;color:#94A3B8;margin-top:1px}
 
 /* Auto-filled indicator */
 .rc-filled-banner{
@@ -2945,37 +2950,37 @@ function printForm(){
   align-items:center;justify-content:space-between;gap:10px;
 }
 .rc-filled-banner.show{display:flex}
-.rc-filled-text{font-size:13.5px;color:#166534;font-weight:600}
-.rc-filled-clear{background:none;border:none;color:#DC2626;font-size:13px;cursor:pointer;font-weight:600;padding:2px 6px;font-family:inherit}
+.rc-filled-text{font-size:15.5px;color:#166534;font-weight:600}
+.rc-filled-clear{background:none;border:none;color:#DC2626;font-size:15px;cursor:pointer;font-weight:600;padding:2px 6px;font-family:inherit}
 
 /* ═══ RARE BLOOD TYPES ═══ */
 .rare-wrap{display:flex;flex-direction:column;gap:12px}
 .rare-search-bar{display:flex;gap:8px;align-items:center}
-.rare-search-bar input{flex:1;padding:10px 14px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:15px;direction:rtl}
-.rare-search-bar select{padding:10px 12px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:14px;background:#fff}
+.rare-search-bar input{flex:1;padding:10px 14px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:17px;direction:rtl}
+.rare-search-bar select{padding:10px 12px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:16px;background:#fff}
 .rare-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .rs-card{background:#fff;border-radius:12px;padding:10px 12px;text-align:center;border:1.5px solid #EEF2F6;cursor:pointer;transition:all .15s}
 .rs-card.active{border-color:#BE123C;background:#FFF1F2}
 .rs-card:active{transform:scale(.97)}
-.rs-type{font-size:16px;font-weight:800;color:#BE123C}
-.rs-count{font-size:12px;color:#94A3B8;margin-top:2px}
+.rs-type{font-size:18px;font-weight:800;color:#BE123C}
+.rs-count{font-size:14px;color:#94A3B8;margin-top:2px}
 .rare-list{background:#fff;border-radius:14px;overflow:hidden;border:1px solid #EEF2F6}
 .rare-row{display:flex;align-items:center;padding:11px 14px;border-bottom:1px solid #F8FAFC;gap:10px}
 .rare-row:last-child{border-bottom:none}
-.rare-av{width:36px;height:36px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#BE123C;flex-shrink:0}
+.rare-av{width:36px;height:36px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#BE123C;flex-shrink:0}
 .rare-info{flex:1;min-width:0}
-.rare-name{font-size:14px;font-weight:700;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rare-addr{font-size:12px;color:#94A3B8;margin-top:2px}
-.rare-mob{font-size:13px;color:#BE123C;font-weight:600}
-.rare-call{background:none;border:none;color:#16A34A;font-size:21px;cursor:pointer;padding:4px;flex-shrink:0}
-.rare-export-btn{width:100%;padding:12px;background:#1E293B;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px}
+.rare-name{font-size:16px;font-weight:700;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rare-addr{font-size:14px;color:#94A3B8;margin-top:2px}
+.rare-mob{font-size:15px;color:#BE123C;font-weight:600}
+.rare-call{background:none;border:none;color:#16A34A;font-size:23px;cursor:pointer;padding:4px;flex-shrink:0}
+.rare-export-btn{width:100%;padding:12px;background:#1E293B;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px}
 .rare-export-btn:active{background:#0F172A}
-.rare-count-badge{background:#BE123C;color:#fff;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:700;margin-right:auto}
+.rare-count-badge{background:#BE123C;color:#fff;border-radius:20px;padding:2px 10px;font-size:14px;font-weight:700;margin-right:auto}
 @media print{@page{margin:10mm}}</style></head><body>
   <div class="hdr">
     <div class="en">Ministry of Health<br>Wasit Health Directorate<br>Technical Affairs Dept.<br><strong>Blood Donor Questionnaire</strong></div>
     <div class="tc"><h2>استمارة تبرع بالدم</h2><p>شعبة مصرف الدم الرئيسي — واسط</p><p>وزارة الصحة / دائرة صحة واسط</p></div>
-    <div><div class="bn">رقم القنينة: ${vals.bnum}</div><div style="font-size:11px;color:#757575;margin-top:6px">التاريخ: ${vals.ddate}<br>الوقت: ${vals.dtime}</div></div>
+    <div><div class="bn">رقم القنينة: ${vals.bnum}</div><div style="font-size:13px;color:#757575;margin-top:6px">التاريخ: ${vals.ddate}<br>الوقت: ${vals.dtime}</div></div>
   </div>
   <div class="sec">البيانات الشخصية</div>
   <div class="g2">
@@ -3026,9 +3031,9 @@ function printBC(type){
   <style>body{font-family:'Segoe UI',Arial,sans-serif;direction:rtl;padding:20px;background:#fff}
   .card{border:1px solid #ddd;border-radius:10px;padding:18px;max-width:340px;margin:0 auto}
   .hd{display:flex;align-items:center;gap:9px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #eee}
-  .hd-ico{width:36px;height:36px;background:#BE123C;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px}
-  .hd-t{font-size:13px;font-weight:bold;color:#1a1a1a}.hd-s{font-size:11px;color:#9e9e9e}
-  .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f5f5f5;font-size:13px}
+  .hd-ico{width:36px;height:36px;background:#BE123C;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:19px}
+  .hd-t{font-size:15px;font-weight:bold;color:#1a1a1a}.hd-s{font-size:13px;color:#9e9e9e}
+  .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f5f5f5;font-size:15px}
   .row:last-of-type{border-bottom:none}.rl{color:#9e9e9e}.rv{font-weight:bold;color:#1a1a1a}
   .rv.red{color:#BE123C}
   .bc{text-align:center;padding:10px;margin:12px 0;background:#fafafa;border-radius:8px;border:1px solid #eee}
@@ -3042,20 +3047,20 @@ function printBC(type){
 .app-header{background:#fff;border-bottom:1px solid #EEF2F6;flex-shrink:0}
 .ah-top{display:flex;align-items:center;justify-content:space-between;padding:13px 16px 10px}
 .ah-brand{display:flex;align-items:center;gap:10px}
-.ah-name{font-size:14px;font-weight:700;color:#1E293B;line-height:1.35}
-.ah-sub{font-size:11px;color:#94A3B8;margin-top:1px}
-.ah-online{display:flex;align-items:center;gap:5px;font-size:11.5px;color:#16A34A;font-weight:600;flex-shrink:0}
+.ah-name{font-size:16px;font-weight:700;color:#1E293B;line-height:1.35}
+.ah-sub{font-size:13px;color:#94A3B8;margin-top:1px}
+.ah-online{display:flex;align-items:center;gap:5px;font-size:13.5px;color:#16A34A;font-weight:600;flex-shrink:0}
 .ah-online span{width:7px;height:7px;background:#22C55E;border-radius:50%;display:inline-block;animation:pulse 2s infinite}
 .ah-user{margin:0 16px 12px;background:#F8FAFC;border-radius:10px;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;border:1px solid #EEF2F6}
 .ah-user-l{display:flex;align-items:center;gap:9px}
-.ah-av{width:32px;height:32px;border-radius:50%;background:#BE123C;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:700;flex-shrink:0}
-.ah-uname{font-size:13.5px;font-weight:700;color:#1E293B}
-.ah-urole{font-size:11.5px;color:#64748B;margin-top:1px}
-.ah-dept{font-size:12px;font-weight:700;color:#BE123C;background:#FFF1F2;border:1px solid #FECDD3;padding:3px 11px;border-radius:20px;flex-shrink:0}
+.ah-av{width:32px;height:32px;border-radius:50%;background:#BE123C;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:700;flex-shrink:0}
+.ah-uname{font-size:15.5px;font-weight:700;color:#1E293B}
+.ah-urole{font-size:13.5px;color:#64748B;margin-top:1px}
+.ah-dept{font-size:14px;font-weight:700;color:#BE123C;background:#FFF1F2;border:1px solid #FECDD3;padding:3px 11px;border-radius:20px;flex-shrink:0}
 
 /* PAGE TITLE BAR */
 .page-title-bar{display:flex;align-items:center;justify-content:space-between;padding:9px 16px 7px;background:#fff;border-bottom:1px solid #EEF2F6;flex-shrink:0}
-.ptb-title{font-size:14.5px;font-weight:700;color:#1E293B}
+.ptb-title{font-size:16.5px;font-weight:700;color:#1E293B}
 
 
 /* WORK HOME GRID */
@@ -3064,29 +3069,29 @@ function printBC(type){
 .wcard:hover{border-color:#BE123C;background:#FFF8F8;transform:translateY(-1px);box-shadow:0 4px 14px rgba(190,18,60,.1)}
 .wcard:active{transform:scale(.97)}
 .wcard.primary{border-color:#BE123C;background:linear-gradient(135deg,#FFF1F2,#FFE4E8)}
-.wcard-icon{font-size:31px;display:block;margin-bottom:8px;line-height:1}
-.wcard-name{font-size:14px;font-weight:700;color:#1E293B}
-.wcard-desc{font-size:12px;color:#64748B;margin-top:2px}
-.wcard-badge{display:inline-block;font-size:11px;padding:2px 9px;border-radius:20px;margin-top:6px;font-weight:700}
+.wcard-icon{font-size:33px;display:block;margin-bottom:8px;line-height:1}
+.wcard-name{font-size:16px;font-weight:700;color:#1E293B}
+.wcard-desc{font-size:14px;color:#64748B;margin-top:2px}
+.wcard-badge{display:inline-block;font-size:13px;padding:2px 9px;border-radius:20px;margin-top:6px;font-weight:700}
 .wb-red{background:#FEE2E2;color:#991B1B}
 .wb-green{background:#DCFCE7;color:#166534}
 .wb-orange{background:#FEF3C7;color:#92400E}
 
 /* ACCOUNT SCREEN */
 .acc-profile{background:#fff;border-radius:16px;padding:22px;margin-bottom:12px;border:1px solid #EEF2F6;text-align:center}
-.acc-av-big{width:64px;height:64px;border-radius:50%;background:#BE123C;display:flex;align-items:center;justify-content:center;color:#fff;font-size:25px;font-weight:700;margin:0 auto 12px;border:3px solid #FECDD3}
-.acc-pname{font-size:18px;font-weight:800;color:#1E293B}
-.acc-psub{font-size:12px;color:#94A3B8;margin-top:4px}
-.acc-prole{display:inline-block;background:#FFF1F2;color:#BE123C;font-size:12.5px;padding:4px 14px;border-radius:20px;margin-top:8px;font-weight:700;border:1px solid #FECDD3}
+.acc-av-big{width:64px;height:64px;border-radius:50%;background:#BE123C;display:flex;align-items:center;justify-content:center;color:#fff;font-size:27px;font-weight:700;margin:0 auto 12px;border:3px solid #FECDD3}
+.acc-pname{font-size:20px;font-weight:800;color:#1E293B}
+.acc-psub{font-size:14px;color:#94A3B8;margin-top:4px}
+.acc-prole{display:inline-block;background:#FFF1F2;color:#BE123C;font-size:14.5px;padding:4px 14px;border-radius:20px;margin-top:8px;font-weight:700;border:1px solid #FECDD3}
 .acc-menu-list{background:#fff;border-radius:14px;border:1px solid #EEF2F6;overflow:hidden}
 .ami{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid #F8FAFC;cursor:pointer;transition:background .12s}
 .ami:last-child{border:none}
 .ami:hover{background:#F8FAFC}
-.ami-icon{width:36px;height:36px;border-radius:10px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.ami-icon{width:36px;height:36px;border-radius:10px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0}
 .ami-icon.danger{background:#FEE2E2}
-.ami-text{font-size:14px;font-weight:600;color:#1E293B}
-.ami-sub{font-size:12px;color:#94A3B8;margin-top:1px}
-.ami-arr{margin-right:auto;color:#CBD5E1;font-size:19px;flex-shrink:0}
+.ami-text{font-size:16px;font-weight:600;color:#1E293B}
+.ami-sub{font-size:14px;color:#94A3B8;margin-top:1px}
+.ami-arr{margin-right:auto;color:#CBD5E1;font-size:21px;flex-shrink:0}
 
 /* OVERRIDE: content background */
 .content{background:#F1F5F9 !important}
@@ -3109,7 +3114,7 @@ function printBC(type){
 .offline-bar{
   position:fixed;top:0;left:0;right:0;z-index:9999;
   background:#92400E;color:#fff;
-  padding:9px 16px;font-size:14px;font-weight:600;
+  padding:9px 16px;font-size:16px;font-weight:600;
   display:none;align-items:center;justify-content:space-between;
   gap:10px;box-shadow:0 2px 12px rgba(0,0,0,.2);
 }
@@ -3119,38 +3124,38 @@ function printBC(type){
 .ob-dot{width:8px;height:8px;border-radius:50%;background:#FCD34D;flex-shrink:0}
 .ob-dot.sync{background:#6EE7B7;animation:blink .8s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-.ob-badge{background:rgba(255,255,255,.25);border-radius:20px;padding:2px 10px;font-size:12px}
+.ob-badge{background:rgba(255,255,255,.25);border-radius:20px;padding:2px 10px;font-size:14px}
 
 .offline-btn-disabled{opacity:.45;cursor:not-allowed !important;pointer-events:none}
 .offline-queue-card{background:#FEF3C7;border:1px solid #FCD34D;border-radius:12px;padding:12px 14px;margin-bottom:8px}
-.oqc-title{font-size:14px;font-weight:700;color:#92400E}
-.oqc-sub{font-size:12px;color:#B45309;margin-top:3px}
-.oqc-count{background:#92400E;color:#fff;border-radius:20px;padding:2px 9px;font-size:12px;font-weight:700}
+.oqc-title{font-size:16px;font-weight:700;color:#92400E}
+.oqc-sub{font-size:14px;color:#B45309;margin-top:3px}
+.oqc-count{background:#92400E;color:#fff;border-radius:20px;padding:2px 9px;font-size:14px;font-weight:700}
 
 /* BACK BUTTON */
 .back-btn{
   display:none;align-items:center;gap:6px;
   background:none;border:none;cursor:pointer;
-  color:#BE123C;font-size:14px;font-weight:600;
+  color:#BE123C;font-size:16px;font-weight:600;
   padding:8px 16px 4px;font-family:inherit;
   -webkit-tap-highlight-color:transparent;
 }
 .back-btn.show{display:flex}
-.back-btn-icon{font-size:19px}
+.back-btn-icon{font-size:21px}
 
 /* ═══ BOTTLE SEQUENCES ═══ */
 .seq-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
 .seq-card{background:#fff;border-radius:14px;padding:14px;border:1.5px solid #EEF2F6;position:relative}
 .seq-card.active{border-color:#BE123C}
-.seq-type{font-size:13px;font-weight:700;color:#1E293B;margin-bottom:6px}
-.seq-num{font-size:23px;font-weight:800;color:#BE123C;line-height:1}
-.seq-range{font-size:11px;color:#94A3B8;margin-top:3px}
-.seq-remain{font-size:11px;font-weight:600;margin-top:4px}
+.seq-type{font-size:15px;font-weight:700;color:#1E293B;margin-bottom:6px}
+.seq-num{font-size:25px;font-weight:800;color:#BE123C;line-height:1}
+.seq-range{font-size:13px;color:#94A3B8;margin-top:3px}
+.seq-remain{font-size:13px;font-weight:600;margin-top:4px}
 .seq-remain.ok{color:#16A34A}
 .seq-remain.warn{color:#D97706}
 .seq-remain.danger{color:#DC2626}
-.seq-edit{position:absolute;top:8px;left:8px;background:#FFF1F2;border:none;border-radius:8px;padding:4px 8px;font-size:12px;color:#BE123C;cursor:pointer;font-family:inherit;font-weight:600}
-.seq-add-btn{width:100%;padding:12px;background:#BE123C;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px}
+.seq-edit{position:absolute;top:8px;left:8px;background:#FFF1F2;border:none;border-radius:8px;padding:4px 8px;font-size:14px;color:#BE123C;cursor:pointer;font-family:inherit;font-weight:600}
+.seq-add-btn{width:100%;padding:12px;background:#BE123C;color:#fff;border:none;border-radius:12px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px}
 .seq-add-btn:active{background:#9F1239}
 
 /* ═══ DONOR AUTOCOMPLETE ═══ */
@@ -3169,9 +3174,9 @@ function printBC(type){
 }
 .ac-item:last-child{border-bottom:none;border-radius:0 0 10px 10px}
 .ac-item:active{background:#FFF1F2}
-.ac-av{width:32px;height:32px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#BE123C;flex-shrink:0}
-.ac-info .ac-name{font-size:14px;font-weight:700;color:#1E293B}
-.ac-info .ac-sub{font-size:11.5px;color:#94A3B8;margin-top:1px}
+.ac-av{width:32px;height:32px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#BE123C;flex-shrink:0}
+.ac-info .ac-name{font-size:16px;font-weight:700;color:#1E293B}
+.ac-info .ac-sub{font-size:13.5px;color:#94A3B8;margin-top:1px}
 
 /* Auto-filled indicator */
 .rc-filled-banner{
@@ -3180,32 +3185,32 @@ function printBC(type){
   align-items:center;justify-content:space-between;gap:10px;
 }
 .rc-filled-banner.show{display:flex}
-.rc-filled-text{font-size:13.5px;color:#166534;font-weight:600}
-.rc-filled-clear{background:none;border:none;color:#DC2626;font-size:13px;cursor:pointer;font-weight:600;padding:2px 6px;font-family:inherit}
+.rc-filled-text{font-size:15.5px;color:#166534;font-weight:600}
+.rc-filled-clear{background:none;border:none;color:#DC2626;font-size:15px;cursor:pointer;font-weight:600;padding:2px 6px;font-family:inherit}
 
 /* ═══ RARE BLOOD TYPES ═══ */
 .rare-wrap{display:flex;flex-direction:column;gap:12px}
 .rare-search-bar{display:flex;gap:8px;align-items:center}
-.rare-search-bar input{flex:1;padding:10px 14px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:15px;direction:rtl}
-.rare-search-bar select{padding:10px 12px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:14px;background:#fff}
+.rare-search-bar input{flex:1;padding:10px 14px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:17px;direction:rtl}
+.rare-search-bar select{padding:10px 12px;border:1.5px solid #EEF2F6;border-radius:12px;font-family:inherit;font-size:16px;background:#fff}
 .rare-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .rs-card{background:#fff;border-radius:12px;padding:10px 12px;text-align:center;border:1.5px solid #EEF2F6;cursor:pointer;transition:all .15s}
 .rs-card.active{border-color:#BE123C;background:#FFF1F2}
 .rs-card:active{transform:scale(.97)}
-.rs-type{font-size:16px;font-weight:800;color:#BE123C}
-.rs-count{font-size:12px;color:#94A3B8;margin-top:2px}
+.rs-type{font-size:18px;font-weight:800;color:#BE123C}
+.rs-count{font-size:14px;color:#94A3B8;margin-top:2px}
 .rare-list{background:#fff;border-radius:14px;overflow:hidden;border:1px solid #EEF2F6}
 .rare-row{display:flex;align-items:center;padding:11px 14px;border-bottom:1px solid #F8FAFC;gap:10px}
 .rare-row:last-child{border-bottom:none}
-.rare-av{width:36px;height:36px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#BE123C;flex-shrink:0}
+.rare-av{width:36px;height:36px;border-radius:50%;background:#FFF1F2;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#BE123C;flex-shrink:0}
 .rare-info{flex:1;min-width:0}
-.rare-name{font-size:14px;font-weight:700;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rare-addr{font-size:12px;color:#94A3B8;margin-top:2px}
-.rare-mob{font-size:13px;color:#BE123C;font-weight:600}
-.rare-call{background:none;border:none;color:#16A34A;font-size:21px;cursor:pointer;padding:4px;flex-shrink:0}
-.rare-export-btn{width:100%;padding:12px;background:#1E293B;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px}
+.rare-name{font-size:16px;font-weight:700;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rare-addr{font-size:14px;color:#94A3B8;margin-top:2px}
+.rare-mob{font-size:15px;color:#BE123C;font-weight:600}
+.rare-call{background:none;border:none;color:#16A34A;font-size:23px;cursor:pointer;padding:4px;flex-shrink:0}
+.rare-export-btn{width:100%;padding:12px;background:#1E293B;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px}
 .rare-export-btn:active{background:#0F172A}
-.rare-count-badge{background:#BE123C;color:#fff;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:700;margin-right:auto}
+.rare-count-badge{background:#BE123C;color:#fff;border-radius:20px;padding:2px 10px;font-size:14px;font-weight:700;margin-right:auto}
 @media print{@page{margin:6mm}}</style></head><body>
   <div class="card">
     <div class="hd"><div class="hd-ico">🩸</div>
@@ -3321,8 +3326,8 @@ function openNotifPanel(){
   const infRows=infList.map(r=>`
     <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid #FECACA;background:#FEF2F2;border-radius:10px;margin-bottom:8px">
       <div>
-        <div style="font-weight:700;font-size:14.5px;color:#7F1D1D">⛔ القنينة رقم ${r.bottle_number||'—'} مصابة</div>
-        <div style="font-size:12.5px;color:#757575;margin-top:2px">${r.blood_type||'—'}${r.serology_type?' — '+esc(r.serology_type):''} — بانتظار الفرز بالمخزن المؤقت</div>
+        <div style="font-weight:700;font-size:16.5px;color:#7F1D1D">⛔ القنينة رقم ${r.bottle_number||'—'} مصابة</div>
+        <div style="font-size:14.5px;color:#757575;margin-top:2px">${r.blood_type||'—'}${r.serology_type?' — '+esc(r.serology_type):''} — بانتظار الفرز بالمخزن المؤقت</div>
       </div>
     </div>`).join('');
 
@@ -3340,8 +3345,8 @@ function openNotifPanel(){
     const label=expired?'⛔ انتهت صلاحيتها':(days===0?'⚠️ تنتهي اليوم':'⏳ تنتهي بعد '+days+' يوم');
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid ${expired?'#FECACA':'#FDE68A'};background:${expired?'#FEF2F2':'#FFFBEB'};border-radius:10px;margin-bottom:8px">
       <div>
-        <div style="font-weight:700;font-size:14.5px">${g.n} قنينة — ${g.bt} — ${g.ct}</div>
-        <div style="font-size:12.5px;color:#757575;margin-top:2px">${label} — ${fd(g.date)}</div>
+        <div style="font-weight:700;font-size:16.5px">${g.n} قنينة — ${g.bt} — ${g.ct}</div>
+        <div style="font-size:14.5px;color:#757575;margin-top:2px">${label} — ${fd(g.date)}</div>
       </div>
     </div>`;
   }).join('');
@@ -3355,12 +3360,13 @@ setInterval(refreshExpiryNotifications, 5*60*1000);
 
 // ================================================================
 // SUPPLY (التجهيز) — 3-level drill-down: component type → blood type (within that
-// component) → individual bottle. Only one level's container is visible at a time; each level
-// has its own "رجوع" back button to the one before it.
+// component) → individual bottle. Only one level's container is visible at a time; going back a
+// level is handled entirely by the top "رجوع" button (see goBack()) — no in-page back buttons.
 // ================================================================
-let _supplySelectedComponent = null;
+let _supplySelectedComponent = null, _supplySelectedBT = null, _supplyLevel = 1;
 
 function _supplyShowLevel(n){
+  _supplyLevel = n;
   const g1=G('supplyTypeGrid'), g2=G('supplyGrid'), g3=G('supplyList');
   if(g1) g1.style.display = n===1 ? '' : 'none';
   if(g2) g2.style.display = n===2 ? '' : 'none';
@@ -3401,10 +3407,7 @@ async function loadSupplyByComponent(componentType){
   const cnt={};
   (counts||[]).forEach(r=>{ cnt[r.blood_type]=(cnt[r.blood_type]||0)+1; });
   G('supplyGrid').innerHTML=`
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div style="font-size:15px;font-weight:700;color:#BE123C">${componentType} — اختر الفصيلة</div>
-      <button class="btn" style="font-size:12px;padding:7px 12px" onclick="loadSupplyComponentGrid()"><i class="ti ti-arrow-right"></i> رجوع</button>
-    </div>
+    <div style="font-size:18px;font-weight:700;color:#BE123C;margin-bottom:10px">${componentType} — اختر الفصيلة</div>
     <div class="btg">${bts.map(bt=>`<div class="stock-bt ${(cnt[bt]||0)===0?'empty-bt':''}" onclick="loadSupplyList('${bt}')">
       <div class="stock-bt-type">${bt}</div>
       <div class="stock-bt-count">${cnt[bt]||0} قنينة</div>
@@ -3484,15 +3487,13 @@ function bloodBagCard(r, onclickJs){
 }
 
 async function loadSupplyList(bt){
+  _supplySelectedBT = bt;
   const ct=_supplySelectedComponent||'دم كامل';
   const{data}=await db.from('blood_donations')
     .select('id,bottle_number,bottle_type,blood_type,component_type,draw_date,expiry_date,donors(full_name)')
     .eq('status','in_stock').eq('blood_type',bt).eq('component_type',ct).eq('is_deleted',false)
     .order('expiry_date',{ascending:true});
-  const backBtn=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div style="font-size:15px;font-weight:700;color:#BE123C">${ct} — فصيلة ${bt} — ${(data||[]).length} قنينة</div>
-      <button class="btn" style="font-size:12px;padding:7px 12px" onclick="loadSupplyByComponent('${ct}')"><i class="ti ti-arrow-right"></i> رجوع</button>
-    </div>`;
+  const titleBar=`<div style="font-size:18px;font-weight:700;color:#BE123C;margin-bottom:10px">${ct} — فصيلة ${bt} — ${(data||[]).length} قنينة</div>`;
   if(data&&data.length){
     const bar=`<div id="supplyBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
       <span id="supplyBulkCount">0 محدد</span>
@@ -3502,9 +3503,9 @@ async function loadSupplyList(bt){
         <button class="btn" style="background:#374151;color:#fff;border:none" onclick="clearSupplyBulkSelection()">إلغاء التحديد</button>
       </div>
     </div>`;
-    G('supplyList').innerHTML=backBtn+`${bar}<div class="bb-grid">${data.map(r=>bloodBagCard(r,`openBottleDetail('${r.id}')`)).join('')}</div>`;
+    G('supplyList').innerHTML=titleBar+`${bar}<div class="bb-grid">${data.map(r=>bloodBagCard(r,`openBottleDetail('${r.id}')`)).join('')}</div>`;
   } else {
-    G('supplyList').innerHTML=backBtn+'<div class="empty"><i class="ti ti-package"></i><p>لا توجد قناني من فصيلة '+bt+'</p></div>';
+    G('supplyList').innerHTML=titleBar+'<div class="empty"><i class="ti ti-package"></i><p>لا توجد قناني من فصيلة '+bt+'</p></div>';
   }
   _supplyShowLevel(3);
 }
@@ -3569,7 +3570,7 @@ function openSeparateModalBulk(ids, bt, singleLabel){
     <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #E5E7EB;border-radius:10px;margin-bottom:7px;cursor:pointer">
       <input type="checkbox" class="sep-comp" value="${c.type}" data-days="${c.days}" checked style="width:18px;height:18px">
       <span style="font-weight:700">${c.type}</span>
-      <span style="color:#757575;font-size:13px;margin-right:auto">إكسباير ${c.days==365?'سنة':c.days+' يوم'}</span>
+      <span style="color:#757575;font-size:15px;margin-right:auto">إكسباير ${c.days==365?'سنة':c.days+' يوم'}</span>
     </label>`).join('');
   G('bottleDetailModal').classList.remove('on');
   G('separateModal').classList.add('on');
@@ -3670,8 +3671,8 @@ async function openDamagedList(){
       list.map(r=>`<label style="display:flex;align-items:center;gap:10px;padding:10px;border:1px solid #F1F5F9;border-radius:10px;margin-bottom:6px;cursor:pointer">
         <input type="checkbox" class="dmg-chk" value="${r.id}" style="width:18px;height:18px;flex-shrink:0">
         <div style="flex:1">
-          <div style="font-weight:700;font-size:14px">قنينة ${r.bottle_number} — ${r.blood_type||'—'} — ${r.component_type||'دم كامل'}</div>
-          <div style="font-size:12px;color:#757575;margin-top:2px">السبب: ${esc(r.damage_reason||'—')} | ${fd(r.damaged_date)} | ${esc(r.donors?.full_name||'—')}</div>
+          <div style="font-weight:700;font-size:16px">قنينة ${r.bottle_number} — ${r.blood_type||'—'} — ${r.component_type||'دم كامل'}</div>
+          <div style="font-size:14px;color:#757575;margin-top:2px">السبب: ${esc(r.damage_reason||'—')} | ${fd(r.damaged_date)} | ${esc(r.donors?.full_name||'—')}</div>
         </div>
       </label>`).join('');
   }
@@ -3988,6 +3989,15 @@ function updateHeaderDept(){
 // BACK BUTTON
 // ================================================================
 function goBack(){
+  // Layered screens (التجهيز has 3 levels, الفصل has 2): step back ONE level instead of
+  // leaving the screen entirely, unless already at that screen's top level.
+  if(G('s-supply')?.classList.contains('on') && typeof _supplyLevel!=='undefined'){
+    if(_supplyLevel===3){ loadSupplyByComponent(_supplySelectedComponent); return; }
+    if(_supplyLevel===2){ loadSupplyComponentGrid(); return; }
+  }
+  if(G('s-separation')?.classList.contains('on') && typeof _sepLevel!=='undefined'){
+    if(_sepLevel===2){ loadSeparationBoard(); return; }
+  }
   const isMob = window.innerWidth <= 768;
   if(isMob){
     // On mobile: go to work tab grid
@@ -4087,9 +4097,9 @@ if('serviceWorker' in navigator){
     <div class="modal-title">✏️ تعديل التسلسل</div>
     <div class="modal-body">
       <input type="hidden" id="esq-id">
-      <div style="background:#F8FAFC;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:14px">
+      <div style="background:#F8FAFC;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:16px">
         <strong id="esq-type-lbl"></strong>
-        <div style="color:#94A3B8;font-size:12px;margin-top:3px" id="esq-current-lbl"></div>
+        <div style="color:#94A3B8;font-size:14px;margin-top:3px" id="esq-current-lbl"></div>
       </div>
       <div class="fgrid">
         <div class="fgrp"><label>الرقم الحالي</label><input type="number" id="esq-current"></div>
@@ -4131,7 +4141,7 @@ if('serviceWorker' in navigator){
         <div class="fgrp s2"><label>كلمة المرور *</label><input type="password" id="au-pw" placeholder="8 أحرف على الأقل"></div>
       </div>
       <div style="margin-top:12px">
-        <label style="font-size:14px;color:#616161;font-weight:600;display:block;margin-bottom:8px">الأقسام المسموح بها</label>
+        <label style="font-size:16px;color:#616161;font-weight:600;display:block;margin-bottom:8px">الأقسام المسموح بها</label>
         <div id="au-perms" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
       </div>
     </div>
@@ -4152,7 +4162,7 @@ if('serviceWorker' in navigator){
         <div class="fgrp s2"><label>الاسم الكامل</label><input type="text" id="eu-name" placeholder="اسم الموظف"></div>
       </div>
       <div style="margin-top:12px">
-        <label style="font-size:14px;color:#616161;font-weight:600;display:block;margin-bottom:8px">الأقسام المسموح بها</label>
+        <label style="font-size:16px;color:#616161;font-weight:600;display:block;margin-bottom:8px">الأقسام المسموح بها</label>
         <div id="eu-perms" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
       </div>
     </div>
@@ -4220,10 +4230,10 @@ if('serviceWorker' in navigator){
 <!-- DONATION INTERVAL BLOCK MODAL — stays open until the employee dismisses it -->
 <div class="overlay" id="intervalBlockModal">
   <div class="modal" style="text-align:center;border-top:6px solid #BE123C">
-    <div style="font-size:45px;margin-bottom:6px">⛔</div>
-    <div style="font-size:18px;font-weight:800;color:#BE123C;margin-bottom:12px">لا يمكن قبول هذا التبرع</div>
-    <div id="ibmText" style="font-size:17px;line-height:1.9;font-weight:600;color:#1a1a1a;background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:14px"></div>
-    <button class="btn btn-p" style="width:100%;justify-content:center;margin-top:16px;font-size:16px;padding:13px" onclick="G('intervalBlockModal').classList.remove('on')">
+    <div style="font-size:47px;margin-bottom:6px">⛔</div>
+    <div style="font-size:20px;font-weight:800;color:#BE123C;margin-bottom:12px">لا يمكن قبول هذا التبرع</div>
+    <div id="ibmText" style="font-size:19px;line-height:1.9;font-weight:600;color:#1a1a1a;background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:14px"></div>
+    <button class="btn btn-p" style="width:100%;justify-content:center;margin-top:16px;font-size:18px;padding:13px" onclick="G('intervalBlockModal').classList.remove('on')">
       <i class="ti ti-check"></i> فهمت
     </button>
   </div>
@@ -4237,16 +4247,16 @@ if('serviceWorker' in navigator){
       <input type="hidden" id="dm-id">
       <input type="hidden" id="dm-btyp-val">
       <div style="background:#FFF1F2;border:1.5px solid #FECDD3;border-radius:12px;padding:14px;margin-bottom:14px;text-align:center">
-        <div id="dm-donor-name" style="font-weight:800;font-size:21px;color:#1a1a1a;line-height:1.3"></div>
+        <div id="dm-donor-name" style="font-weight:800;font-size:23px;color:#1a1a1a;line-height:1.3"></div>
         <div style="display:flex;justify-content:center;gap:18px;margin-top:8px">
           <div>
-            <div style="font-size:12px;color:#757575">رقم القنينة</div>
-            <div id="dm-bnum-big" style="font-size:25px;font-weight:800;color:#BE123C">—</div>
+            <div style="font-size:14px;color:#757575">رقم القنينة</div>
+            <div id="dm-bnum-big" style="font-size:27px;font-weight:800;color:#BE123C">—</div>
           </div>
           <div style="width:1px;background:#FECDD3"></div>
           <div>
-            <div style="font-size:12px;color:#757575">نوع القنينة</div>
-            <div id="dm-btyp-sub" style="font-size:17px;font-weight:700;color:#1a1a1a;margin-top:2px">—</div>
+            <div style="font-size:14px;color:#757575">نوع القنينة</div>
+            <div id="dm-btyp-sub" style="font-size:19px;font-weight:700;color:#1a1a1a;margin-top:2px">—</div>
           </div>
         </div>
       </div>
@@ -4255,7 +4265,7 @@ if('serviceWorker' in navigator){
         <div class="fgrp" id="dm-exp-grp"><label>تاريخ النفاد (تلقائي)</label><input type="date" id="dm-exp" class="auto" readonly></div>
       </div>
       <div id="dm-trima-section" style="display:none;margin-top:10px;background:#F0F9FF;border:1px solid #BAE6FD;border-radius:10px;padding:12px">
-        <div style="font-size:13.5px;font-weight:700;color:#0369A1;margin-bottom:8px">جهاز التريما — حدد الناتج (أو الاثنين):</div>
+        <div style="font-size:15.5px;font-weight:700;color:#0369A1;margin-bottom:8px">جهاز التريما — حدد الناتج (أو الاثنين):</div>
         <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1.5px solid #BAE6FD;background:#fff;border-radius:8px;margin-bottom:6px;cursor:pointer">
           <input type="checkbox" id="dm-trima-blood" style="width:17px;height:17px"><span style="font-weight:600">دم مضغوط <span style="color:#757575;font-weight:400">(إكسباير ٢١ يوم)</span></span>
         </label>
@@ -4298,21 +4308,21 @@ if('serviceWorker' in navigator){
     <div class="modal-body">
       <input type="hidden" id="vm-id">
       <div style="background:#FFF1F2;border:1.5px solid #FECDD3;border-radius:12px;padding:14px;margin-bottom:14px;text-align:center">
-        <div id="vm-donor-name" style="font-weight:800;font-size:21px;color:#1a1a1a;line-height:1.3"></div>
+        <div id="vm-donor-name" style="font-weight:800;font-size:23px;color:#1a1a1a;line-height:1.3"></div>
         <div style="display:flex;justify-content:center;gap:18px;margin-top:8px">
           <div>
-            <div style="font-size:12px;color:#757575">رقم القنينة</div>
-            <div id="vm-bnum-big" style="font-size:25px;font-weight:800;color:#BE123C">—</div>
+            <div style="font-size:14px;color:#757575">رقم القنينة</div>
+            <div id="vm-bnum-big" style="font-size:27px;font-weight:800;color:#BE123C">—</div>
           </div>
           <div style="width:1px;background:#FECDD3"></div>
           <div>
-            <div style="font-size:12px;color:#757575">تاريخ السحب</div>
-            <div id="vm-draw-date" style="font-size:17px;font-weight:700;color:#1a1a1a;margin-top:2px">—</div>
+            <div style="font-size:14px;color:#757575">تاريخ السحب</div>
+            <div id="vm-draw-date" style="font-size:19px;font-weight:700;color:#1a1a1a;margin-top:2px">—</div>
           </div>
         </div>
       </div>
       <div>
-        <label style="font-size:14px;color:#616161;font-weight:700;display:block;margin-bottom:8px">نتيجة الفحوصات *</label>
+        <label style="font-size:16px;color:#616161;font-weight:700;display:block;margin-bottom:8px">نتيجة الفحوصات *</label>
         <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #BBF7D0;background:#F0FDF4;border-radius:10px;margin-bottom:8px;cursor:pointer">
           <input type="checkbox" id="vm-allneg" onchange="vmAllNegChange()" style="width:18px;height:18px">
           <span style="font-weight:700;color:#166534">All-Negative — كل الفحوصات سالبة</span>
@@ -4350,16 +4360,16 @@ if('serviceWorker' in navigator){
     <div class="modal-body">
       <input type="hidden" id="cm-id">
       <div style="background:#FFF1F2;border:1.5px solid #FECDD3;border-radius:12px;padding:14px;margin-bottom:14px;text-align:center">
-        <div id="cm-donor-name" style="font-weight:800;font-size:21px;color:#1a1a1a;line-height:1.3"></div>
+        <div id="cm-donor-name" style="font-weight:800;font-size:23px;color:#1a1a1a;line-height:1.3"></div>
         <div style="display:flex;justify-content:center;gap:18px;margin-top:8px">
           <div>
-            <div style="font-size:12px;color:#757575">رقم القنينة</div>
-            <div id="cm-bnum-big" style="font-size:25px;font-weight:800;color:#BE123C">—</div>
+            <div style="font-size:14px;color:#757575">رقم القنينة</div>
+            <div id="cm-bnum-big" style="font-size:27px;font-weight:800;color:#BE123C">—</div>
           </div>
           <div style="width:1px;background:#FECDD3"></div>
           <div>
-            <div style="font-size:12px;color:#757575">تاريخ السحب</div>
-            <div id="cm-draw-date" style="font-size:17px;font-weight:700;color:#1a1a1a;margin-top:2px">—</div>
+            <div style="font-size:14px;color:#757575">تاريخ السحب</div>
+            <div id="cm-draw-date" style="font-size:19px;font-weight:700;color:#1a1a1a;margin-top:2px">—</div>
           </div>
         </div>
       </div>
@@ -4380,7 +4390,7 @@ if('serviceWorker' in navigator){
     <div class="modal-title"><i class="ti ti-package"></i> صرف قنينة</div>
     <div class="modal-body">
       <input type="hidden" id="disp-id">
-      <div id="disp-info" style="background:#F8FAFC;border:1px solid #EEF2F6;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:15px"></div>
+      <div id="disp-info" style="background:#F8FAFC;border:1px solid #EEF2F6;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:17px"></div>
       <div class="fgrp"><label>اسم المستشفى *</label><input type="text" id="disp-hosp" placeholder="اسم المستشفى المستلمة"></div>
     </div>
     <div class="modal-foot">
@@ -4394,18 +4404,18 @@ if('serviceWorker' in navigator){
 <div class="overlay" id="bottleDetailModal">
   <div class="modal" style="text-align:center">
     <input type="hidden" id="bd-id">
-    <div style="font-size:13px;color:#757575;margin-bottom:2px">رقم القنينة</div>
-    <div id="bd-num-big" style="font-size:35px;font-weight:800;color:#BE123C;margin-bottom:6px">—</div>
-    <div id="bd-donor-name" style="font-size:14px;color:#757575;margin-bottom:4px">—</div>
-    <div style="display:inline-block;background:#FFF1F2;color:#BE123C;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:14px" id="bd-component">دم كامل</div>
+    <div style="font-size:15px;color:#757575;margin-bottom:2px">رقم القنينة</div>
+    <div id="bd-num-big" style="font-size:37px;font-weight:800;color:#BE123C;margin-bottom:6px">—</div>
+    <div id="bd-donor-name" style="font-size:16px;color:#757575;margin-bottom:4px">—</div>
+    <div style="display:inline-block;background:#FFF1F2;color:#BE123C;font-size:14px;font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:14px" id="bd-component">دم كامل</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center">
       <div style="background:#F8FAFC;border:1px solid #EEF2F6;border-radius:10px;padding:10px">
-        <div style="font-size:12px;color:#757575">تاريخ السحب</div>
-        <div id="bd-draw-date" style="font-size:17px;font-weight:700;color:#1a1a1a;margin-top:3px">—</div>
+        <div style="font-size:14px;color:#757575">تاريخ السحب</div>
+        <div id="bd-draw-date" style="font-size:19px;font-weight:700;color:#1a1a1a;margin-top:3px">—</div>
       </div>
       <div style="background:#F8FAFC;border:1px solid #EEF2F6;border-radius:10px;padding:10px">
-        <div style="font-size:12px;color:#757575">مكان الخزن</div>
-        <div id="bd-storage" style="font-size:15px;font-weight:700;color:#1a1a1a;margin-top:3px">—</div>
+        <div style="font-size:14px;color:#757575">مكان الخزن</div>
+        <div id="bd-storage" style="font-size:17px;font-weight:700;color:#1a1a1a;margin-top:3px">—</div>
       </div>
     </div>
     <button id="bd-separate-btn" class="btn" style="display:none;width:100%;justify-content:center;margin-top:12px;border-color:#0369A1;color:#0369A1" onclick="openSeparateModal()"><i class="ti ti-git-fork"></i> فصل المكونات</button>
@@ -4434,10 +4444,10 @@ if('serviceWorker' in navigator){
     <div class="modal-title"><i class="ti ti-git-fork"></i> فصل مكونات الدم</div>
     <div class="modal-body">
       <input type="hidden" id="sep-id">
-      <div id="sep-bottle-info" style="font-size:14px;color:#757575;margin-bottom:12px;text-align:center">—</div>
-      <div style="font-size:13.5px;font-weight:700;color:#374151;margin-bottom:8px">حدد المكونات الناتجة فعلياً:</div>
+      <div id="sep-bottle-info" style="font-size:16px;color:#757575;margin-bottom:12px;text-align:center">—</div>
+      <div style="font-size:15.5px;font-weight:700;color:#374151;margin-bottom:8px">حدد المكونات الناتجة فعلياً:</div>
       <div id="sep-list"></div>
-      <div style="font-size:12.5px;color:#94A3B8;margin-top:6px">القنينة الأصلية (دم كامل) ستختفي من الخزين، وكل مكوّن محدد يدخل الخزين كسطر مستقل بنفس اسم المتبرع ورقم القنينة.</div>
+      <div style="font-size:14.5px;color:#94A3B8;margin-top:6px">القنينة الأصلية (دم كامل) ستختفي من الخزين، وكل مكوّن محدد يدخل الخزين كسطر مستقل بنفس اسم المتبرع ورقم القنينة.</div>
     </div>
     <div class="modal-foot">
       <button class="btn" onclick="G('separateModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
@@ -4463,7 +4473,7 @@ if('serviceWorker' in navigator){
     <div class="modal-title"><i class="ti ti-trash"></i> تسجيل تلف</div>
     <div class="modal-body">
       <input type="hidden" id="dmg-ids">
-      <div id="dmg-count-info" style="margin-bottom:10px;font-size:14px;color:#757575;text-align:center"></div>
+      <div id="dmg-count-info" style="margin-bottom:10px;font-size:16px;color:#757575;text-align:center"></div>
       <div class="fgrp"><label>سبب التلف *</label><input type="text" id="dmg-reason" placeholder="مثال: انقطاع كهرباء، كسر، تلوث..."></div>
     </div>
     <div class="modal-foot">
@@ -4491,7 +4501,7 @@ if('serviceWorker' in navigator){
     <div class="modal-title"><i class="ti ti-droplet"></i> تأكيد سحب جماعي</div>
     <div class="modal-body">
       <input type="hidden" id="bdm-ids">
-      <div id="bdm-info" style="margin-bottom:10px;font-size:14px;color:#757575"></div>
+      <div id="bdm-info" style="margin-bottom:10px;font-size:16px;color:#757575"></div>
       <div class="fgrp"><label>تاريخ السحب *</label><input type="date" id="bdm-date"></div>
     </div>
     <div class="modal-foot">
@@ -4507,12 +4517,12 @@ if('serviceWorker' in navigator){
     <div class="modal-title"><i class="ti ti-microscope"></i> فحص جماعي — فيروسات</div>
     <div class="modal-body">
       <input type="hidden" id="bvm-ids">
-      <div id="bvm-info" style="margin-bottom:10px;font-size:14px;color:#757575"></div>
+      <div id="bvm-info" style="margin-bottom:10px;font-size:16px;color:#757575"></div>
       <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #BBF7D0;background:#F0FDF4;border-radius:10px;cursor:pointer">
         <input type="checkbox" id="bvm-allneg" style="width:18px;height:18px">
         <span style="font-weight:700;color:#166534">All-Negative — كل الفحوصات سالبة للمحدد بالكامل</span>
       </label>
-      <div style="font-size:12.5px;color:#94A3B8;margin-top:8px">لحالة الإصابة (Positive)، افحص القنينة لحالها من القائمة العادية.</div>
+      <div style="font-size:14.5px;color:#94A3B8;margin-top:8px">لحالة الإصابة (Positive)، افحص القنينة لحالها من القائمة العادية.</div>
     </div>
     <div class="modal-foot">
       <button class="btn" onclick="G('bulkVmModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
@@ -4527,7 +4537,7 @@ if('serviceWorker' in navigator){
     <div class="modal-title"><i class="ti ti-droplet"></i> تصنيف جماعي</div>
     <div class="modal-body">
       <input type="hidden" id="bcm-ids">
-      <div id="bcm-info" style="margin-bottom:10px;font-size:14px;color:#757575"></div>
+      <div id="bcm-info" style="margin-bottom:10px;font-size:16px;color:#757575"></div>
       <div class="fgrp"><label>فصيلة الدم — تُطبّق على كل المحدد *</label>
         <select id="bcm-bt"><option value="">اختر...</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select>
       </div>
@@ -4543,7 +4553,7 @@ if('serviceWorker' in navigator){
 <div class="overlay" id="waQueueModal">
   <div class="modal" style="text-align:center">
     <div class="modal-title" style="justify-content:center"><i class="ti ti-brand-whatsapp"></i> قائمة التواصل عبر واتساب</div>
-    <div style="font-size:13.5px;color:#757575;margin-bottom:12px"><span id="waQueuePos">1</span> من <span id="waQueueTotal">0</span></div>
+    <div style="font-size:15.5px;color:#757575;margin-bottom:12px"><span id="waQueuePos">1</span> من <span id="waQueueTotal">0</span></div>
     <div id="waQueueBody"></div>
     <div class="modal-foot" style="justify-content:center;flex-wrap:wrap">
       <a id="waQueueOpenBtn" href="#" target="_blank" onclick="setTimeout(waQueueNext,300)" class="btn btn-p" style="text-decoration:none;justify-content:center"><i class="ti ti-brand-whatsapp"></i> فتح واتساب وإرسال</a>
