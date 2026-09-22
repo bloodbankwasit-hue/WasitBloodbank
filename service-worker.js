@@ -1,5 +1,5 @@
-// مصرف الدم الرئيسي — واسط | Service Worker v2
-const CACHE = 'bloodbank-wasit-v5';
+// مصرف الدم الرئيسي — واسط | Service Worker v3
+const CACHE = 'bloodbank-wasit-v6';
 
 const CRITICAL = [
   './',
@@ -48,22 +48,24 @@ self.addEventListener('fetch', e=>{
   // Non-GET: pass through
   if(e.request.method !== 'GET') return;
 
+  // Network-first: whenever the device is online, ALWAYS fetch the current file and refresh
+  // the cache with it — never blindly serve whatever happened to be cached before. The cache
+  // is only a fallback for when the network genuinely fails (offline use), never the default.
   e.respondWith(
-    caches.match(e.request).then(cached=>{
+    fetch(e.request).then(res=>{
+      if(res.ok){
+        const clone = res.clone();
+        caches.open(CACHE).then(c=>c.put(e.request, clone));
+      }
+      return res;
+    }).catch(async ()=>{
+      const cached = await caches.match(e.request);
       if(cached) return cached;
-      return fetch(e.request).then(res=>{
-        if(res.ok){
-          const clone = res.clone();
-          caches.open(CACHE).then(c=>c.put(e.request, clone));
-        }
-        return res;
-      }).catch(async ()=>{
-        if(e.request.mode === 'navigate'){
-          const fallback = await caches.match('./index.html');
-          if(fallback) return fallback;
-        }
-        return new Response('', {status:504, statusText:'Offline'});
-      });
+      if(e.request.mode === 'navigate'){
+        const fallback = await caches.match('./index.html');
+        if(fallback) return fallback;
+      }
+      return new Response('', {status:504, statusText:'Offline'});
     })
   );
 });
