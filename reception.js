@@ -91,16 +91,29 @@ async function _queryRejectedMatch(nm, nid, mob){
     // not "%" — "%" is a literal character here, so a "%name%" pattern would only ever match a
     // name that literally contains a percent sign, silently matching nothing for every normal
     // name.
+    // A name match must NOT depend on the exact whitespace matching character-for-character
+    // (e.g. a double space, or a stray leading/trailing space) — that's invisible to a human
+    // comparing two names on screen but breaks an exact substring match completely. So the
+    // database query casts a WIDE net using just the first word, and the real decision is made
+    // here in JS by comparing both names with their whitespace normalized (collapsed to single
+    // spaces, trimmed) — a donor-safety check should err toward catching a match, not missing
+    // one over a formatting difference.
     const filters = [];
-    if(nm.length>2)  filters.push(`full_name.ilike.*${nm}*`);
+    const firstWord = nm.trim().split(/\s+/)[0];
+    if(firstWord.length>2) filters.push(`full_name.ilike.*${firstWord}*`);
     if(nid.length>5) filters.push(`national_id.eq.${nid}`);
     if(mob.length>6) filters.push(`mobile.eq.${mob}`);
     if(!filters.length) return null;
     const{data}=await db.from('rejected_donors')
       .select('full_name,rejection_reason,rejection_type,national_id,mobile')
       .or(filters.join(','))
-      .eq('is_deleted',false).limit(1);
-    return data&&data.length ? data[0] : null;
+      .eq('is_deleted',false).limit(20);
+    if(!data||!data.length) return null;
+    const norm=s=>(s||'').trim().replace(/\s+/g,' ');
+    const nmNorm=norm(nm);
+    const exact = data.find(r=> nid&&r.national_id===nid || mob&&r.mobile===mob
+      || (nmNorm && (norm(r.full_name)===nmNorm || norm(r.full_name).includes(nmNorm) || nmNorm.includes(norm(r.full_name)))));
+    return exact || null;
   }
   return await checkRejectedOffline(nm, nid, mob);
 }
