@@ -147,7 +147,12 @@ async function checkDonorSafetyOnSelect(d){
   // that ISN'T the one the real donation is actually linked to (a duplicate donor row).
   const{count:byId}=await db.from('blood_donations').select('id',{count:'exact',head:true}).eq('donor_id', d.id);
   const{count:byName}=await db.from('blood_donations').select('id,donors!inner(full_name)',{count:'exact',head:true}).eq('donors.full_name', nm);
-  toast('🔧 تشخيص: مصاب='+(rejHit?'نعم('+rejHit.full_name+')':'لا')+' | مدة='+(intervalResult?(intervalResult.allowed?'مسموح':'ممنوع'):'لا يوجد')+' | id المختار='+d.id+' | تبرعات بهذا id='+byId+' | تبرعات بنفس الاسم='+byName,'warning',20000);
+  // One more comparison: pull the RAW stored full_name from rejected_donors for anything
+  // containing part of this name, to catch an invisible text mismatch (extra space, different
+  // Arabic letter form...) that would make an exact/ilike match silently fail.
+  const{data:rjRaw}=await db.from('rejected_donors').select('full_name').eq('is_deleted',false).ilike('full_name','*'+nm.split(' ')[0]+'*').limit(3);
+  const rjDump = (rjRaw||[]).map(r=>'['+r.full_name+']').join(' , ') || 'ولا صف';
+  toast('🔧 تشخيص: مصاب='+(rejHit?'نعم':'لا')+' | id المختار='+d.id+' | تبرعات بهذا id='+byId+' | بنفس الاسم='+byName+' | الاسم المبحوث=['+nm+'] | بجدول المرفوضين وجدت: '+rjDump,'warning',25000);
 
   // Centered popup — immediate, impossible to miss. Being مصاب/مرفوض always takes priority
   // over a timing issue, since it's the more serious reason and staff need to see it first.
