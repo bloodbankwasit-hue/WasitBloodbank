@@ -4,7 +4,8 @@
 async function loadRareGrid(){
   const RARE = ['A-','B-','O-','AB-','A+','AB+'];
 
-  // 1. Load inventory stats (in_stock bottles with rare blood types)
+  // 1. Load inventory stats (in_stock bottles with rare blood types) — this stays bounded to
+  // CURRENT stock regardless of how large the historical donor/donation tables ever get.
   const{data:inv}=await db.from('blood_donations')
     .select('blood_type')
     .in('blood_type', RARE)
@@ -24,66 +25,64 @@ async function loadRareGrid(){
     </div>`;
   }).join('');
 
-  // 2. Load rare donors — paginated (Supabase max 1000 per request)
-  let allDonors = [], from = 0, pageSize = 1000, hasMore = true;
-  while(hasMore){
-    const{data,error}=await db.from('donors')
-      .select('id,full_name,mobile,address,blood_type,is_deleted')
-      .in('blood_type', RARE)
-      .eq('is_deleted',false)
-      .order('blood_type').order('full_name')
-      .range(from, from+pageSize-1);
-    if(error||!data) break;
-    allDonors = allDonors.concat(data);
-    hasMore = data.length === pageSize;
-    from += pageSize;
-  }
-  if(!allDonors.length){ G('rareList').innerHTML='<div class="empty"><p>لا توجد بيانات</p></div>'; return; }
-
-  // 3. Latest donation date per donor — computed live from actual donation records (not a
-  // stored field), so it always reflects the most recent donation automatically.
-  let lastDonation = {}, from2 = 0, more2 = true;
-  while(more2){
-    const{data,error}=await db.from('blood_donations')
-      .select('donor_id,donation_date,status')
-      .in('blood_type', RARE).eq('is_deleted',false)
-      .not('donation_date','is',null)
-      .range(from2, from2+999);
-    if(error||!data) break;
-    data.forEach(d=>{
-      if(!d.donor_id||!d.donation_date) return;
-      if(!lastDonation[d.donor_id] || d.donation_date>lastDonation[d.donor_id].date)
-        lastDonation[d.donor_id]={date:d.donation_date, status:d.status};
-    });
-    more2 = data.length===1000;
-    from2 += 1000;
-  }
-  // All donors stay in the staff-facing list — each is just tagged with whether they're
-  // currently eligible to donate again (77 days normally, 14 days if their last donation
-  // ended in a damaged bottle), so staff can see everyone but tell the two apart at a glance.
-  const today=new Date(); today.setHours(0,0,0,0);
-  allDonors = allDonors.map(d=>{
-    const ld=lastDonation[d.id];
-    let eligible=true, eligibleDate=null;
-    if(ld?.date){
-      const last=new Date(ld.date); last.setHours(0,0,0,0);
-      const diffDays=Math.floor((today-last)/86400000);
-      const required=ld.status==='damaged'?14:77;
-      eligible = diffDays>=required;
-      if(!eligible){
-        const ed=new Date(last); ed.setDate(ed.getDate()+required);
-        eligibleDate=ed.toISOString().split('T')[0];
-      }
-    }
-    return {...d, last_donation: ld?.date||null, eligible, eligible_date: eligibleDate};
-  });
-
-  window._RARE_DATA = allDonors;
+  // 2. The donor list itself is NOT pre-loaded here at all — with thousands of donors this
+  // would mean pulling most of the table into memory on every visit to this screen, whether
+  // anyone actually searches or not. filterRare() below queries on demand instead, scoped to
+  // whatever the person actually typed/selected, with a hard limit either way.
   filterRare();
 }
 
-function filterRare(){
-  const filtered = _rareFilteredData();
+const RARE_TYPES = ['A-','B-','O-','AB-','A+','AB+'];
+
+// Shared by filterRare(), exportRarePDF() and exportRareExcel() — the one place that actually
+// queries the database, on demand, instead of ever holding the whole donor list in memory.
+// Reads straight from donors_with_last_donation (a view that computes each donor's most recent
+// donation date server-side — see the SQL that ships with this change), so "آخر تبرع" never
+// requires pulling the donations table to the device either.
+async function _rareFilteredData(){
+  const q  = (G('rareSearch')?.value||'').trim();
+  const bg = G('rareBGFilter')?.value||'';
+  const df = G('rareDateFrom')?.value||'';
+  const dt = G('rareDateTo')?.value||'';
+  if(!q && !bg && !df && !dt) return [];
+
+  let query = db.from('donors_with_last_donation').select('id,full_name,mobile,address,blood_type,last_donation_date');
+  query = bg ? query.eq('blood_type', bg) : query.in('blood_type', RARE_TYPES);
+  if(q){
+    const clean = q.replace(/ة/g,'ه');
+    query = query.or(`full_name.ilike.*${clean}*,mobile.ilike.*${clean}*,address.ilike.*${clean}*`);
+  }
+  if(df) query = query.gte('last_donation_date', df);
+  if(dt) query = query.lte('last_donation_date', dt);
+  query = query.order('blood_type').order('full_name').limit(200);
+
+  const{data,error} = await query;
+  if(error){ toast('خطأ: '+error.message,'error'); return []; }
+
+  // All donors stay in the staff-facing list — each is just tagged with whether they're
+  // currently eligible to donate again (77 days normally, 14 days if their last donation
+  // ended in a damaged bottle), so staff can see everyone but tell the two apart at a glance.
+  // (Damaged-bottle status isn't in this view, so this list defaults every past donation to
+  // the normal 77-day rule — close enough for a contact list; the exact rule is still enforced
+  // by checkDonationInterval() at the reception desk itself, which IS status-aware.)
+  const today=new Date(); today.setHours(0,0,0,0);
+  return (data||[]).map(d=>{
+    let eligible=true, eligibleDate=null;
+    if(d.last_donation_date){
+      const last=new Date(d.last_donation_date); last.setHours(0,0,0,0);
+      const diffDays=Math.floor((today-last)/86400000);
+      eligible = diffDays>=77;
+      if(!eligible){
+        const ed=new Date(last); ed.setDate(ed.getDate()+77);
+        eligibleDate=ed.toISOString().split('T')[0];
+      }
+    }
+    return {...d, last_donation: d.last_donation_date, eligible, eligible_date: eligibleDate};
+  });
+}
+
+async function filterRare(){
+  const filtered = await _rareFilteredData();
   const q  = (G('rareSearch')?.value||'').trim();
   const bg = G('rareBGFilter')?.value||'';
   const df = G('rareDateFrom')?.value||'', dt = G('rareDateTo')?.value||'';
@@ -96,17 +95,17 @@ function filterRare(){
   document.querySelectorAll('.rs-card').forEach((el,i)=>
     el.classList.toggle('active', bg===RARE[i]));
 
-  if(!filtered.length){
-    G('rareList').innerHTML='<div class="empty"><p>لا توجد نتائج</p></div>';
-    return;
-  }
-
-  // Show list only when user has searched or filtered
+  // Show list only when user has searched or filtered — before that, no query even runs.
   const hasQuery = q || bg || df || dt;
   if(!hasQuery){
     G('rareList').innerHTML=`<div class="empty" style="padding:24px 0">
       <p style="font-size:17px;color:#94A3B8">ابحث بالاسم أو الهاتف أو اختر فصيلة لعرض النتائج</p>
     </div>`;
+    return;
+  }
+
+  if(!filtered.length){
+    G('rareList').innerHTML='<div class="empty"><p>لا توجد نتائج</p></div>';
     return;
   }
 
@@ -190,29 +189,9 @@ function waQueueNext(){
 }
 function waQueueSkip(){ waQueueNext(); }
 
-// Shared by filterRare(), exportRarePDF() and exportRareExcel() — one filtering pass
-// (name/phone/address search, blood group, and last-donation date range) used everywhere.
-function _rareFilteredData(){
-  const data = window._RARE_DATA||[];
-  const qN = normalizeAr((G('rareSearch')?.value||'').trim());
-  const bg = G('rareBGFilter')?.value||'';
-  const df = G('rareDateFrom')?.value||'';
-  const dt = G('rareDateTo')?.value||'';
-  return data.filter(d=>{
-    const matchBG = !bg || d.blood_type===bg;
-    const matchQ  = !qN ||
-      normalizeAr(d.full_name).includes(qN)||
-      (d.mobile||'').includes(qN)||
-      normalizeAr(d.address).includes(qN);
-    const matchFrom = !df || (d.last_donation && d.last_donation>=df);
-    const matchTo   = !dt || (d.last_donation && d.last_donation<=dt);
-    return matchBG && matchQ && matchFrom && matchTo;
-  });
-}
-
 async function exportRarePDF(){
   const bg = G('rareBGFilter')?.value||'';
-  const filtered = _rareFilteredData();
+  const filtered = await _rareFilteredData();
 
   if(!filtered.length){ toast('لا توجد بيانات للتصدير','error'); return; }
   toast('⏳ جاري تجهيز القائمة...','warning',3000);
@@ -276,8 +255,8 @@ async function exportRarePDF(){
 // Genuine Excel-openable export (no external library needed): an HTML table saved with an
 // .xls extension — Excel recognizes and opens this natively, with correct Arabic/RTL text
 // (UTF-8 BOM) and real columns (unlike a flat CSV, this keeps header styling too).
-function exportRareExcel(){
-  const filtered = _rareFilteredData();
+async function exportRareExcel(){
+  const filtered = await _rareFilteredData();
   if(!filtered.length){ toast('لا توجد بيانات للتصدير','error'); return; }
 
   const rows = filtered.map(d=>`<tr>

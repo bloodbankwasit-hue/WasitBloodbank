@@ -32,15 +32,20 @@ function switchInfRejMode(mode){
   }
 }
 
-async function loadInfected(type, tabEl){
-  document.querySelectorAll('#infectedPane .tab').forEach(t=>t.classList.remove('on'));
-  if(tabEl) tabEl.classList.add('on');
+async function loadInfected(type, tabEl, page=1){
+  if(tabEl){
+    document.querySelectorAll('#infectedPane .tab').forEach(t=>t.classList.remove('on'));
+    tabEl.classList.add('on');
+    _infType = type;
+  }
+  _infPage=page;
   load(true);
   let q=db.from('blood_donations')
-    .select('bottle_number,serology_result,serology_type,donation_date,id,donors(donor_number,full_name,mobile)')
+    .select('bottle_number,serology_result,serology_type,donation_date,id,donors(donor_number,full_name,mobile)',{count:'exact'})
     .eq('serology_result','Positive').eq('is_deleted',false).order('created_at',{ascending:false});
-  if(type) q=q.eq('serology_type',type);
-  const {data}=await q; load(false);
+  if(_infType) q=q.eq('serology_type',_infType);
+  q=q.range((page-1)*PS, page*PS-1);
+  const {data,count}=await q; load(false);
   if(data&&data.length){
     G('infTbl').innerHTML=`<div class="tw"><table><thead><tr>
       <th>رقم المتبرع</th><th>اسم المتبرع</th><th>رقم القنينة</th>
@@ -53,28 +58,48 @@ async function loadInfected(type, tabEl){
       <td>${fd(r.donation_date)}</td>
       <td dir="ltr">${esc(N(r.donors?.mobile))}</td>
     </tr>`).join('')}</tbody></table></div>`;
+    G('infPag').innerHTML=_pagHtml(count,page,'goInfPage');
   } else {
     G('infTbl').innerHTML='<div class="empty"><i class="ti ti-shield-check" style="color:#2e7d32"></i><p>لا توجد حالات إيجابية</p></div>';
+    G('infPag').innerHTML='';
   }
+}
+let _infPage=1, _infType='';
+function goInfPage(p){ loadInfected(undefined, undefined, p); }
+
+// Shared pagination-control renderer (same look as سجل المتبرعين's pager) — takes the total
+// row count, current page, and the name of the function to call with a page number.
+function _pagHtml(count, page, fnName){
+  const tp=Math.max(1,Math.ceil(count/PS));
+  const start=Math.max(1,Math.min(page-2,tp-4));
+  return `<span>إجمالي: ${fnum(count)} سجل — الصفحة ${page} من ${tp}</span>
+    <div class="pag-btns">
+      <button class="pbtn" onclick="${fnName}(${page-1})" ${page<=1?'disabled':''}>→</button>
+      ${Array.from({length:Math.min(5,tp)},(_,i)=>{const p=start+i;return`<button class="pbtn ${p===page?'on':''}" onclick="${fnName}(${p})">${p}</button>`;}).join('')}
+      <button class="pbtn" onclick="${fnName}(${page+1})" ${page>=tp?'disabled':''}>←</button>
+    </div>`;
 }
 
 // ================================================================
 // REJECTED
 // ================================================================
-let _rjSearchTimer=null;
+let _rjSearchTimer=null, _rjPage=1;
 function rjSearchLive(){
   clearTimeout(_rjSearchTimer);
-  _rjSearchTimer=setTimeout(loadRejected, 300);
+  _rjSearchTimer=setTimeout(()=>loadRejected(1), 300);
 }
+function goRjPage(p){ loadRejected(p); }
 
-async function loadRejected(){
+async function loadRejected(page=1){
+  _rjPage=page;
   const s=G('rjSrch').value.trim(); load(true);
-  let q=db.from('rejected_donors').select('*').eq('is_deleted',false).order('rejection_date',{ascending:false});
+  let q=db.from('rejected_donors').select('*',{count:'exact'}).eq('is_deleted',false).order('rejection_date',{ascending:false});
   // With no search text: browse the current tab's type only. While searching: search across
   // BOTH types together (a name might be rejected either way, and staff need to know which).
   if(s) q=q.ilike('full_name','%'+s+'%');
   else  q=q.eq('rejection_type', _rejMode==='perm' ? 'دائم' : 'مؤقت');
-  const {data}=await q; load(false);
+  q=q.range((page-1)*PS, page*PS-1);
+  const {data,count}=await q; load(false);
   if(data&&data.length){
     G('rjTbl').innerHTML=`<div class="tw"><table><thead><tr>
       <th>الاسم</th><th>العمر</th><th>سبب الرفض</th><th>تاريخ الرفض</th><th>نوع الرفض</th><th>ملاحظات</th>
@@ -84,8 +109,10 @@ async function loadRejected(){
       <td><span class="pill ${r.rejection_type==='مؤقت'?'py':'pr'}">${r.rejection_type}</span></td>
       <td>${esc(N(r.notes))}</td>
     </tr>`).join('')}</tbody></table></div>`;
+    G('rjPag').innerHTML=_pagHtml(count,page,'goRjPage');
   } else {
     G('rjTbl').innerHTML='<div class="empty"><i class="ti ti-user-x"></i><p>لا توجد سجلات</p></div>';
+    G('rjPag').innerHTML='';
   }
 }
 

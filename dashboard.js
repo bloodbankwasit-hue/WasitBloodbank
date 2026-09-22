@@ -42,10 +42,11 @@ async function loadDash(){
       G('recentTbl').innerHTML='<div class="empty"><i class="ti ti-clock"></i><p>لا توجد تبرعات اليوم حتى الآن</p></div>';
     }
 
-    // Blood type counts
-    const {data:btd}=await db.from('blood_donations').select('blood_type').eq('is_deleted',false).not('blood_type','is',null);
+    // Blood type counts — computed entirely inside the database (blood_type_distribution()),
+    // never pulls the donations table's rows to the device just to count them client-side.
+    const {data:btd}=await db.rpc('blood_type_distribution');
     const btc={};
-    (btd||[]).forEach(r=>{btc[r.blood_type]=(btc[r.blood_type]||0)+1;});
+    (btd||[]).forEach(r=>{btc[r.blood_type]=r.cnt;});
     const bts=['A+','A-','B+','B-','O+','O-','AB+','AB-'];
     const rare=['O-','AB-','A-','B-'];
     G('btGrid').innerHTML=bts.map(bt=>`<div class="btc ${rare.includes(bt)?'warn':''}">

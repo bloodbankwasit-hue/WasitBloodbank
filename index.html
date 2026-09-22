@@ -1168,6 +1168,7 @@ tbody tr:hover td{background:#fafafa}
             <div class="tab" onclick="loadInfected('سفلس VDRL',this)">سفلس</div>
           </div>
           <div id="infTbl"><div class="empty"><i class="ti ti-virus"></i><p>جاري التحميل...</p></div></div>
+          <div class="pag" id="infPag"></div>
         </div>
 
         <div id="rejectedPane" style="display:none">
@@ -1177,6 +1178,7 @@ tbody tr:hover td{background:#fafafa}
             <input type="text" class="sinp" id="rjSrch" placeholder="🔍 بحث بالاسم — يشمل الدائم والمؤقت مع بعض..." style="max-width:320px" oninput="rjSearchLive(this.value)" onkeydown="if(event.key==='Enter')loadRejected()">
           </div>
           <div id="rjTbl"><div class="empty"><i class="ti ti-user-x"></i><p>جاري التحميل...</p></div></div>
+          <div class="pag" id="rjPag"></div>
         </div>
       </div>
 
@@ -2007,9 +2009,11 @@ async function exportDonorFormPDF(){
     .section-hdr{background:#EDEDED;text-align:center;font-weight:700;font-size:16.5px;padding:6px;border:1px solid #000;border-top:none}
     .vitals td.lbl{width:20%}
     .vitals td.val{width:20%;text-align:center}
-    @media print{@page{margin:10mm}}
+    @media print{@page{margin:10mm} .close-float{display:none}}
+    .close-float{position:fixed;top:14px;left:14px;z-index:999;background:#1E293B;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-family:'Amiri',serif;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2)}
   </style></head>
   <body>
+    <button class="close-float" onclick="window.close()">✕ إغلاق والرجوع للتطبيق</button>
     <div class="frame">
       <div class="hdr">
         <div class="dept">دائرة صحة واسط<br>مصرف الدم الرئيسي في واسط</div>
@@ -3012,7 +3016,8 @@ function printForm(){
 .rare-export-btn{width:100%;padding:12px;background:#1E293B;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px}
 .rare-export-btn:active{background:#0F172A}
 .rare-count-badge{background:#BE123C;color:#fff;border-radius:20px;padding:2px 10px;font-size:14px;font-weight:700;margin-right:auto}
-@media print{@page{margin:10mm}}</style></head><body>
+@media print{@page{margin:10mm} .close-float{display:none}}</style></head><body>
+  <button class="close-float" style="position:fixed;top:14px;left:14px;z-index:999;background:#1E293B;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-family:'Segoe UI',Arial,sans-serif;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2)" onclick="window.close()">✕ إغلاق والرجوع للتطبيق</button>
   <div class="hdr">
     <div class="en">Ministry of Health<br>Wasit Health Directorate<br>Technical Affairs Dept.<br><strong>Blood Donor Questionnaire</strong></div>
     <div class="tc"><h2>استمارة تبرع بالدم</h2><p>شعبة مصرف الدم الرئيسي — واسط</p><p>وزارة الصحة / دائرة صحة واسط</p></div>
@@ -3247,7 +3252,8 @@ function printBC(type){
 .rare-export-btn{width:100%;padding:12px;background:#1E293B;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px}
 .rare-export-btn:active{background:#0F172A}
 .rare-count-badge{background:#BE123C;color:#fff;border-radius:20px;padding:2px 10px;font-size:14px;font-weight:700;margin-right:auto}
-@media print{@page{margin:6mm}}</style></head><body>
+@media print{@page{margin:6mm} .close-float{display:none}}</style></head><body>
+  <button class="close-float" style="position:fixed;top:14px;left:14px;z-index:999;background:#1E293B;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-family:'Segoe UI',Arial,sans-serif;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2)" onclick="window.close()">✕ إغلاق والرجوع للتطبيق</button>
   <div class="card">
     <div class="hd"><div class="hd-ico">🩸</div>
       <div><div class="hd-t">مصرف الدم الرئيسي — واسط</div><div class="hd-s">وزارة الصحة</div></div>
@@ -4181,9 +4187,11 @@ function exportRowsToPDF(title, headers, rows, filename){
       table{width:100%;border-collapse:collapse;font-size:12px}
       th,td{border:1px solid #ccc;padding:6px 8px;text-align:center}
       th{background:#BE123C;color:#fff}
-      @media print{@page{margin:10mm}}
+      @media print{@page{margin:10mm} .close-float{display:none}}
+      .close-float{position:fixed;top:14px;left:14px;z-index:999;background:#1E293B;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-family:Arial,sans-serif;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2)}
     </style></head>
     <body>
+      <button class="close-float" onclick="window.close()">✕ إغلاق والرجوع للتطبيق</button>
       <h2>${esc(title)}</h2>
       <p>تاريخ التصدير: ${new Date().toLocaleDateString('en-GB')} | عدد السجلات: ${rows.length}</p>
       <table><thead><tr>${headRow}</tr></thead><tbody>${bodyRows}</tbody></table>

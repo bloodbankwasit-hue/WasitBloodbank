@@ -249,8 +249,8 @@ function printStats(){
 .rare-export-btn{width:100%;padding:12px;background:#1E293B;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px}
 .rare-export-btn:active{background:#0F172A}
 .rare-count-badge{background:#BE123C;color:#fff;border-radius:20px;padding:2px 10px;font-size:14px;font-weight:700;margin-right:auto}
-@media print{@page{margin:10mm}}</style></head>
-  <body>${c}<script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
+@media print{@page{margin:10mm} .close-float{display:none}}</style></head>
+  <body><button class="close-float" style="position:fixed;top:14px;left:14px;z-index:999;background:#1E293B;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-family:'Segoe UI',Arial,sans-serif;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2)" onclick="window.close()">✕ إغلاق والرجوع للتطبيق</button>${c}<script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
   w.document.close();
 }
 
