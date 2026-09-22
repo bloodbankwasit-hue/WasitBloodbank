@@ -36,7 +36,7 @@ async function loadDash(){
         <td>${N(r.blood_type)}</td>
         <td><span class="pill ${r.donation_type==='طوعي'?'pg':'py'}">${r.donation_type}</span></td>
         <td>${ft(r.donation_time)}</td>
-        <td><span class="pill ${(['in_stock','dispatched','rejected_positive'].includes(r.status)&&r.serology_result)?r.serology_result==='Negative'?'pg':'pr':'py'}">${(['in_stock','dispatched','rejected_positive'].includes(r.status)&&r.serology_result)?r.serology_result==='Negative'?'سالبة ✅':'موجبة ⚠️':'لم يُفحص'}</span></td>
+        <td><span class="pill ${r.serology_result?(r.serology_result==='Negative'?'pg':'pr'):'py'}">${r.serology_result?(r.serology_result==='Negative'?'سالبة ✅':'موجبة ⚠️'):'لم يُفحص'}</span></td>
       </tr>`).join('')}</tbody></table></div>`;
     } else {
       G('recentTbl').innerHTML='<div class="empty"><i class="ti ti-clock"></i><p>لا توجد تبرعات اليوم حتى الآن</p></div>';

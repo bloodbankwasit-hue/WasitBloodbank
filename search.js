@@ -25,7 +25,7 @@ async function doSearch(){
       (!mom||r.donors?.mother_name?.includes(mom))
     );
     if(SRDATA.length){
-      G('srRes').innerHTML=`<div style="margin-bottom:8px;font-size:12px;color:#757575">عدد النتائج: <strong>${SRDATA.length}</strong></div>
+      G('srRes').innerHTML=`<div style="margin-bottom:8px;font-size:13px;color:#757575">عدد النتائج: <strong>${SRDATA.length}</strong></div>
       <div class="tw"><table><thead><tr>
         <th>رقم المتبرع</th><th>الاسم</th><th>الفصيلة</th><th>نوع القنينة</th><th>رقم القنينة</th>
         <th>نوع التبرع</th><th>تاريخ التبرع</th><th>تاريخ النفاد</th><th>الفحوصات</th><th></th>
@@ -35,7 +35,7 @@ async function doSearch(){
         <td style="font-weight:700;color:#BE123C">${r.bottle_number}</td>
         <td><span class="pill ${r.donation_type==='طوعي'?'pg':'py'}">${r.donation_type}</span></td>
         <td>${fd(r.donation_date)}</td><td>${fd(r.expiry_date)}</td>
-        <td><span class="pill ${(['in_stock','dispatched','rejected_positive'].includes(r.status)&&r.serology_result)?r.serology_result==='Negative'?'pg':'pr':'py'}">${(['in_stock','dispatched','rejected_positive'].includes(r.status)&&r.serology_result)?r.serology_result==='Negative'?'سالبة ✅':'موجبة ⚠️':'لم يُفحص'}</span></td>
+        <td><span class="pill ${r.serology_result?(r.serology_result==='Negative'?'pg':'pr'):'py'}">${r.serology_result?(r.serology_result==='Negative'?'سالبة ✅':'موجبة ⚠️'):'لم يُفحص'}</span></td>
         <td><button class="ibtn" onclick="loadSectionScript('barcode').then(()=>openBC(${r.bottle_number}))"><i class="ti ti-barcode"></i></button></td>
       </tr>`).join('')}</tbody></table></div>`;
     } else {

@@ -16,7 +16,10 @@ async function applyLabUpdate(id, fieldUpdates){
   const effSer = ('serology_result' in fieldUpdates) ? fieldUpdates.serology_result : (cur?.serology_result ?? null);
   const effSerType = ('serology_type' in fieldUpdates) ? fieldUpdates.serology_type : (cur?.serology_type ?? null);
   const complete = !!effBt && !!effSer;
-  const newStatus = complete ? (effSer==='Positive' ? 'rejected_positive' : 'in_stock') : 'pending_lab';
+  // Once lab is complete, a negative bottle no longer goes straight to 'in_stock' — it lands in
+  // 'pending_release' (المخزن المؤقت) first, where the responsible staff reviews it (and can still
+  // separate it there if it's a separable type) before manually confirming it into in_stock/التجهيز.
+  const newStatus = complete ? (effSer==='Positive' ? 'rejected_positive' : 'pending_release') : 'pending_lab';
 
   const payload = {...fieldUpdates};
   if(complete) payload.status = newStatus;

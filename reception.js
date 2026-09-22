@@ -107,7 +107,7 @@ document.addEventListener('click',e=>{
 });
 
 function newDonor(){
-  G('rcPrintArea').style.display='none';
+  G('rcPrintModal').classList.remove('on');
   G('rcSaveBtn').style.display='flex';
   resetReception();
   _lastDonation = null;
@@ -133,6 +133,11 @@ async function fetchNextDonorNumberPreview(){
     const next=(data && data.length && data[0].donor_number) ? data[0].donor_number+1 : 1;
     el.value=next;
   }catch(e){ /* preview only — ignore failures */ }
+}
+
+function getHospName(){
+  const v=G('rc-hosp')?.value.trim()||'';
+  return v==='أخرى' ? (G('rc-hosp-other')?.value.trim()||'') : v;
 }
 
 function toggleRcPat(){
@@ -192,6 +197,10 @@ async function saveReception(){
   }
   const nm=G('rc-name').value.trim(), by=parseInt(G('rc-by').value);
   if(!nm||!by){ toast('يرجى تعبئة الاسم وسنة التولد','error'); return; }
+  const _mobVal=G('rc-mob')?.value.trim()||'';
+  if(_mobVal && !/^07[0-9]{9}$/.test(_mobVal)){ toast('رقم الموبايل يجب أن يكون 11 رقم ويبدأ بـ 07','error'); return; }
+  const _nidVal=G('rc-nid')?.value.trim()||'';
+  if(_nidVal && _nidVal.length!==12){ toast('رقم البطاقة الوطنية يجب أن يكون 12 رقم','error'); return; }
   load(true);
   // Safety net: re-check by national ID / mobile even if no autocomplete suggestion was picked
   const _intervalBlock = await checkIntervalBeforeSave(G('rc-nid')?.value, G('rc-mob')?.value);
@@ -213,7 +222,7 @@ async function saveReception(){
       occupation:G('rc-job').value.trim()||null,
       donation_type:G('rc-dtype').value,
       patient_name:G('rc-pat').value.trim()||null,
-      hospital_name:G('rc-hosp').value.trim()||null,
+      hospital_name:getHospName()||null,
       donation_date:new Date().toISOString().split('T')[0],
       donation_time:new Date().toTimeString().substring(0,5),
       bottle_type:btype,
@@ -304,7 +313,7 @@ async function saveReception(){
         occupation:G('rc-job').value.trim(),
         donation_type:G('rc-dtype').value,
         patient_name:G('rc-pat').value.trim(),
-        hospital_name:G('rc-hosp').value.trim(),
+        hospital_name:getHospName(),
         blood_pressure:G('rc-bp').value.trim(),
         pulse:G('rc-pulse').value,
         temperature:G('rc-temp').value,
@@ -312,8 +321,8 @@ async function saveReception(){
         hemoglobin:G('rc-hgb').value,
         expiry_date:'', // will calculate from bottle type
       };
-      // Show print options instead of reset
-      G('rcPrintArea').style.display='block';
+      // Show print options as a centered popup instead of resetting the form
+      G('rcPrintModal').classList.add('on');
       G('rcSaveBtn').style.display='none';
       toast('✅ تم الحفظ — رقم القنينة: '+bnum,'success',4000);
     }
@@ -322,7 +331,8 @@ async function saveReception(){
 }
 
 function resetReception(){
-  ['rc-name','rc-by','rc-age','rc-mom','rc-nid','rc-mob','rc-addr','rc-job','rc-pat','rc-hosp','rc-bp','rc-pulse','rc-temp','rc-weight','rc-hgb'].forEach(id=>{const e=G(id);if(e)e.value='';});
+  ['rc-name','rc-by','rc-age','rc-mom','rc-nid','rc-mob','rc-addr','rc-job','rc-pat','rc-hosp','rc-hosp-other','rc-bp','rc-pulse','rc-temp','rc-weight','rc-hgb'].forEach(id=>{const e=G(id);if(e)e.value='';});
+  const _ho=G('rc-hosp-other'); if(_ho) _ho.style.display='none';
   if(G('rc-date')){ const t=new Date().toISOString().split('T')[0]; G('rc-date').value=fd(t); }
   if(G('rc-time')){ G('rc-time').value=new Date().toTimeString().substring(0,5); }
   fetchNextDonorNumberPreview();

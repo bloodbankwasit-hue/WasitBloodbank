@@ -58,7 +58,7 @@ async function runGlobalSearch(){
 
     const sections=[];
     if(donationRows.length){
-      sections.push(`<div class="sh-t" style="font-size:14px;margin:14px 0 8px"><i class="ti ti-droplet"></i> تبرعات (${donationRows.length})</div>` +
+      sections.push(`<div class="sh-t" style="font-size:15px;margin:14px 0 8px"><i class="ti ti-droplet"></i> تبرعات (${donationRows.length})</div>` +
         donationRows.map(r=>`<div class="flow-card">
           <div class="fc-av">🩸</div>
           <div style="flex:1">
@@ -68,7 +68,7 @@ async function runGlobalSearch(){
         </div>`).join(''));
     }
     if(rejectedRows.length){
-      sections.push(`<div class="sh-t" style="font-size:14px;margin:14px 0 8px"><i class="ti ti-ban"></i> قائمة المرفوضين (${rejectedRows.length})</div>` +
+      sections.push(`<div class="sh-t" style="font-size:15px;margin:14px 0 8px"><i class="ti ti-ban"></i> قائمة المرفوضين (${rejectedRows.length})</div>` +
         rejectedRows.map(r=>`<div class="flow-card">
           <div class="fc-av">⛔</div>
           <div style="flex:1">
@@ -150,7 +150,7 @@ async function loadDonors(page=1){
           <td><span class="pill ${r.donation_type==='طوعي'?'pg':'py'}">${r.donation_type}</span></td>
           <td>${fd(r.donation_date)}</td>
           <td style="color:${exp?'#BE123C':'inherit'}">${fd(r.expiry_date)}${exp?' ⚠':''}</td>
-          <td><span class="pill ${(['in_stock','dispatched','rejected_positive'].includes(r.status)&&r.serology_result)?r.serology_result==='Negative'?'pg':'pr':'py'}">${(['in_stock','dispatched','rejected_positive'].includes(r.status)&&r.serology_result)?r.serology_result==='Negative'?'سالبة ✅':'موجبة ⚠️':'لم يُفحص'}</span></td>
+          <td><span class="pill ${r.serology_result?(r.serology_result==='Negative'?'pg':'pr'):'py'}">${r.serology_result?(r.serology_result==='Negative'?'سالبة ✅':'موجبة ⚠️'):'لم يُفحص'}</span></td>
           <td style="white-space:nowrap">
             <button class="ibtn" onclick="printDonorFromList(storeDonorForPrint({donor_name:'${sq(r.donors?.full_name)}',bottle_number:${r.bottle_number||0},bottle_type:'${r.bottle_type||''}',donation_date:'${r.donation_date||''}',donation_type:'${r.donation_type||''}',birth_year:${r.donors?.birth_year||0},gender:'${r.donors?.gender||''}',mobile:'${sq(r.donors?.mobile)}',national_id:'${sq(r.donors?.national_id)}',address:'${sq(r.donors?.address)}',expiry_date:'${r.expiry_date||''}',blood_type:'${r.blood_type||''}' }))" title="طباعة" style="color:#BE123C"><i class="ti ti-printer"></i></button>
             <button class="ibtn" onclick="editDonorRow('${r.id}')" title="تعديل" style="color:#2563EB"><i class="ti ti-edit"></i></button>

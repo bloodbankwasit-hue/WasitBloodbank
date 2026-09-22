@@ -9,7 +9,7 @@ async function loadDraw(){
     .order('created_at',{ascending:true});
   load(false);
   if(data&&data.length){
-    const bar=`<div id="drawBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+    const bar=`<div id="drawBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
       <span id="drawBulkCount">0 محدد</span>
       <div style="display:flex;gap:6px">
         <button class="btn" style="background:#BE123C;color:#fff;border:none" onclick="openBulkDrawModal()"><i class="ti ti-check"></i> تأكيد السحب للكل</button>
