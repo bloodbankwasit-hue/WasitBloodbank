@@ -73,23 +73,73 @@ function fillDonor(d){
 
   // Close all lists
   ['ac-name','ac-nid','ac-mob'].forEach(id=>{ const e=G(id); if(e) e.classList.remove('show'); });
-  setTimeout(()=>checkRejectedName(),100);
-  // Check donation interval
-  setTimeout(async()=>{
-    const iw=G('intervalWarn');
-    if(!d.id||!iw) return;
-    const result = await checkDonationInterval(d.id);
-    if(result && !result.allowed){
-      const remaining = result.required - result.diffDays;
-      G('intervalWarnTitle').textContent = '⛔ لا يمكن التبرع — آخر تبرع منذ '+result.diffDays+' يوم فقط';
-      G('intervalWarnReason').textContent = 'المدة الدنيا بين التبرعات '+result.required+' يوماً — يتبقى '+remaining+' يوم للتمكن من التبرع (آخر تبرع: '+result.lastDate+')';
-      iw.style.display='flex';
-      iw.dataset.blocked='1';
-    } else {
-      iw.style.display='none';
-      iw.dataset.blocked='';
-    }
-  },200);
+
+  // Run both safety checks the instant a suggestion is picked, and pop a centered, hard-to-miss
+  // modal right away if either applies — this is on top of (not instead of) the inline banners,
+  // which stay as the ongoing indicator while the form is open and still catch a name typed by
+  // hand without ever picking a suggestion.
+  checkDonorSafetyOnSelect(d);
+}
+
+// The one place that actually queries rejected_donors — used both by the live-typing check
+// (checkRejectedName) and by the immediate on-select check below, so they can never drift out
+// of sync with each other.
+async function _queryRejectedMatch(nm, nid, mob){
+  if(nm.length<3 && nid.length<5 && mob.length<7) return null;
+  if(IS_ONLINE){
+    // NOTE: inside .or()'s string filter syntax, PostgREST requires "*" as the ilike wildcard,
+    // not "%" — "%" is a literal character here, so a "%name%" pattern would only ever match a
+    // name that literally contains a percent sign, silently matching nothing for every normal
+    // name.
+    const filters = [];
+    if(nm.length>2)  filters.push(`full_name.ilike.*${nm}*`);
+    if(nid.length>5) filters.push(`national_id.eq.${nid}`);
+    if(mob.length>6) filters.push(`mobile.eq.${mob}`);
+    if(!filters.length) return null;
+    const{data}=await db.from('rejected_donors')
+      .select('full_name,rejection_reason,rejection_type,national_id,mobile')
+      .or(filters.join(','))
+      .eq('is_deleted',false).limit(1);
+    return data&&data.length ? data[0] : null;
+  }
+  return await checkRejectedOffline(nm, nid, mob);
+}
+
+async function checkDonorSafetyOnSelect(d){
+  const nm=d.full_name||'', nid=d.national_id||'', mob=d.mobile||'';
+  const [rejHit, intervalResult] = await Promise.all([
+    _queryRejectedMatch(nm, nid, mob),
+    d.id ? checkDonationInterval(d.id) : Promise.resolve(null)
+  ]);
+
+  // Update the inline banners/blocking state too (still needed for the save-time block and as
+  // a persistent reminder while the form stays open).
+  const w=G('rejWarn');
+  if(w){
+    if(rejHit){
+      G('rejWarnTitle').textContent='⛔ '+rejHit.full_name+' — '+(rejHit.rejection_type||'مرفوض');
+      G('rejWarnReason').textContent='السبب: '+rejHit.rejection_reason;
+      w.classList.add('show');
+    } else w.classList.remove('show');
+  }
+  const iw=G('intervalWarn');
+  if(iw){
+    if(intervalResult && !intervalResult.allowed){
+      const remaining=intervalResult.required-intervalResult.diffDays;
+      G('intervalWarnTitle').textContent='⛔ لا يمكن التبرع — آخر تبرع منذ '+intervalResult.diffDays+' يوم فقط';
+      G('intervalWarnReason').textContent='المدة الدنيا بين التبرعات '+intervalResult.required+' يوماً — يتبقى '+remaining+' يوم للتمكن من التبرع (آخر تبرع: '+intervalResult.lastDate+')';
+      iw.style.display='flex'; iw.dataset.blocked='1';
+    } else { iw.style.display='none'; iw.dataset.blocked=''; }
+  }
+
+  // Centered popup — immediate, impossible to miss. Being مصاب/مرفوض always takes priority
+  // over a timing issue, since it's the more serious reason and staff need to see it first.
+  if(rejHit){
+    showIntervalBlockModal('⛔ هذا الشخص مصاب / مرفوض من التبرع ('+(rejHit.rejection_type||'مرفوض')+') — السبب: '+rejHit.rejection_reason);
+  } else if(intervalResult && !intervalResult.allowed){
+    const remaining=intervalResult.required-intervalResult.diffDays;
+    showIntervalBlockModal('⛔ لا يمكن قبول تبرع هذا الشخص الآن — آخر تبرع له منذ '+intervalResult.diffDays+' يوم فقط (المطلوب '+intervalResult.required+' يوماً) — يتبقى '+remaining+' يوم.');
+  }
 }
 
 function clearDonorFill(){
@@ -157,28 +207,7 @@ async function checkRejectedName(){
   const nid = G('rc-nid')?.value.trim()||'';
   const mob = G('rc-mob')?.value.trim()||'';
   const w   = G('rejWarn');
-  if(nm.length<3 && nid.length<5 && mob.length<7){ w.classList.remove('show'); return; }
-
-  let hit = null;
-  if(IS_ONLINE){
-    // Online: check from Supabase
-    // NOTE: inside .or()'s string filter syntax, PostgREST requires "*" as the ilike wildcard,
-    // not "%" — "%" is a literal character here, so a "%name%" pattern would only ever match a
-    // name that literally contains a percent sign, silently matching nothing for every normal
-    // name. This is why a rejected donor could exist in the table and still never be caught here.
-    const filters = [];
-    if(nm.length>2)   filters.push(`full_name.ilike.*${nm}*`);
-    if(nid.length>5)  filters.push(`national_id.eq.${nid}`);
-    if(mob.length>6)  filters.push(`mobile.eq.${mob}`);
-    const{data}=await db.from('rejected_donors')
-      .select('full_name,rejection_reason,rejection_type,national_id,mobile')
-      .or(filters.join(','))
-      .eq('is_deleted',false).limit(1);
-    hit = data&&data.length ? data[0] : null;
-  } else {
-    // Offline: check from IndexedDB cache
-    hit = await checkRejectedOffline(nm, nid, mob);
-  }
+  const hit = await _queryRejectedMatch(nm, nid, mob);
 
   if(hit){
     G('rejWarnTitle').textContent='⛔ '+hit.full_name+' — '+(hit.rejection_type||'مرفوض');
