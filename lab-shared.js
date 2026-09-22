@@ -36,12 +36,20 @@ async function applyLabUpdate(id, fieldUpdates){
   }
 
   if(complete && effSer==='Positive' && cur?.donors?.full_name){
-    await db.from('rejected_donors').insert({
+    const{error:rejErr}=await db.from('rejected_donors').insert({
       full_name:cur.donors.full_name, rejection_reason:'إصابة: '+effSerType,
       rejection_date:new Date().toISOString().split('T')[0], rejection_type:'دائم',
       created_by:SES?.user?.id
     });
-    await cacheRejectedDonors();
+    if(rejErr){
+      // This must NEVER fail silently — a donor who isn't in this list can walk back in and
+      // donate again. Surface it loudly so staff add them manually right away (شاشة المصابون
+      // والمرفوضون → المرفوضون مؤقتاً → إضافة) instead of assuming the automatic block worked.
+      console.error('rejected_donors insert failed:', rejErr);
+      toast('⚠️ فشلت إضافة '+cur.donors.full_name+' لقائمة المرفوضين تلقائياً — أضفه يدوياً حالاً من شاشة المصابون والمرفوضون!','error',10000);
+    } else {
+      await cacheRejectedDonors();
+    }
   }
 
   return {complete, effSer, effBt};
