@@ -209,11 +209,15 @@ async function confirmMedicalReject(){
   try{
     const{data:d}=await db.from('blood_donations').select('donor_id,bottle_number,bottle_type,donors(full_name)').eq('id',id).single();
     const donorName = d?.donors?.full_name || '';
-    await db.from('rejected_donors').insert({
+    const{error:rejErr}=await db.from('rejected_donors').insert({
       full_name:donorName, rejection_reason:reason,
       rejection_date:new Date().toISOString().split('T')[0], rejection_type:'مؤقت',
       created_by:SES?.user?.id
     });
+    if(rejErr){
+      console.error('rejected_donors insert failed:', rejErr);
+      toast('⚠️ فشلت إضافة '+donorName+' لقائمة المرفوضين تلقائياً — أضفه يدوياً حالاً!','error',10000);
+    }
     // Release the already-reserved bottle number back into the reuse pool
     if(d?.bottle_number && d?.bottle_type){
       await db.from('bottle_number_pool').insert({

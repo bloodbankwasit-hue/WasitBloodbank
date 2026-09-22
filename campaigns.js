@@ -173,7 +173,7 @@ async function confirmRelease(id){
   if(error){ toast('خطأ: '+error.message,'error'); return; }
   await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'in_stock'}});
   toast('✅ تم تأكيد القنينة — أصبحت جاهزة بالتجهيز','success');
-  await loadPendingRelease();
+  await withScrollPreserved(loadPendingRelease);
 }
 
 async function bulkConfirmRelease(){
@@ -187,7 +187,7 @@ async function bulkConfirmRelease(){
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'in_stock'}});
   }
   toast('✅ تم تأكيد '+ids.length+' قنينة','success');
-  await loadPendingRelease();
+  await withScrollPreserved(loadPendingRelease);
 }
 
 // ================================================================

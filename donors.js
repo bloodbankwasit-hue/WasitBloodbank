@@ -1,6 +1,19 @@
 // ================================================================
 // DONORS LIST
 // ================================================================
+function openDonorsExport(){
+  openAdvExport({
+    title:'تصدير متقدم — سجل المتبرعين', filename:'سجل_المتبرعين',
+    table:'blood_donations',
+    select:'bottle_number,bottle_type,blood_type,component_type,donation_type,donation_date,status,donors(full_name)',
+    dateField:'donation_date', nameField:'donors.full_name', orderBy:'bottle_number',
+    filters:['dateRange','bottleType','bloodType','bottleRange','specificBottles','name'],
+    headers:['رقم القنينة','اسم المتبرع','نوع القنينة','الفصيلة','المكوّن','نوع التبرع','تاريخ التبرع','الحالة'],
+    rowMap:r=>[r.bottle_number, r.donors?.full_name||'—', r.bottle_type, r.blood_type||'—', r.component_type||'دم كامل',
+      r.donation_type||'—', fd(r.donation_date), AUDIT_STATUS_LABELS[r.status]||r.status]
+  });
+}
+
 function showDonorsPlaceholder(){
   G('dTbl').innerHTML='<div class="empty"><i class="ti ti-search"></i><p>استخدم البحث أو الفلاتر أعلاه لعرض المتبرعين</p></div>';
   G('dPag').innerHTML='';

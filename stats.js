@@ -29,6 +29,7 @@ async function loadStats(){
     byCompOut[ct]=(byCompOut[ct]||0)+1;
   });
   const allComps=[...new Set([...Object.keys(byCompIn),...Object.keys(byCompOut)])];
+  window._STATS_BREAKDOWN={f,t,total:data.length,byTyp,byGen,byBot,bts,byBld,byCompIn,byCompOut,allComps};
   G('stRpt').style.display='block';
   G('stRpt').innerHTML=`<div class="rpt">
     <div class="rpt-hd">
@@ -251,4 +252,30 @@ function printStats(){
 @media print{@page{margin:10mm}}</style></head>
   <body>${c}<script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
   w.document.close();
+}
+
+function exportStatsExcel(){
+  const s=window._STATS_BREAKDOWN;
+  if(!s){toast('يرجى توليد التقرير أولاً','warning'); return;}
+  // One sheet, several stacked sections (blank row between each) — Excel opens this fine.
+  const sec=(title,rows)=>`<tr><td colspan="2" style="background:#1E293B;color:#fff;font-weight:bold;padding:6px">${esc(title)}</td></tr>`+
+    rows.map(([a,b])=>`<tr><td>${esc(String(a))}</td><td>${esc(String(b))}</td></tr>`).join('')+
+    `<tr><td>&nbsp;</td><td></td></tr>`;
+
+  let body='';
+  body+=`<tr><td colspan="2" style="background:#BE123C;color:#fff;font-weight:bold;font-size:14px;padding:8px">تقرير إحصائي — مصرف الدم الرئيسي واسط (${s.f} إلى ${s.t}) — الإجمالي: ${s.total}</td></tr>`;
+  body+=`<tr><td>&nbsp;</td><td></td></tr>`;
+  body+=sec('حسب نوع التبرع', ['طوعي','تعويضي'].map(t=>[t, fnum(s.byTyp[t]||0)]));
+  body+=sec('حسب الجنس', Object.entries(s.byGen).map(([g,c])=>[g, fnum(c)]));
+  body+=sec('حسب نوع القنينة', s.bts.filter(b=>s.byBot[b]).map(b=>[b, fnum(s.byBot[b])]));
+  body+=sec('حسب فصيلة الدم', Object.entries(s.byBld).sort((a,b)=>b[1]-a[1]).map(([b,c])=>[b, fnum(c)]));
+  body+=sec('دخول/خروج حسب نوع المحتوى', s.allComps.map(c=>[c, 'دخل: '+fnum(s.byCompIn[c]||0)+' — خرج: '+fnum(s.byCompOut[c]||0)]));
+
+  const html=`<html dir="rtl"><head><meta charset="UTF-8"></head><body><table border="1">${body}</table></body></html>`;
+  const blob=new Blob(['\uFEFF'+html],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`تقرير_احصائي_${s.f}_${s.t}.xls`;
+  a.click();
+  toast('✅ تم تصدير التقرير لإكسل','success',3500);
 }

@@ -83,19 +83,10 @@ async function loadRareGrid(){
 }
 
 function filterRare(){
-  const data = window._RARE_DATA||[];
-  const q    = (G('rareSearch')?.value||'').trim().toLowerCase();
-  const bg   = G('rareBGFilter')?.value||'';
-
-  const qN = normalizeAr(q);
-  const filtered = data.filter(d=>{
-    const matchBG = !bg || d.blood_type===bg;
-    const matchQ  = !qN ||
-      normalizeAr(d.full_name).includes(qN)||
-      (d.mobile||'').includes(qN)||
-      normalizeAr(d.address).includes(qN);
-    return matchBG && matchQ;
-  });
+  const filtered = _rareFilteredData();
+  const q  = (G('rareSearch')?.value||'').trim();
+  const bg = G('rareBGFilter')?.value||'';
+  const df = G('rareDateFrom')?.value||'', dt = G('rareDateTo')?.value||'';
 
   const badge=G('rareCountBadge');
   if(badge) badge.textContent=filtered.length;
@@ -111,7 +102,7 @@ function filterRare(){
   }
 
   // Show list only when user has searched or filtered
-  const hasQuery = qN || bg;
+  const hasQuery = q || bg || df || dt;
   if(!hasQuery){
     G('rareList').innerHTML=`<div class="empty" style="padding:24px 0">
       <p style="font-size:17px;color:#94A3B8">ابحث بالاسم أو الهاتف أو اختر فصيلة لعرض النتائج</p>
@@ -199,20 +190,29 @@ function waQueueNext(){
 }
 function waQueueSkip(){ waQueueNext(); }
 
-
-async function exportRarePDF(){
+// Shared by filterRare(), exportRarePDF() and exportRareExcel() — one filtering pass
+// (name/phone/address search, blood group, and last-donation date range) used everywhere.
+function _rareFilteredData(){
   const data = window._RARE_DATA||[];
-  const q    = (G('rareSearch')?.value||'').trim().toLowerCase();
-  const bg   = G('rareBGFilter')?.value||'';
-  const qN = normalizeAr(q);
-  const filtered = data.filter(d=>{
+  const qN = normalizeAr((G('rareSearch')?.value||'').trim());
+  const bg = G('rareBGFilter')?.value||'';
+  const df = G('rareDateFrom')?.value||'';
+  const dt = G('rareDateTo')?.value||'';
+  return data.filter(d=>{
     const matchBG = !bg || d.blood_type===bg;
     const matchQ  = !qN ||
       normalizeAr(d.full_name).includes(qN)||
       (d.mobile||'').includes(qN)||
       normalizeAr(d.address).includes(qN);
-    return matchBG && matchQ;
+    const matchFrom = !df || (d.last_donation && d.last_donation>=df);
+    const matchTo   = !dt || (d.last_donation && d.last_donation<=dt);
+    return matchBG && matchQ && matchFrom && matchTo;
   });
+}
+
+async function exportRarePDF(){
+  const bg = G('rareBGFilter')?.value||'';
+  const filtered = _rareFilteredData();
 
   if(!filtered.length){ toast('لا توجد بيانات للتصدير','error'); return; }
   toast('⏳ جاري تجهيز القائمة...','warning',3000);
@@ -277,18 +277,7 @@ async function exportRarePDF(){
 // .xls extension — Excel recognizes and opens this natively, with correct Arabic/RTL text
 // (UTF-8 BOM) and real columns (unlike a flat CSV, this keeps header styling too).
 function exportRareExcel(){
-  const data = window._RARE_DATA||[];
-  const q    = (G('rareSearch')?.value||'').trim().toLowerCase();
-  const bg   = G('rareBGFilter')?.value||'';
-  const qN = normalizeAr(q);
-  const filtered = data.filter(d=>{
-    const matchBG = !bg || d.blood_type===bg;
-    const matchQ  = !qN ||
-      normalizeAr(d.full_name).includes(qN)||
-      (d.mobile||'').includes(qN)||
-      normalizeAr(d.address).includes(qN);
-    return matchBG && matchQ;
-  });
+  const filtered = _rareFilteredData();
   if(!filtered.length){ toast('لا توجد بيانات للتصدير','error'); return; }
 
   const rows = filtered.map(d=>`<tr>

@@ -1,14 +1,35 @@
 // ================================================================
-// INFECTED + REJECTED — merged into one screen with a mode switcher (both lists
-// serve the same purpose: donors currently excluded from donating, one
-// permanently for a confirmed infection, the other temporarily for other reasons).
+// INFECTED + REJECTED — three modes: المصابون (from blood_donations, read-only),
+// مرفوضون دائماً and مرفوضون مؤقتاً (both from rejected_donors, split by rejection_type).
+// The search box works across BOTH rejected types regardless of which tab is active, and
+// labels each result with its actual type — the tabs are for plain browsing only.
 // ================================================================
+let _rejMode = 'perm';
+
+function openRejectedExport(){
+  openAdvExport({
+    title:'تصدير — قائمة المرفوضين', filename:'قائمة_المرفوضين',
+    table:'rejected_donors',
+    select:'full_name,age,rejection_reason,rejection_date,rejection_type,notes',
+    dateField:'rejection_date', nameField:'full_name', orderBy:'rejection_date', orderAsc:false,
+    filters:['dateRange','rejectionType','name'],
+    headers:['الاسم','العمر','سبب الرفض','تاريخ الرفض','نوع الرفض','ملاحظات'],
+    rowMap:r=>[r.full_name, r.age||'—', r.rejection_reason, fd(r.rejection_date), r.rejection_type, r.notes||'—']
+  });
+}
+
 function switchInfRejMode(mode){
   G('irModeInfected').classList.toggle('on', mode==='infected');
-  G('irModeRejected').classList.toggle('on', mode==='rejected');
+  G('irModePerm').classList.toggle('on', mode==='perm');
+  G('irModeTemp').classList.toggle('on', mode==='temp');
   G('infectedPane').style.display = mode==='infected' ? 'block' : 'none';
-  G('rejectedPane').style.display = mode==='rejected' ? 'block' : 'none';
-  if(mode==='rejected') loadRejected();
+  G('rejectedPane').style.display = mode==='infected' ? 'none' : 'block';
+  if(mode!=='infected'){
+    _rejMode = mode;
+    G('rjAddBtn').style.display = mode==='perm' ? '' : 'none';
+    G('rjSrch').value='';
+    loadRejected();
+  }
 }
 
 async function loadInfected(type, tabEl){
@@ -40,10 +61,19 @@ async function loadInfected(type, tabEl){
 // ================================================================
 // REJECTED
 // ================================================================
+let _rjSearchTimer=null;
+function rjSearchLive(){
+  clearTimeout(_rjSearchTimer);
+  _rjSearchTimer=setTimeout(loadRejected, 300);
+}
+
 async function loadRejected(){
   const s=G('rjSrch').value.trim(); load(true);
   let q=db.from('rejected_donors').select('*').eq('is_deleted',false).order('rejection_date',{ascending:false});
+  // With no search text: browse the current tab's type only. While searching: search across
+  // BOTH types together (a name might be rejected either way, and staff need to know which).
   if(s) q=q.ilike('full_name','%'+s+'%');
+  else  q=q.eq('rejection_type', _rejMode==='perm' ? 'دائم' : 'مؤقت');
   const {data}=await q; load(false);
   if(data&&data.length){
     G('rjTbl').innerHTML=`<div class="tw"><table><thead><tr>
@@ -60,7 +90,42 @@ async function loadRejected(){
 }
 
 function showRejModal(){ G('rj-dt').value=new Date().toISOString().split('T')[0]; G('rjModal').classList.add('on'); }
-function closeRjModal(){ G('rjModal').classList.remove('on'); ['rj-nm','rj-age','rj-rsn','rj-note'].forEach(id=>G(id).value=''); }
+function closeRjModal(){
+  G('rjModal').classList.remove('on');
+  ['rj-nm','rj-age','rj-rsn','rj-note'].forEach(id=>G(id).value='');
+  const l=G('ac-rjnm'); if(l) l.classList.remove('show');
+}
+
+// ── Autocomplete: typing an existing donor's name suggests them and fills their age ──
+let _rjAcTimer=null;
+async function rjNameSearch(val){
+  const list=G('ac-rjnm'); if(!list) return;
+  if(!val||val.trim().length<3){ list.classList.remove('show'); return; }
+  clearTimeout(_rjAcTimer);
+  _rjAcTimer=setTimeout(async()=>{
+    const{data}=await db.from('donors')
+      .select('id,full_name,birth_year,mobile,national_id')
+      .eq('is_deleted',false).ilike('full_name','%'+val.trim().replace(/ة/g,'ه')+'%').limit(6);
+    if(!data||!data.length){ list.classList.remove('show'); return; }
+    list.innerHTML=data.map(d=>`
+      <div class="ac-item" onmousedown="fillRjDonor(${JSON.stringify(d).replace(/"/g,'&quot;')})">
+        <div class="ac-av">${esc(d.full_name.charAt(0))}</div>
+        <div class="ac-info">
+          <div class="ac-name">${esc(d.full_name)}</div>
+          <div class="ac-sub">${esc(d.mobile||'—')} | ${esc(d.national_id||'—')}</div>
+        </div>
+      </div>`).join('');
+    list.classList.add('show');
+  },250);
+}
+function fillRjDonor(d){
+  G('rj-nm').value=d.full_name||'';
+  if(d.birth_year) G('rj-age').value=new Date().getFullYear()-d.birth_year;
+  const l=G('ac-rjnm'); if(l) l.classList.remove('show');
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.ac-wrap')){ const l=G('ac-rjnm'); if(l) l.classList.remove('show'); }
+});
 
 async function saveRejected(){
   const nm=G('rj-nm').value.trim(), rsn=G('rj-rsn').value.trim();
@@ -68,7 +133,7 @@ async function saveRejected(){
   const {error}=await db.from('rejected_donors').insert({
     full_name:nm, age:parseInt(G('rj-age').value)||null,
     rejection_reason:rsn, rejection_date:G('rj-dt').value,
-    rejection_type:G('rj-typ').value, notes:G('rj-note').value.trim()||null,
+    rejection_type:'دائم', notes:G('rj-note').value.trim()||null,
     created_by:SES?.user?.id
   });
   if(error){toast('خطأ: '+error.message,'error'); return;}

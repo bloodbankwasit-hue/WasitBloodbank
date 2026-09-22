@@ -2,6 +2,19 @@
 // WORKFLOW — CLASSIFICATION UNIT (وحدة التصنيف) — determines the blood type of pending
 // bottles; does not touch virus testing at all (that's the virology unit's job now).
 // ================================================================
+function openClassificationExport(){
+  openAdvExport({
+    title:'تصدير — وحدة التصنيف', filename:'وحدة_التصنيف',
+    table:'blood_donations',
+    select:'bottle_number,bottle_type,blood_type,component_type,draw_date,status,donors(full_name)',
+    dateField:'draw_date', nameField:'donors.full_name', orderBy:'bottle_number',
+    filters:['dateRange','bottleType','bloodType','bottleRange','specificBottles','name'],
+    headers:['رقم القنينة','اسم المتبرع','نوع القنينة','الفصيلة','المكوّن','الحالة','تاريخ السحب'],
+    rowMap:r=>[r.bottle_number, r.donors?.full_name||'—', r.bottle_type, r.blood_type||'لم تُحدد', r.component_type||'دم كامل',
+      AUDIT_STATUS_LABELS[r.status]||r.status, fd(r.draw_date)]
+  });
+}
+
 async function loadClassification(){
   load(true);
   const{data}=await db.from('blood_donations')

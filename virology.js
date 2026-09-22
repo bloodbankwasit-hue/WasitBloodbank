@@ -2,6 +2,19 @@
 // WORKFLOW — VIROLOGY UNIT (وحدة الفيروسات) — tests pending bottles for infection; does not
 // touch blood type at all (that's the classification unit's job, entirely separate now).
 // ================================================================
+function openVirologyExport(){
+  openAdvExport({
+    title:'تصدير — وحدة الفيروسات', filename:'وحدة_الفيروسات',
+    table:'blood_donations',
+    select:'bottle_number,bottle_type,blood_type,component_type,draw_date,serology_result,serology_type,status,donors(full_name)',
+    dateField:'draw_date', nameField:'donors.full_name', orderBy:'bottle_number',
+    filters:['dateRange','bottleType','bloodType','bottleRange','specificBottles','name'],
+    headers:['رقم القنينة','اسم المتبرع','نوع القنينة','الفصيلة','المكوّن','نتيجة الفحص','نوع الفحص','تاريخ السحب'],
+    rowMap:r=>[r.bottle_number, r.donors?.full_name||'—', r.bottle_type, r.blood_type||'—', r.component_type||'دم كامل',
+      r.serology_result?(r.serology_result==='Negative'?'سالبة':'موجبة'):'لم يُفحص', r.serology_type||'—', fd(r.draw_date)]
+  });
+}
+
 async function loadVirology(){
   load(true);
   const{data}=await db.from('blood_donations')

@@ -186,6 +186,10 @@ tbody tr:hover td{background:#fafafa}
 
 /* ===== BLOOD TYPE GRID ===== */
 .btg{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;margin-bottom:14px}
+.chip-group{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:flex;align-items:center;gap:5px;background:#F8FAFC;border:1.5px solid #EEF2F6;border-radius:20px;padding:6px 12px;font-size:15px;cursor:pointer;user-select:none}
+.chip input{width:15px;height:15px;accent-color:#BE123C}
+.chip:has(input:checked){background:#FFF1F2;border-color:#BE123C;color:#BE123C;font-weight:700}
 .btc{background:#fff;border:2px solid #f0f0f0;border-radius:12px;padding:12px 5px;text-align:center;cursor:pointer;transition:all .15s;box-shadow:0 1px 4px rgba(0,0,0,.05)}
 .btc:hover,.btc.warn{border-color:#BE123C;background:#FFF1F2;transform:scale(1.04)}
 .btc-t{font-size:21px;font-weight:800;color:#BE123C}
@@ -1112,6 +1116,9 @@ tbody tr:hover td{background:#fafafa}
                 <i class="ti ti-file-spreadsheet"></i> تصدير CSV
               </button>
             </div>
+            <button class="btn" onclick="openDonorsExport()" style="justify-content:center;width:100%">
+              <i class="ti ti-file-export"></i> تصدير متقدم (فلاتر أكثر: نوع القنينة، تسلسل، قناني معينة...)
+            </button>
           </div>
         </div>
         <div id="dTbl"><div class="empty"><i class="ti ti-users"></i><p>جاري التحميل...</p></div></div>
@@ -1148,7 +1155,8 @@ tbody tr:hover td{background:#fafafa}
       <div class="sc" id="s-infected">
         <div class="tabs" style="margin-bottom:10px">
           <div class="tab on" id="irModeInfected" onclick="switchInfRejMode('infected')">⚠️ المصابون</div>
-          <div class="tab" id="irModeRejected" onclick="switchInfRejMode('rejected')">🚫 المرفوضون مؤقتاً</div>
+          <div class="tab" id="irModePerm" onclick="switchInfRejMode('perm')">⛔ مرفوضون دائماً</div>
+          <div class="tab" id="irModeTemp" onclick="switchInfRejMode('temp')">⏳ مرفوضون مؤقتاً</div>
         </div>
 
         <div id="infectedPane">
@@ -1164,9 +1172,9 @@ tbody tr:hover td{background:#fafafa}
 
         <div id="rejectedPane" style="display:none">
           <div class="abar">
-            <button class="btn btn-p" onclick="showRejModal()"><i class="ti ti-user-plus"></i> إضافة مرفوض</button>
-            <input type="text" class="sinp" id="rjSrch" placeholder="بحث بالاسم..." style="max-width:260px" onkeydown="if(event.key==='Enter')loadRejected()">
-            <button class="btn" onclick="loadRejected()"><i class="ti ti-search"></i> بحث</button>
+            <button class="btn btn-p" id="rjAddBtn" style="display:none" onclick="showRejModal()"><i class="ti ti-user-plus"></i> إضافة مرفوض دائم</button>
+            <button class="btn" onclick="openRejectedExport()"><i class="ti ti-file-export"></i> تصدير متقدم</button>
+            <input type="text" class="sinp" id="rjSrch" placeholder="🔍 بحث بالاسم — يشمل الدائم والمؤقت مع بعض..." style="max-width:320px" oninput="rjSearchLive(this.value)" onkeydown="if(event.key==='Enter')loadRejected()">
           </div>
           <div id="rjTbl"><div class="empty"><i class="ti ti-user-x"></i><p>جاري التحميل...</p></div></div>
         </div>
@@ -1205,6 +1213,8 @@ tbody tr:hover td{background:#fafafa}
                 <option value="A+">A+</option>
                 <option value="AB+">AB+</option>
               </select>
+              <div class="fgrp" style="margin:0"><label style="font-size:14px;color:#757575;display:block;margin-bottom:4px">آخر تبرع من</label><input type="date" id="rareDateFrom" onchange="filterRare()" style="width:100%;padding:9px 10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:16px"></div>
+              <div class="fgrp" style="margin:0"><label style="font-size:14px;color:#757575;display:block;margin-bottom:4px">آخر تبرع إلى</label><input type="date" id="rareDateTo" onchange="filterRare()" style="width:100%;padding:9px 10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:16px"></div>
               <button onclick="filterRare();exportRarePDF()"
                 style="padding:9px;background:#1E293B;color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer">
                 📄 PDF
@@ -1234,7 +1244,8 @@ tbody tr:hover td{background:#fafafa}
           <div class="fgrp"><label style="font-size:14px;color:#757575;font-weight:600">من تاريخ</label><input type="date" id="stFrom"></div>
           <div class="fgrp"><label style="font-size:14px;color:#757575;font-weight:600">إلى تاريخ</label><input type="date" id="stTo"></div>
           <button class="btn btn-p" onclick="loadStats()"><i class="ti ti-chart-bar"></i> توليد التقرير</button>
-          <button class="btn" onclick="printStats()"><i class="ti ti-printer"></i> طباعة</button>
+          <button class="btn" onclick="printStats()"><i class="ti ti-printer"></i> طباعة PDF</button>
+          <button class="btn" style="background:#166534;color:#fff;border:none" onclick="exportStatsExcel()"><i class="ti ti-table"></i> Excel</button>
         </div>
         <div id="stRpt" style="display:none"></div>
       </div>
@@ -1539,23 +1550,30 @@ tbody tr:hover td{background:#fafafa}
 
       <!-- ========== LAB ========== -->
       <div class="sc" id="s-virology">
-        <div class="sh"><div class="sh-t"><i class="ti ti-microscope"></i> وحدة الفيروسات — عينات بانتظار الفحص</div></div>
+        <div class="sh"><div class="sh-t"><i class="ti ti-microscope"></i> وحدة الفيروسات — عينات بانتظار الفحص</div>
+          <button class="btn" style="font-size:13px;padding:7px 12px" onclick="openVirologyExport()"><i class="ti ti-file-export"></i> تصدير متقدم</button>
+        </div>
         <div id="virologyList"><div class="empty"><i class="ti ti-microscope"></i><p>جاري التحميل...</p></div></div>
       </div>
 
       <div class="sc" id="s-classification">
-        <div class="sh"><div class="sh-t"><i class="ti ti-droplet"></i> وحدة التصنيف — قناني بانتظار تحديد الفصيلة</div></div>
+        <div class="sh"><div class="sh-t"><i class="ti ti-droplet"></i> وحدة التصنيف — قناني بانتظار تحديد الفصيلة</div>
+          <button class="btn" style="font-size:13px;padding:7px 12px" onclick="openClassificationExport()"><i class="ti ti-file-export"></i> تصدير متقدم</button>
+        </div>
         <div id="classificationList"><div class="empty"><i class="ti ti-droplet"></i><p>جاري التحميل...</p></div></div>
       </div>
 
       <!-- ========== SUPPLY ========== -->
       <div class="sc" id="s-supply">
-        <div class="sh" style="display:flex;align-items:center;justify-content:space-between">
+        <div class="sh" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div class="sh-t"><i class="ti ti-package"></i> خزين القناني</div>
-          <button id="viewDamagedBtn" class="btn" style="border-color:#7F1D1D;color:#7F1D1D;font-size:15px;padding:7px 12px" onclick="openDamagedList()">🗑️ القناني التالفة (0)</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" style="font-size:15px;padding:7px 12px" onclick="openSupplyExport()"><i class="ti ti-file-export"></i> تصدير متقدم</button>
+            <button id="viewDamagedBtn" class="btn" style="border-color:#7F1D1D;color:#7F1D1D;font-size:15px;padding:7px 12px" onclick="openDamagedList()">🗑️ القناني التالفة (0)</button>
+          </div>
         </div>
         <div id="supplyTypeGrid" class="comp-stock-grid" style="margin-bottom:16px"></div>
-        <div class="btg" id="supplyGrid"></div>
+        <div id="supplyGrid"></div>
         <div id="supplyList"></div>
       </div>
 
@@ -1619,13 +1637,17 @@ tbody tr:hover td{background:#fafafa}
 <!-- ADD REJECTED MODAL -->
 <div class="overlay" id="rjModal">
   <div class="modal">
-    <div class="modal-title"><i class="ti ti-user-x"></i> إضافة مرفوض من التبرع</div>
+    <div class="modal-title"><i class="ti ti-user-x"></i> إضافة مرفوض دائم من التبرع</div>
     <div class="fgrid">
-      <div class="fgrp s2"><label>الاسم الكامل *</label><input type="text" id="rj-nm" placeholder="اسم المتبرع المرفوض"></div>
+      <div class="fgrp s2"><label>الاسم الكامل *</label>
+        <div class="ac-wrap">
+          <input type="text" id="rj-nm" placeholder="اسم المتبرع المرفوض" oninput="rjNameSearch(this.value)" autocomplete="off">
+          <div class="ac-list" id="ac-rjnm"></div>
+        </div>
+      </div>
       <div class="fgrp"><label>العمر</label><input type="number" id="rj-age" placeholder="العمر"></div>
       <div class="fgrp s2"><label>سبب الرفض *</label><input type="text" id="rj-rsn" placeholder="سبب الرفض التفصيلي"></div>
       <div class="fgrp"><label>تاريخ الرفض</label><input type="date" id="rj-dt"></div>
-      <div class="fgrp"><label>نوع الرفض</label><select id="rj-typ"><option value="مؤقت">مؤقت</option><option value="دائم">دائم</option></select></div>
       <div class="fgrp"><label>ملاحظات</label><input type="text" id="rj-note" placeholder="ملاحظات إضافية"></div>
     </div>
     <div class="modal-foot">
@@ -1659,7 +1681,7 @@ const PS = 20;
 const TITLES = {
   dashboard:'لوحة التحكم', add:'إضافة متبرع جديد', donors:'سجل المتبرعين',
   search:'بحث متقدم', globalsearch:'الأرشيف الشامل', campaigns:'حملات التبرع', separation:'الفصل', pending_release:'المخزن المؤقت', barcode:'الباركود والطباعة', infected:'المصابون',
-  rejected:'المرفوضون مؤقتاً', rare:'الفصائل النادرة',
+  rejected:'المرفوضون', rare:'الفصائل النادرة',
   stats:'الإحصائيات', audit:'سجل التتبع', settings:'الإعدادات', dthome:'الرئيسية'
 };
 
@@ -2622,7 +2644,16 @@ function setupNotifTabVisibility(){
 }
 
 
+// Remembers each screen's scroll position, keyed by section id, so navigating back to a
+// screen (via "رجوع" or re-opening a tile) restores where the person left off instead of
+// always landing at the top — this covers ANY navigation through nav(), not just one screen.
+let _scrollMemory = {};
+
 async function nav(name, el){
+  const outEl = _activeScrollEl();
+  const outgoing = document.querySelector('.sc.on');
+  if(outEl && outgoing) _scrollMemory[outgoing.id] = outEl.scrollTop;
+
   if(name && name!=='workhome' && name!=='account' && name!=='dthome')
     localStorage.setItem('bb_lastPage', name);
   document.querySelectorAll('.sc').forEach(s=>s.classList.remove('on'));
@@ -2666,6 +2697,11 @@ async function nav(name, el){
     case 'classification': await loadClassification(); break;
     case 'supply':     await loadSupply(); break;
     case 'barcode': G('bcRes').style.display='none'; break;
+  }
+  const inEl = _activeScrollEl();
+  if(inEl){
+    const savedY = _scrollMemory['s-'+name] || 0;
+    requestAnimationFrame(()=>{ inEl.scrollTop = savedY; });
   }
 }
 
@@ -3373,6 +3409,28 @@ function _supplyShowLevel(n){
   if(g3) g3.style.display = n===3 ? '' : 'none';
 }
 
+// Refreshes whichever level of التجهيز the person is currently on, instead of always resetting
+// to level 1 — so an action (فصل/تلف) taken from deep in the bottle list doesn't bounce them
+// back out to the component-type grid.
+async function _supplyRefreshCurrentLevel(){
+  if(_supplyLevel===3 && _supplySelectedBT) await loadSupplyList(_supplySelectedBT);
+  else if(_supplyLevel===2 && _supplySelectedComponent) await loadSupplyByComponent(_supplySelectedComponent);
+  else await loadSupplyComponentGrid();
+}
+
+function openSupplyExport(){
+  openAdvExport({
+    title:'تصدير — التجهيز والخزين', filename:'التجهيز',
+    table:'blood_donations',
+    select:'bottle_number,bottle_type,blood_type,component_type,status,draw_date,expiry_date,dispatch_date,hospital_name,donors(full_name)',
+    dateField:'draw_date', nameField:'donors.full_name', orderBy:'bottle_number',
+    filters:['dateRange','bottleType','bloodType','bottleRange','specificBottles','name'],
+    headers:['رقم القنينة','اسم المتبرع','نوع القنينة','الفصيلة','المكوّن','الحالة','تاريخ السحب','تاريخ الانتهاء','تاريخ الصرف','الجهة المستلمة'],
+    rowMap:r=>[r.bottle_number, r.donors?.full_name||'—', r.bottle_type, r.blood_type||'—', r.component_type||'دم كامل',
+      AUDIT_STATUS_LABELS[r.status]||r.status, fd(r.draw_date), fd(r.expiry_date), r.dispatch_date?fd(r.dispatch_date):'—', r.hospital_name||'—']
+  });
+}
+
 async function loadSupply(){
   await autoMarkExpiredDamaged();
   const{count:dmgCount}=await db.from('blood_donations').select('id',{count:'exact',head:true}).eq('status','damaged').eq('is_deleted',false);
@@ -3613,9 +3671,12 @@ async function confirmSeparate(){
     }
     toast('✅ تم فصل '+ids.length+' قنينة إلى '+totalRows+' مكوّن بنجاح','success',4500);
     G('separateModal').classList.remove('on');
-    if(G('s-separation')?.classList.contains('on')) await (typeof _sepSelectedType!=='undefined' && _sepSelectedType ? loadSeparationList(_sepSelectedType) : loadSeparationBoard());
-    else if(G('s-pending_release')?.classList.contains('on')) await loadPendingRelease();
-    else await loadSupply();
+    if(G('s-separation')?.classList.contains('on'))
+      await withScrollPreserved(()=> (typeof _sepSelectedType!=='undefined' && _sepSelectedType) ? loadSeparationList(_sepSelectedType) : loadSeparationBoard());
+    else if(G('s-pending_release')?.classList.contains('on'))
+      await withScrollPreserved(loadPendingRelease);
+    else
+      await withScrollPreserved(_supplyRefreshCurrentLevel);
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }
 }
@@ -3644,9 +3705,12 @@ async function confirmDamage(){
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:ids[0],new_values:{status:'damaged',reason,count:ids.length}});
     toast('⚠️ تم تسجيل '+ids.length+' قنينة كتالفة','warning',4000);
     G('damageModal').classList.remove('on');
-    if(G('s-pending_release')?.classList.contains('on')) await loadPendingRelease();
-    else if(G('s-separation')?.classList.contains('on')) await (typeof _sepSelectedType!=='undefined' && _sepSelectedType ? loadSeparationList(_sepSelectedType) : loadSeparationBoard());
-    else await loadSupply();
+    if(G('s-pending_release')?.classList.contains('on'))
+      await withScrollPreserved(loadPendingRelease);
+    else if(G('s-separation')?.classList.contains('on'))
+      await withScrollPreserved(()=> (typeof _sepSelectedType!=='undefined' && _sepSelectedType) ? loadSeparationList(_sepSelectedType) : loadSeparationBoard());
+    else
+      await withScrollPreserved(_supplyRefreshCurrentLevel);
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }
 }
@@ -3739,7 +3803,7 @@ const WORK_CARDS = [
   {key:'supply',    icon:'📦', name:'التجهيز',      desc:'الخزين والصرف'},
   {key:'donors',    icon:'👥', name:'المتبرعون',    desc:'سجل التبرعات'},
   {key:'globalsearch', icon:'🔍', name:'البحث والأرشيف', desc:'بحث سريع أو متقدم بكل البيانات'},
-  {key:'infected',  icon:'⚠️', name:'المصابون والمرفوضون', desc:'الحالات الإيجابية والمرفوضون مؤقتاً'},
+  {key:'infected',  icon:'⚠️', name:'المصابون والمرفوضون', desc:'الحالات الإيجابية والمرفوضون مؤقتاً ودائماً'},
   {key:'rare',      icon:'💎', name:'الفصائل النادرة', desc:'O− و AB−'},
   {key:'stats',     icon:'📈', name:'الإحصائيات',  desc:'تقارير وطباعة'},
 ];
@@ -3988,15 +4052,170 @@ function updateHeaderDept(){
 // ================================================================
 // BACK BUTTON
 // ================================================================
+// ================================================================
+// ADVANCED EXPORT — shared engine used by every screen's "تصدير متقدم" button.
+// Each screen calls openAdvExport(cfg) with a config describing which filters apply to ITS
+// data and how to turn the matching rows into an export. See usages in donors.js, virology.js,
+// classification.js, infected-rejected.js, rare.js, stats.js and this file's supply section.
+// ================================================================
+let _AE_CONFIG = null;
+
+function openAdvExport(cfg){
+  _AE_CONFIG = cfg;
+  G('aeTitle').textContent = cfg.title;
+  let html = '';
+  if(cfg.filters.includes('dateRange')){
+    html += `<div class="fgrp"><label>من تاريخ</label><input type="date" id="ae-from"></div>
+             <div class="fgrp"><label>إلى تاريخ</label><input type="date" id="ae-to"></div>`;
+  }
+  if(cfg.filters.includes('bottleType')){
+    const types = cfg.bottleTypes || ['مفلتر','رباعي','ريفيوس','ثنائي','أحادي','تريما','رباعي SAG'];
+    html += `<div class="fgrp s2"><label>نوع القنينة (اختر وحدة أو أكثر — اتركه فاضي لكل الأنواع)</label>
+      <div class="chip-group" id="ae-bt">${types.map(t=>`<label class="chip"><input type="checkbox" value="${t}"> ${t}</label>`).join('')}</div></div>`;
+  }
+  if(cfg.filters.includes('bloodType')){
+    html += `<div class="fgrp s2"><label>الفصيلة (اختر وحدة أو أكثر — اتركها فاضية لكل الفصائل)</label>
+      <div class="chip-group" id="ae-blt">${['A+','A-','B+','B-','O+','O-','AB+','AB-'].map(t=>`<label class="chip"><input type="checkbox" value="${t}"> ${t}</label>`).join('')}</div></div>`;
+  }
+  if(cfg.filters.includes('rejectionType')){
+    html += `<div class="fgrp s2"><label>نوع الرفض (اختر وحدة أو الاثنين — اتركه فاضي للكل)</label>
+      <div class="chip-group" id="ae-rjt">
+        <label class="chip"><input type="checkbox" value="دائم"> دائم</label>
+        <label class="chip"><input type="checkbox" value="مؤقت"> مؤقت</label>
+      </div></div>`;
+  }
+  if(cfg.filters.includes('bottleRange')){
+    html += `<div class="fgrp"><label>تسلسل القنينة من</label><input type="number" id="ae-bnfrom" placeholder="اختياري"></div>
+             <div class="fgrp"><label>إلى</label><input type="number" id="ae-bnto" placeholder="اختياري"></div>`;
+  }
+  if(cfg.filters.includes('specificBottles')){
+    html += `<div class="fgrp s2"><label>أرقام قناني معينة (مفصولة بفاصلة — لو معبّى، يتجاوز فلاتر النوع/الفصيلة/التسلسل فوق)</label>
+      <input type="text" id="ae-specific" placeholder="مثال: 21930, 21935, 21940"></div>`;
+  }
+  if(cfg.filters.includes('name')){
+    html += `<div class="fgrp s2"><label>بحث بالاسم</label><input type="text" id="ae-name" placeholder="اسم المتبرع (اختياري)"></div>`;
+  }
+  G('aeFiltersBody').innerHTML = html;
+  G('advExportModal').classList.add('on');
+}
+
+async function runAdvExport(format){
+  const cfg = _AE_CONFIG;
+  if(!cfg) return;
+  load(true);
+  try{
+    const nameVal = G('ae-name')?.value.trim() || '';
+    const needsJoin = !!nameVal && cfg.nameField && cfg.nameField.includes('.') && cfg.select.includes('donors(');
+    const selectStr = needsJoin ? cfg.select.replace('donors(', 'donors!inner(') : cfg.select;
+
+    let q = db.from(cfg.table).select(selectStr).eq('is_deleted', false);
+    if(cfg.baseFilters) cfg.baseFilters.forEach(([col,op,val])=>{ q = q[op](col, val); });
+
+    const from = G('ae-from')?.value, to = G('ae-to')?.value;
+    if(from) q = q.gte(cfg.dateField, from);
+    if(to)   q = q.lte(cfg.dateField, to);
+
+    const specific = G('ae-specific')?.value.trim();
+    if(specific){
+      const nums = specific.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n));
+      if(nums.length) q = q.in('bottle_number', nums);
+    } else {
+      const bnFrom = G('ae-bnfrom')?.value, bnTo = G('ae-bnto')?.value;
+      if(bnFrom) q = q.gte('bottle_number', parseInt(bnFrom));
+      if(bnTo)   q = q.lte('bottle_number', parseInt(bnTo));
+
+      const btChecked = [...document.querySelectorAll('#ae-bt input:checked')].map(c=>c.value);
+      if(btChecked.length) q = q.in('bottle_type', btChecked);
+
+      const bltChecked = [...document.querySelectorAll('#ae-blt input:checked')].map(c=>c.value);
+      if(bltChecked.length) q = q.in('blood_type', bltChecked);
+
+      const rjtChecked = [...document.querySelectorAll('#ae-rjt input:checked')].map(c=>c.value);
+      if(rjtChecked.length) q = q.in('rejection_type', rjtChecked);
+    }
+
+    if(nameVal) q = q.ilike(cfg.nameField, '%'+nameVal+'%');
+    if(cfg.orderBy) q = q.order(cfg.orderBy, {ascending: cfg.orderAsc!==false});
+    q = q.limit(5000);
+
+    const{data,error} = await q;
+    load(false);
+    if(error){ toast('خطأ: '+error.message,'error'); return; }
+    if(!data||!data.length){ toast('لا توجد بيانات مطابقة لهذي الفلاتر','error'); return; }
+
+    const rows = data.map(cfg.rowMap);
+    G('advExportModal').classList.remove('on');
+    if(format==='excel') exportRowsToExcel(cfg.title, cfg.headers, rows, cfg.filename);
+    else exportRowsToPDF(cfg.title, cfg.headers, rows, cfg.filename);
+  }catch(e){ load(false); toast('خطأ: '+e.message,'error'); }
+}
+
+// Generic Excel export (HTML-table-as-.xls — Excel opens this natively, no library needed)
+function exportRowsToExcel(title, headers, rows, filename){
+  const headRow = headers.map(h=>`<th>${esc(h)}</th>`).join('');
+  const bodyRows = rows.map(r=>'<tr>'+r.map(c=>`<td>${c==null?'':esc(String(c))}</td>`).join('')+'</tr>').join('');
+  const html = `<html dir="rtl"><head><meta charset="UTF-8"></head><body>
+    <table border="1">
+      <tr style="background:#BE123C;color:#fff;font-weight:bold">${headRow}</tr>
+      ${bodyRows}
+    </table>
+  </body></html>`;
+  const blob = new Blob(['\uFEFF'+html], {type:'application/vnd.ms-excel;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${filename}_${new Date().toISOString().split('T')[0]}.xls`;
+  a.click();
+  toast('✅ تم تصدير '+rows.length+' سجل لإكسل','success',3500);
+}
+
+// Generic printable PDF export (same window.print() convention used across the app)
+function exportRowsToPDF(title, headers, rows, filename){
+  const headRow = headers.map(h=>`<th>${esc(h)}</th>`).join('');
+  const bodyRows = rows.map(r=>'<tr>'+r.map(c=>`<td>${c==null?'':esc(String(c))}</td>`).join('')+'</tr>').join('');
+  const w = window.open('', '_blank');
+  w.document.write(`<html dir="rtl"><head><meta charset="UTF-8"><title>${esc(title)}</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:20px}
+      h2{color:#BE123C;text-align:center;margin-bottom:4px}
+      p{text-align:center;color:#666;font-size:13px;margin-top:0}
+      table{width:100%;border-collapse:collapse;font-size:12px}
+      th,td{border:1px solid #ccc;padding:6px 8px;text-align:center}
+      th{background:#BE123C;color:#fff}
+      @media print{@page{margin:10mm}}
+    </style></head>
+    <body>
+      <h2>${esc(title)}</h2>
+      <p>تاريخ التصدير: ${new Date().toLocaleDateString('en-GB')} | عدد السجلات: ${rows.length}</p>
+      <table><thead><tr>${headRow}</tr></thead><tbody>${bodyRows}</tbody></table>
+      <script>setTimeout(()=>window.print(),400)<\/script>
+    </body></html>`);
+  w.document.close();
+}
+
+// Preserves scroll position across a list re-render triggered by an action (confirm/separate/
+// damage...) — without this, refreshing a long list after an action always jumps back to its
+// top instead of staying where the person was working.
+function _activeScrollEl(){
+  const popup = G('sectionPopupBody');
+  if(popup && G('sectionPopup')?.classList.contains('on')) return popup;
+  return document.querySelector('.page');
+}
+async function withScrollPreserved(fn){
+  const el = _activeScrollEl();
+  const y = el ? el.scrollTop : 0;
+  await fn();
+  if(el) requestAnimationFrame(()=>{ el.scrollTop = y; });
+}
+
 function goBack(){
   // Layered screens (التجهيز has 3 levels, الفصل has 2): step back ONE level instead of
   // leaving the screen entirely, unless already at that screen's top level.
   if(G('s-supply')?.classList.contains('on') && typeof _supplyLevel!=='undefined'){
-    if(_supplyLevel===3){ loadSupplyByComponent(_supplySelectedComponent); return; }
-    if(_supplyLevel===2){ loadSupplyComponentGrid(); return; }
+    if(_supplyLevel===3){ withScrollPreserved(()=>loadSupplyByComponent(_supplySelectedComponent)); return; }
+    if(_supplyLevel===2){ withScrollPreserved(loadSupplyComponentGrid); return; }
   }
   if(G('s-separation')?.classList.contains('on') && typeof _sepLevel!=='undefined'){
-    if(_sepLevel===2){ loadSeparationBoard(); return; }
+    if(_sepLevel===2){ withScrollPreserved(loadSeparationBoard); return; }
   }
   const isMob = window.innerWidth <= 768;
   if(isMob){
@@ -4424,6 +4643,21 @@ if('serviceWorker' in navigator){
       <button class="btn btn-p" style="flex:1;justify-content:center" onclick="toast('قيد الإضافة','warning')"><i class="ti ti-package"></i> تجهيز</button>
     </div>
     <button class="btn" style="width:100%;justify-content:center;margin-top:8px" onclick="G('bottleDetailModal').classList.remove('on')"><i class="ti ti-x"></i> إغلاق</button>
+  </div>
+</div>
+
+<!-- ADVANCED EXPORT — one generic modal reused from every screen that offers it; each caller
+     supplies a config (openAdvExport(cfg)) saying which filters to show and how to query/shape
+     the result. See runAdvExport() below. -->
+<div class="overlay" id="advExportModal">
+  <div class="modal" style="width:580px">
+    <div class="modal-title"><i class="ti ti-file-export"></i> <span id="aeTitle">تصدير متقدم</span></div>
+    <div class="fgrid" id="aeFiltersBody"></div>
+    <div class="modal-foot">
+      <button class="btn" onclick="G('advExportModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
+      <button class="btn" style="background:#166534;color:#fff;border:none" onclick="runAdvExport('excel')"><i class="ti ti-table"></i> Excel</button>
+      <button class="btn btn-p" onclick="runAdvExport('pdf')"><i class="ti ti-file-text"></i> PDF</button>
+    </div>
   </div>
 </div>
 
