@@ -142,7 +142,12 @@ async function checkDonorSafetyOnSelect(d){
 
   // TEMPORARY diagnostic — confirms the checks actually ran and what they found, even when
   // neither banner nor popup ends up showing. Remove once confirmed fixed.
-  toast('🔧 تشخيص: مصاب='+(rejHit?'نعم('+rejHit.full_name+')':'لا')+' | مدة='+(intervalResult?(intervalResult.allowed?'مسموح':'ممنوع'):'لا يوجد تبرع سابق'),'warning',9000);
+  // Also compares "donations found by this exact donor_id" vs "donations found by matching
+  // NAME instead" — if these numbers differ, the autocomplete is resolving to a donor record
+  // that ISN'T the one the real donation is actually linked to (a duplicate donor row).
+  const{count:byId}=await db.from('blood_donations').select('id',{count:'exact',head:true}).eq('donor_id', d.id);
+  const{count:byName}=await db.from('blood_donations').select('id,donors!inner(full_name)',{count:'exact',head:true}).eq('donors.full_name', nm);
+  toast('🔧 تشخيص: مصاب='+(rejHit?'نعم('+rejHit.full_name+')':'لا')+' | مدة='+(intervalResult?(intervalResult.allowed?'مسموح':'ممنوع'):'لا يوجد')+' | id المختار='+d.id+' | تبرعات بهذا id='+byId+' | تبرعات بنفس الاسم='+byName,'warning',20000);
 
   // Centered popup — immediate, impossible to miss. Being مصاب/مرفوض always takes priority
   // over a timing issue, since it's the more serious reason and staff need to see it first.
