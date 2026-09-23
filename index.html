@@ -2167,8 +2167,11 @@ function initOfflineDB(){
 async function cacheRejectedDonors(){
   if(!IS_ONLINE || !offlineDB) return;
   try{
+    // rejected_donors has no national_id/mobile columns — selecting them here was the same
+    // "column does not exist" error that broke the online check, silently emptying this
+    // offline cache every single time it ran.
     const{data}=await db.from('rejected_donors')
-      .select('id,full_name,national_id,mobile,rejection_reason,rejection_type,rejection_date')
+      .select('id,full_name,rejection_reason,rejection_type,rejection_date')
       .eq('is_deleted',false).limit(5000);
     if(!data) return;
     const tx  = offlineDB.transaction('rejected_cache','readwrite');
@@ -2180,7 +2183,8 @@ async function cacheRejectedDonors(){
   }catch(e){console.log('[Offline] Cache error:',e);}
 }
 
-// ── Check name/NID/mobile against local cache ──
+// ── Check name against local cache (rejected_donors has no national_id/mobile columns —
+// name is the only field to match on, same as the online check) ──
 async function checkRejectedOffline(name, nid, mobile){
   if(!offlineDB) return null;
   return new Promise(res=>{
@@ -2189,15 +2193,12 @@ async function checkRejectedOffline(name, nid, mobile){
     const all = st.getAll();
     all.onsuccess = e=>{
       const rows = e.target.result||[];
-      const nm   = (name||'').trim().toLowerCase();
-      const n    = (nid||'').trim();
-      const mob  = (mobile||'').trim();
-      const hit  = rows.find(r=>{
-        if(nm.length>2 && r.full_name && r.full_name.toLowerCase().includes(nm)) return true;
-        if(n.length>5  && r.national_id && r.national_id===n) return true;
-        if(mob.length>6 && r.mobile && r.mobile===mob) return true;
-        return false;
-      });
+      const norm = s=>normalizeAr((s||'').replace(/\s+/g,' '));
+      const nmNorm = norm(name);
+      const hit = nmNorm ? rows.find(r=>{
+        const rn = norm(r.full_name);
+        return rn && (rn===nmNorm || rn.includes(nmNorm) || nmNorm.includes(rn));
+      }) : null;
       res(hit||null);
     };
     all.onerror = ()=>res(null);
@@ -3962,11 +3963,15 @@ async function checkIntervalBeforeSave(nid, mob){
 
 async function checkDonationInterval(donorId){
   if(!donorId) return null;
+  // Every past donation counts toward the interval, regardless of its test outcome — the 77-day
+  // rule is about physical recovery from having actually given blood, not about whether that
+  // donation turned out usable. Excluding a rejected_positive donation here would make an
+  // infected donor's own (only) donation invisible to this check, hiding the interval warning
+  // entirely for them.
   const{data}=await db.from('blood_donations')
     .select('created_at, donation_date, draw_date, status')
     .eq('donor_id', donorId)
     .eq('is_deleted', false)
-    .not('status','eq','rejected_positive')
     .order('created_at',{ascending:false})
     .limit(1);
   if(!data||!data.length) return null;

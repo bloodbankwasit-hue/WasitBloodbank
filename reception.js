@@ -85,40 +85,24 @@ function fillDonor(d){
 // (checkRejectedName) and by the immediate on-select check below, so they can never drift out
 // of sync with each other.
 async function _queryRejectedMatch(nm, nid, mob){
-  if(nm.length<3 && nid.length<5 && mob.length<7) return null;
+  if(nm.length<3) return null;
   if(IS_ONLINE){
-    // Three SEPARATE queries instead of one .or() combining ilike with eq conditions — that
-    // combination was silently failing to match on name even when a real match existed (the
-    // ilike-alone query below works correctly by itself; mixing it into .or() with eq siblings
-    // does not, whatever the exact PostgREST-level cause). Separate, simple queries per field
-    // are the reliable way to check all three identifiers.
-    const SEL='full_name,rejection_reason,rejection_type,national_id,mobile';
+    // rejected_donors has NO national_id/mobile columns at all — only full_name. Matching is
+    // by name alone. (This was the actual root cause of every earlier attempt at this check
+    // silently finding nothing: selecting/filtering on national_id/mobile against this table
+    // always errored with "column does not exist", and that error was never being checked.)
+    const SEL='full_name,rejection_reason,rejection_type';
     const firstWord = nm.trim().split(/\s+/)[0];
-    const queries=[];
-    if(firstWord.length>2) queries.push(db.from('rejected_donors').select(SEL).eq('is_deleted',false).ilike('full_name','*'+firstWord+'*').limit(20));
-    if(nid.length>5) queries.push(db.from('rejected_donors').select(SEL).eq('is_deleted',false).eq('national_id',nid).limit(1));
-    if(mob.length>6) queries.push(db.from('rejected_donors').select(SEL).eq('is_deleted',false).eq('mobile',mob).limit(1));
-    if(!queries.length) return null;
-    const results = await Promise.all(queries);
-    const data = results.flatMap(r=>r.data||[]);
-    // TEMPORARY diagnostic — shows exactly what this function's OWN internal query returned
-    // and how the comparison evaluated, not a separate stand-in query. Remove once confirmed.
-    window._lastRejQueryDebug = {
-      errors: results.map(r=>r.error?.message||null),
-      rowCount: data.length,
-      rows: data.map(r=>r.full_name)
-    };
-    if(!data.length) return null;
+    if(firstWord.length<3) return null;
+    const{data,error}=await db.from('rejected_donors').select(SEL).eq('is_deleted',false).ilike('full_name','*'+firstWord+'*').limit(20);
+    if(error || !data || !data.length) return null;
     // A name match must NOT depend on exact whitespace/letter-variant matching — two
     // visually-identical Arabic names commonly differ in which letter variant was typed
-    // (different alef forms, ى vs ي, ة vs ه) or in stray whitespace, especially when one copy
-    // was typed fresh and the other came from an older record. normalizeAr() (used elsewhere
-    // in the app, e.g. rare-donor search) already collapses exactly these variants.
+    // (different alef forms, ى vs ي, ة vs ه) or in stray whitespace. normalizeAr() (used
+    // elsewhere in the app, e.g. rare-donor search) already collapses exactly these variants.
     const norm=s=>normalizeAr((s||'').replace(/\s+/g,' '));
     const nmNorm=norm(nm);
-    const exact = data.find(r=> (nid&&r.national_id===nid) || (mob&&r.mobile===mob)
-      || (nmNorm && (norm(r.full_name)===nmNorm || norm(r.full_name).includes(nmNorm) || nmNorm.includes(norm(r.full_name)))));
-    window._lastRejQueryDebug.matched = !!exact;
+    const exact = data.find(r=> norm(r.full_name)===nmNorm || norm(r.full_name).includes(nmNorm) || nmNorm.includes(norm(r.full_name)));
     return exact || null;
   }
   return await checkRejectedOffline(nm, nid, mob);
@@ -133,9 +117,7 @@ async function checkDonorSafetyOnSelect(d){
       d.id ? checkDonationInterval(d.id) : Promise.resolve(null)
     ]);
   }catch(e){
-    // TEMPORARY diagnostic — if either check throws, we'd otherwise fail completely silently
-    // (no banner, no popup, nothing) with no way to tell why. Remove once confirmed fixed.
-    toast('🔧 تشخيص: فشل الفحص بالكامل — '+e.message,'error',12000);
+    toast('⚠️ تعذّر التحقق من حالة هذا المتبرع — '+e.message,'error',8000);
     return;
   }
 
@@ -158,21 +140,6 @@ async function checkDonorSafetyOnSelect(d){
       iw.style.display='flex'; iw.dataset.blocked='1';
     } else { iw.style.display='none'; iw.dataset.blocked=''; }
   }
-
-  // TEMPORARY diagnostic — confirms the checks actually ran and what they found, even when
-  // neither banner nor popup ends up showing. Remove once confirmed fixed.
-  // Also compares "donations found by this exact donor_id" vs "donations found by matching
-  // NAME instead" — if these numbers differ, the autocomplete is resolving to a donor record
-  // that ISN'T the one the real donation is actually linked to (a duplicate donor row).
-  const{count:byId}=await db.from('blood_donations').select('id',{count:'exact',head:true}).eq('donor_id', d.id);
-  const{count:byName}=await db.from('blood_donations').select('id,donors!inner(full_name)',{count:'exact',head:true}).eq('donors.full_name', nm);
-  // One more comparison: pull the RAW stored full_name from rejected_donors for anything
-  // containing part of this name, to catch an invisible text mismatch (extra space, different
-  // Arabic letter form...) that would make an exact/ilike match silently fail.
-  const{data:rjRaw}=await db.from('rejected_donors').select('full_name').eq('is_deleted',false).ilike('full_name','*'+nm.split(' ')[0]+'*').limit(3);
-  const rjDump = (rjRaw||[]).map(r=>'['+r.full_name+' -> normalized:'+normalizeAr(r.full_name.replace(/\s+/g,' '))+']').join(' , ') || 'ولا صف';
-  const dbg = window._lastRejQueryDebug || {};
-  toast('🔧 تشخيص: مصاب='+(rejHit?'نعم':'لا')+' | أخطاء الاستعلام='+JSON.stringify(dbg.errors)+' | عدد الصفوف الداخلية='+dbg.rowCount+' | الأسماء الداخلية='+JSON.stringify(dbg.rows)+' | تطابق؟='+dbg.matched,'warning',30000);
 
   // Centered popup — immediate, impossible to miss. Being مصاب/مرفوض always takes priority
   // over a timing issue, since it's the more serious reason and staff need to see it first.
