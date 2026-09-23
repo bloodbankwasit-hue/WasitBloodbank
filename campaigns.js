@@ -17,9 +17,13 @@ async function loadSeparationBoard(){
   _sepSelectedType=null;
   load(true);
   const separableTypes=Object.keys(COMPONENT_RULES);
+  // component_type='دم كامل' — same reasoning as loadSeparationList() below: a separated
+  // bottle's resulting components share the same bottle_type as their parent, and must not be
+  // counted here (they no longer belong in الفصل at all — this count has to match exactly
+  // what loadSeparationList() will actually show when the tile is tapped).
   const{data}=await db.from('blood_donations')
     .select('bottle_type')
-    .in('bottle_type', separableTypes).eq('is_deleted',false)
+    .in('bottle_type', separableTypes).eq('component_type','دم كامل').eq('is_deleted',false)
     .in('status',['pending_lab','pending_release','in_stock']);
   load(false);
   const cnt={};
