@@ -155,6 +155,12 @@ async function loadDonors(page=1){
     if(typeF) q=q.eq('donation_type',typeF);
     if(dFrom) q=q.gte('donation_date',dFrom);
     if(dTo)   q=q.lte('donation_date',dTo);
+    // One row per DONATION, never per resulting component — a separated bottle's components
+    // share this same donor/date and would otherwise show up as repeated "duplicate" rows for
+    // the same person. The original whole-blood row (component_type stays 'دم كامل' even after
+    // separation — only its status changes) already carries a "تم الفصل" tag when that happened,
+    // so nothing about the separation is actually hidden, just not repeated per component here.
+    q=q.eq('component_type','دم كامل');
     q=q.order('created_at',{ascending:false}).range((page-1)*PS,page*PS-1);
     const {data,count,error}=await q; if(error) throw error;
     const now=new Date();
