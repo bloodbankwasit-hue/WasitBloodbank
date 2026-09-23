@@ -1774,7 +1774,16 @@ function showIntervalBlockModal(message){
   G('ibmText').textContent = message;
   G('intervalBlockModal').classList.add('on');
 }
-function fd(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('ar-IQ',{year:'numeric',month:'2-digit',day:'2-digit'}); }
+function fd(d){
+  if(!d) return '—';
+  // Built manually (not via toLocaleDateString) so the digits are always plain English 0-9 —
+  // locale-based formatting (e.g. 'ar-IQ') renders Arabic-Indic digits (٠١٢٣...) by default,
+  // which is exactly what we don't want here (matches the "numbers always display in English"
+  // rule already applied to input fields via toEnNums()).
+  const dt=new Date(d);
+  const y=dt.getFullYear(), m=String(dt.getMonth()+1).padStart(2,'0'), day=String(dt.getDate()).padStart(2,'0');
+  return `${y}/${m}/${day}`;
+}
 function ft(t){ return t ? t.substring(0,5) : '—'; }
 function fnum(n){ return n!=null ? Number(n).toLocaleString('ar-IQ') : '—'; }
 // HTML-escape any user-supplied text before inserting into innerHTML (prevents stored XSS
@@ -2373,7 +2382,7 @@ window.addEventListener('offline', onOffline);
 function diag(msg, color){
   const d = document.getElementById('diagLog');
   if(!d) return;
-  const t = new Date().toLocaleTimeString();
+  const t = new Date().toLocaleTimeString('en-GB');
   const div = document.createElement('div');
   div.style.color = color||'#00ff88';
   div.style.borderBottom = '1px solid #333';
@@ -2459,7 +2468,7 @@ async function appInit(){
   diag("appInit started");
   try{ await initOfflineDB(); diag("IndexedDB OK"); }catch(e){ diag("IndexedDB failed: "+e.message, "#ffd700"); }
   try{ if(IS_ONLINE) cacheRejectedDonors(); else onOffline(); }catch(e){}
-  G('tbDate').textContent = new Date().toLocaleDateString('ar-IQ',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  G('tbDate').textContent = new Date().toLocaleDateString('ar-IQ-u-nu-latn',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   setDefaults();
   diag("Checking Supabase session...");
   try{
