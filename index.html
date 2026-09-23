@@ -1362,6 +1362,7 @@ tbody tr:hover td{background:#fafafa}
       <!-- ========== المخزن المؤقت (pending confirmation before التجهيز) ========== -->
       <div class="sc" id="s-pending_release">
         <div class="sh"><div class="sh-t"><i class="ti ti-clock-hour-4"></i> المخزن المؤقت — بانتظار التأكيد</div></div>
+        <div id="prTypeGrid" class="comp-stock-grid" style="margin-bottom:16px"></div>
         <div id="prBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
           <span id="prBulkCount">0 محدد</span>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -2238,19 +2239,43 @@ async function checkRejectedOffline(name, nid, mobile){
 // ── Enqueue an offline operation ──
 async function enqueueOp(type, data){
   if(!offlineDB) return null;
-  return new Promise((res,rej)=>{
-    const tx  = offlineDB.transaction('op_queue','readwrite');
-    const st  = tx.objectStore('op_queue');
-    const req = st.add({
-      type,                         // 'reception'|'draw'|'lab'|'supply'
-      data,                         // payload
-      status:'pending',
-      created_at: new Date().toISOString(),
-      attempts:0
+  let id;
+  try{
+    id = await new Promise((res,rej)=>{
+      const tx  = offlineDB.transaction('op_queue','readwrite');
+      const st  = tx.objectStore('op_queue');
+      const req = st.add({
+        type,                         // 'reception'|'draw'|'lab'|'supply'
+        data,                         // payload
+        status:'pending',
+        created_at: new Date().toISOString(),
+        attempts:0
+      });
+      req.onsuccess = e=>res(e.target.result);
+      req.onerror   = e=>rej(e.target.error);
     });
-    req.onsuccess = e=>res(e.target.result);
-    req.onerror   = e=>rej(e.target.error);
-  });
+  }catch(e){
+    // A clear, specific message here — never a raw browser error string — since this is
+    // exactly the moment the electricity app's users were left with silent failure before.
+    throw new Error('تعذّر الحفظ محلياً — ذاكرة الجهاز ممتلئة على الأغلب. أرسل أي عمليات معلّقة فوراً أو حرّر مساحة بالجهاز ('+(e?.message||'')+')');
+  }
+  checkStorageHeadroom(); // proactive — see comment on the function itself
+  return id;
+}
+
+// Proactive device-storage check, run after every offline save. Warns BEFORE local storage
+// actually fills up rather than only reacting after a write fails — the same lesson learned
+// the hard way on the electricity app (there, localStorage silently hit its small quota mid-use
+// and lost data). IndexedDB's quota here is far larger, making this a rare case in practice, but
+// the check is cheap and the alternative (silent data loss) is exactly what must never repeat.
+async function checkStorageHeadroom(){
+  if(!navigator.storage?.estimate) return; // not supported on this browser — skip silently
+  try{
+    const{usage, quota} = await navigator.storage.estimate();
+    if(quota && usage/quota > 0.8){
+      toast('⚠️ مساحة تخزين الجهاز أوشكت تمتلئ ('+Math.round(usage/quota*100)+'٪) — أرسل العمليات المعلّقة فور ما يرجع النت، ولا تستمر بالحفظ بدون نت أكثر من اللازم','error',12000);
+    }
+  }catch(e){}
 }
 
 // ── Get pending queue ──
@@ -2786,9 +2811,9 @@ function waLink(mobile, msg){
 }
 
 const WHOLE_BLOOD_DAYS = {
-  'مفلتر':45, 'ريفيوس':45, 'ريفيس':45,
+  'مفلتر':45, 'ريفيوس':45,
   'رباعي':35,
-  'رباعي SAG':45, 'رباعي Sag':45,
+  'رباعي SAG':45,
   'ثنائي':35,
   'أحادي':35
 };
@@ -2797,10 +2822,8 @@ const WHOLE_BLOOD_DAYS = {
 const COMPONENT_RULES = {
   'مفلتر':     [{type:'دم مضغوط',days:45},{type:'بلازما',days:365},{type:'صفائح دموية',days:5}],
   'ريفيوس':    [{type:'دم مضغوط',days:45},{type:'بلازما',days:365},{type:'صفائح دموية',days:5}],
-  'ريفيس':     [{type:'دم مضغوط',days:45},{type:'بلازما',days:365},{type:'صفائح دموية',days:5}],
   'رباعي':     [{type:'دم مضغوط',days:35},{type:'بلازما',days:365},{type:'صفائح دموية',days:5},{type:'بروتين بارد',days:365}],
   'رباعي SAG': [{type:'دم مضغوط',days:45},{type:'بلازما',days:365},{type:'صفائح دموية',days:5},{type:'بروتين بارد',days:365}],
-  'رباعي Sag': [{type:'دم مضغوط',days:45},{type:'بلازما',days:365},{type:'صفائح دموية',days:5},{type:'بروتين بارد',days:365}],
   'ثنائي':     [{type:'دم مضغوط',days:35},{type:'بلازما',days:365}]
 };
 // Trima's two possible direct outputs (chosen by the draw employee — no separate step).
@@ -4262,6 +4285,9 @@ function goBack(){
   }
   if(G('s-separation')?.classList.contains('on') && typeof _sepLevel!=='undefined'){
     if(_sepLevel===2){ withScrollPreserved(loadSeparationBoard); return; }
+  }
+  if(G('s-pending_release')?.classList.contains('on') && typeof _prLevel!=='undefined'){
+    if(_prLevel===2){ withScrollPreserved(loadPendingRelease); return; }
   }
   const isMob = window.innerWidth <= 768;
   if(isMob){

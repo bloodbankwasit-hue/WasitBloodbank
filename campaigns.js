@@ -24,7 +24,7 @@ async function loadSeparationBoard(){
   load(false);
   const cnt={};
   (data||[]).forEach(r=>{ cnt[r.bottle_type]=(cnt[r.bottle_type]||0)+1; });
-  const typeIcons={'مفلتر':'🧪','ريفيوس':'🧪','ريفيس':'🧪','رباعي':'🩸','رباعي SAG':'🩸','رباعي Sag':'🩸','ثنائي':'🩸'};
+  const typeIcons={'مفلتر':'🩸','ريفيوس':'🩸','رباعي':'🩸','رباعي SAG':'🩸','ثنائي':'🩸'};
   G('sepTypeGrid').innerHTML=separableTypes.map(t=>`
     <div class="comp-stock-card ${(cnt[t]||0)===0?'empty-bt':''}" onclick="loadSeparationList('${t}')" style="cursor:pointer">
       <div class="comp-stock-icon">${typeIcons[t]||'🩸'}</div>
@@ -98,13 +98,28 @@ function sepBulkSeparate(){
 }
 
 // ================================================================
-// المخزن المؤقت (pending_release) — separable bottles land here once lab is fully complete
-// (tracked before that via شاشة الفصل). Non-separable bottles (e.g. أحادي) come here IMMEDIATELY
-// after draw — before blood type or serology are even known — and update live in place as each
-// result comes in ("غير مفحوصة"/"الفصيلة غير محددة" → the actual result), so staff can watch them
-// progress. Positive/infected bottles also surface here (already auto-flagged 'rejected_positive'
-// and added to the rejected list for donor-safety) so staff can formally mark them 'تالفة'.
+// المخزن المؤقت (pending_release) — 2-level drill-down: component category (دم كامل / دم
+// مضغوط / بلازما / صفائح دموية / بروتين بارد / ⛔ مصابة) → list of bottles in that category.
+// Separable bottles land here once lab is fully complete (tracked before that via شاشة الفصل).
+// Non-separable bottles (e.g. أحادي) come here IMMEDIATELY after draw — before blood type or
+// serology are even known — and update live in place as each result comes in ("غير
+// مفحوصة"/"الفصيلة غير محددة" → the actual result), so staff can watch them progress. Positive/
+// infected bottles also surface here (already auto-flagged 'rejected_positive' and added to the
+// rejected list for donor-safety) so staff can formally mark them 'تالفة'.
 // ================================================================
+const PR_CATEGORIES=['دم كامل','دم مضغوط','بلازما','صفائح دموية','بروتين بارد'];
+let _prAllRows=[], _prSelectedCat=null, _prLevel=1;
+
+function _prShowLevel(n){
+  _prLevel=n;
+  const g1=G('prTypeGrid'), g2=G('prList'), g3=G('prBulkBar');
+  if(g1) g1.style.display = n===1 ? '' : 'none';
+  if(g2) g2.style.display = n===2 ? '' : 'none';
+  if(g3 && n===1) g3.style.display='none';
+}
+
+// Fetches every row that belongs in this screen (unchanged query logic) and shows level 1 —
+// one tile per category, each with a live count.
 async function loadPendingRelease(){
   load(true);
   const nonSeparableTypes=Object.keys(WHOLE_BLOOD_DAYS).filter(t=>!COMPONENT_RULES[t]);
@@ -120,12 +135,47 @@ async function loadPendingRelease(){
   const{data:d3}=await db.from('blood_donations').select(sel)
     .eq('status','pending_lab').neq('component_type','دم كامل').eq('is_deleted',false);
   load(false);
-  const list=[...(d1||[]),...(d2||[]),...(d3||[])].sort((a,b)=>(a.bottle_number||0)-(b.bottle_number||0));
+  _prAllRows=[...(d1||[]),...(d2||[]),...(d3||[])].sort((a,b)=>(a.bottle_number||0)-(b.bottle_number||0));
+
+  const counts={}; PR_CATEGORIES.forEach(c=>counts[c]=0); let infectedCount=0;
+  _prAllRows.forEach(r=>{
+    if(r.status==='rejected_positive'){ infectedCount++; return; }
+    const ct=r.component_type||'دم كامل';
+    counts[ct]=(counts[ct]||0)+1;
+  });
+  const catIcons={'دم كامل':'🩸','دم مضغوط':'🧪','بلازما':'💛','صفائح دموية':'🟡','بروتين بارد':'🧊'};
+  const tiles = PR_CATEGORIES.map(c=>`
+    <div class="comp-stock-card ${counts[c]===0?'empty-bt':''}" onclick="loadPendingReleaseList('${c}')" style="cursor:pointer">
+      <div class="comp-stock-icon">${catIcons[c]}</div>
+      <div class="comp-stock-name">${c}</div>
+      <div class="comp-stock-count">${counts[c]}</div>
+    </div>`).join('') + `
+    <div class="comp-stock-card ${infectedCount===0?'empty-bt':''}" onclick="loadPendingReleaseList('__infected')" style="cursor:pointer;border-color:${infectedCount>0?'#FECDD3':'#EEF2F6'}">
+      <div class="comp-stock-icon">⛔</div>
+      <div class="comp-stock-name" style="color:#BE123C">مصابة</div>
+      <div class="comp-stock-count" style="color:#BE123C">${infectedCount}</div>
+    </div>`;
+  G('prTypeGrid').innerHTML=tiles;
+  _prShowLevel(1);
+}
+
+// Level 2 — the bottles of one selected category, rendered from the already-fetched _prAllRows
+// (no extra query needed — everything for this screen was already pulled in loadPendingRelease).
+function loadPendingReleaseList(cat){
+  _prSelectedCat=cat;
+  const list = cat==='__infected'
+    ? _prAllRows.filter(r=>r.status==='rejected_positive')
+    : _prAllRows.filter(r=>r.status!=='rejected_positive' && (r.component_type||'دم كامل')===cat);
+
+  const titleBar=`<div style="font-size:19px;font-weight:700;color:#BE123C;margin-bottom:10px">${cat==='__infected'?'⛔ مصابة':cat} — ${list.length} قنينة</div>`;
+
   if(!list.length){
-    G('prList').innerHTML='<div class="empty"><i class="ti ti-clock-hour-4"></i><p>لا توجد قناني بالمخزن المؤقت حالياً</p></div>';
+    G('prList').innerHTML=titleBar+'<div class="empty"><i class="ti ti-clock-hour-4"></i><p>لا توجد قناني بهذه الفئة حالياً</p></div>';
+    _prShowLevel(2);
     return;
   }
-  G('prList').innerHTML=list.map(r=>{
+
+  G('prList').innerHTML=titleBar+list.map(r=>{
     const name=r.donors?.full_name?esc(r.donors.full_name):'—';
     const infected=r.status==='rejected_positive';
     const complete=r.status==='pending_release'||infected; // both blood type + serology known
@@ -157,6 +207,15 @@ async function loadPendingRelease(){
     </div>`;
   }).join('');
   updatePrBulkBar();
+  _prShowLevel(2);
+}
+
+// Refreshes whichever level the person is currently on, instead of always resetting to the
+// category grid — so confirming/separating/damaging a bottle from deep in a category's list
+// doesn't bounce them back out to level 1.
+async function _prRefreshCurrentLevel(){
+  if(_prLevel===2 && _prSelectedCat){ await loadPendingRelease(); loadPendingReleaseList(_prSelectedCat); }
+  else await loadPendingRelease();
 }
 
 function updatePrBulkBar(){
@@ -173,7 +232,7 @@ async function confirmRelease(id){
   if(error){ toast('خطأ: '+error.message,'error'); return; }
   await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'in_stock'}});
   toast('✅ تم تأكيد القنينة — أصبحت جاهزة بالتجهيز','success');
-  await withScrollPreserved(loadPendingRelease);
+  await withScrollPreserved(_prRefreshCurrentLevel);
 }
 
 async function bulkConfirmRelease(){
@@ -187,7 +246,7 @@ async function bulkConfirmRelease(){
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'in_stock'}});
   }
   toast('✅ تم تأكيد '+ids.length+' قنينة','success');
-  await withScrollPreserved(loadPendingRelease);
+  await withScrollPreserved(_prRefreshCurrentLevel);
 }
 
 // ================================================================
