@@ -17,10 +17,20 @@ async function loadStats(){
   const byCompIn={}, byCompOut={};
   const bts=['مفلتر','رباعي','ريفيوس','ثنائي','أحادي','تريما','حملة تبرع رباعي','حملة تبرع مفلتر','رباعي SAG'];
   data.forEach(r=>{
-    byTyp[r.donation_type]=(byTyp[r.donation_type]||0)+1;
-    byBot[r.bottle_type]=(byBot[r.bottle_type]||0)+1;
-    if(r.blood_type) byBld[r.blood_type]=(byBld[r.blood_type]||0)+1;
-    if(r.donors?.gender) byGen[r.donors.gender]=(byGen[r.donors.gender]||0)+1;
+    // Donation-level stats (type, bottle type, blood type, gender) must count each ORIGINAL
+    // draw exactly once — a separated bottle's resulting component rows share the very same
+    // donation_type/bottle_type/blood_type/gender as their parent, and would otherwise inflate
+    // these counts by however many components that one draw was split into.
+    if((r.component_type||'دم كامل')==='دم كامل'){
+      byTyp[r.donation_type]=(byTyp[r.donation_type]||0)+1;
+      byBot[r.bottle_type]=(byBot[r.bottle_type]||0)+1;
+      if(r.blood_type) byBld[r.blood_type]=(byBld[r.blood_type]||0)+1;
+      if(r.donors?.gender) byGen[r.donors.gender]=(byGen[r.donors.gender]||0)+1;
+    }
+    // Component-level stock (دخول) legitimately counts EVERY component row produced (each one
+    // really is a distinct unit of stock) — only the original whole-blood row is excluded once
+    // it's been superseded by separation (status='separated'), so it isn't counted twice
+    // alongside the components it turned into.
     const ct=r.component_type||'دم كامل';
     if(r.status!=='separated') byCompIn[ct]=(byCompIn[ct]||0)+1;
   });
@@ -29,13 +39,14 @@ async function loadStats(){
     byCompOut[ct]=(byCompOut[ct]||0)+1;
   });
   const allComps=[...new Set([...Object.keys(byCompIn),...Object.keys(byCompOut)])];
-  window._STATS_BREAKDOWN={f,t,total:data.length,byTyp,byGen,byBot,bts,byBld,byCompIn,byCompOut,allComps};
+  const totalDonations = data.filter(r=>(r.component_type||'دم كامل')==='دم كامل').length;
+  window._STATS_BREAKDOWN={f,t,total:totalDonations,byTyp,byGen,byBot,bts,byBld,byCompIn,byCompOut,allComps};
   G('stRpt').style.display='block';
   G('stRpt').innerHTML=`<div class="rpt">
     <div class="rpt-hd">
       <div><div class="rh-t">شعبة مصرف الدم الرئيسي — واسط</div>
         <div class="rh-s">قسم الأمور الفنية / دائرة صحة واسط / وزارة الصحة</div>
-        <div class="rh-s">الفترة: من ${f} إلى ${t} | الإجمالي: ${fnum(data.length)} تبرع</div>
+        <div class="rh-s">الفترة: من ${f} إلى ${t} | الإجمالي: ${fnum(totalDonations)} تبرع</div>
       </div>
       <div class="rh-en">Ministry of Health<br>Wasit Health Directorate<br>Main Blood Bank Division</div>
     </div>

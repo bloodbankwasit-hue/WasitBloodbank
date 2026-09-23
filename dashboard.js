@@ -7,12 +7,18 @@ async function loadDash(){
   const ms=today.substring(0,7)+'-01';
   const ys=today.substring(0,4)+'-01-01';
   try{
+    // .eq('component_type','دم كامل') on every count/list below — a separated bottle produces
+    // 2-4 rows (one per component), all sharing the SAME donor and draw event; without this
+    // filter, every count on this screen (today/month/year/all-time) and the "recent" list
+    // counts one donation multiple times. The whole-blood row itself (component_type stays
+    // 'دم كامل' even after separation — only its STATUS changes to 'separated') is the one
+    // row that represents the actual, single donation event.
     const [r0,r1,r2,r3,r4]=await Promise.all([
-      db.from('blood_donations').select('*',{count:'exact',head:true}).eq('donation_date',today).eq('is_deleted',false),
-      db.from('blood_donations').select('*',{count:'exact',head:true}).gte('donation_date',ms).eq('is_deleted',false),
-      db.from('blood_donations').select('*',{count:'exact',head:true}).gte('donation_date',ms).eq('donation_type','طوعي').eq('is_deleted',false),
-      db.from('blood_donations').select('*',{count:'exact',head:true}).gte('donation_date',ys).eq('is_deleted',false),
-      db.from('blood_donations').select('*',{count:'exact',head:true}).eq('is_deleted',false)
+      db.from('blood_donations').select('*',{count:'exact',head:true}).eq('donation_date',today).eq('component_type','دم كامل').eq('is_deleted',false),
+      db.from('blood_donations').select('*',{count:'exact',head:true}).gte('donation_date',ms).eq('component_type','دم كامل').eq('is_deleted',false),
+      db.from('blood_donations').select('*',{count:'exact',head:true}).gte('donation_date',ms).eq('donation_type','طوعي').eq('component_type','دم كامل').eq('is_deleted',false),
+      db.from('blood_donations').select('*',{count:'exact',head:true}).gte('donation_date',ys).eq('component_type','دم كامل').eq('is_deleted',false),
+      db.from('blood_donations').select('*',{count:'exact',head:true}).eq('component_type','دم كامل').eq('is_deleted',false)
     ]);
     ['st0','st1','st2','st3','st4'].forEach((id,i)=>{
       const vals=[r0.count,r1.count,r2.count,r3.count,r4.count];
@@ -22,7 +28,7 @@ async function loadDash(){
     // Recent donations today
     const {data:rec}=await db.from('blood_donations')
       .select('bottle_number,bottle_type,donation_type,donation_time,blood_type,serology_result,donors(donor_number,full_name)')
-      .eq('donation_date',today).eq('is_deleted',false)
+      .eq('donation_date',today).eq('component_type','دم كامل').eq('is_deleted',false)
       .order('created_at',{ascending:false}).limit(10);
 
     if(rec&&rec.length){
