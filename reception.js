@@ -101,6 +101,13 @@ async function _queryRejectedMatch(nm, nid, mob){
     if(!queries.length) return null;
     const results = await Promise.all(queries);
     const data = results.flatMap(r=>r.data||[]);
+    // TEMPORARY diagnostic — shows exactly what this function's OWN internal query returned
+    // and how the comparison evaluated, not a separate stand-in query. Remove once confirmed.
+    window._lastRejQueryDebug = {
+      errors: results.map(r=>r.error?.message||null),
+      rowCount: data.length,
+      rows: data.map(r=>r.full_name)
+    };
     if(!data.length) return null;
     // A name match must NOT depend on exact whitespace/letter-variant matching — two
     // visually-identical Arabic names commonly differ in which letter variant was typed
@@ -111,6 +118,7 @@ async function _queryRejectedMatch(nm, nid, mob){
     const nmNorm=norm(nm);
     const exact = data.find(r=> (nid&&r.national_id===nid) || (mob&&r.mobile===mob)
       || (nmNorm && (norm(r.full_name)===nmNorm || norm(r.full_name).includes(nmNorm) || nmNorm.includes(norm(r.full_name)))));
+    window._lastRejQueryDebug.matched = !!exact;
     return exact || null;
   }
   return await checkRejectedOffline(nm, nid, mob);
@@ -163,7 +171,8 @@ async function checkDonorSafetyOnSelect(d){
   // Arabic letter form...) that would make an exact/ilike match silently fail.
   const{data:rjRaw}=await db.from('rejected_donors').select('full_name').eq('is_deleted',false).ilike('full_name','*'+nm.split(' ')[0]+'*').limit(3);
   const rjDump = (rjRaw||[]).map(r=>'['+r.full_name+' -> normalized:'+normalizeAr(r.full_name.replace(/\s+/g,' '))+']').join(' , ') || 'ولا صف';
-  toast('🔧 تشخيص: مصاب='+(rejHit?'نعم':'لا')+' | المبحوث الخام=['+nm+'] | المبحوث مطبّع=['+normalizeAr(nm.replace(/\s+/g,' '))+'] | بجدول المرفوضين: '+rjDump,'warning',25000);
+  const dbg = window._lastRejQueryDebug || {};
+  toast('🔧 تشخيص: مصاب='+(rejHit?'نعم':'لا')+' | أخطاء الاستعلام='+JSON.stringify(dbg.errors)+' | عدد الصفوف الداخلية='+dbg.rowCount+' | الأسماء الداخلية='+JSON.stringify(dbg.rows)+' | تطابق؟='+dbg.matched,'warning',30000);
 
   // Centered popup — immediate, impossible to miss. Being مصاب/مرفوض always takes priority
   // over a timing issue, since it's the more serious reason and staff need to see it first.
