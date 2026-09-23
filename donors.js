@@ -43,23 +43,35 @@ async function runGlobalSearch(){
   load(true);
   try{
     // 1) Matching donors, by identity fields
+    // Split into separate queries instead of one .or() mixing ilike with an eq condition —
+    // that combination was confirmed to silently fail to match (see reception.js's rejected-
+    // donor check for the full diagnosis); three ilike conditions together are fine, but adding
+    // donor_number.eq alongside them in the SAME or() string is not.
     let donorIds=[];
     if(clean){
-      const{data:matched}=await db.from('donors').select('id').eq('is_deleted',false)
-        .or(`national_id.ilike.*${clean}*,full_name.ilike.*${clean}*,mobile.ilike.*${clean}*`+(isNum?`,donor_number.eq.${clean}`:''))
-        .limit(500);
-      donorIds=(matched||[]).map(x=>x.id);
+      const idQueries=[db.from('donors').select('id').eq('is_deleted',false)
+        .or(`national_id.ilike.*${clean}*,full_name.ilike.*${clean}*,mobile.ilike.*${clean}*`).limit(500)];
+      if(isNum) idQueries.push(db.from('donors').select('id').eq('is_deleted',false).eq('donor_number',clean).limit(500));
+      const idResults=await Promise.all(idQueries);
+      donorIds=[...new Set(idResults.flatMap(r=>(r.data||[]).map(x=>x.id)))];
     }
-    // 2) Matching donations, by bottle number or by the matched donor ids
+    // 2) Matching donations, by bottle number or by the matched donor ids — same reasoning:
+    // separate queries instead of mixing eq and in() inside one or() string.
     let donationRows=[];
-    const orParts=[];
-    if(isNum) orParts.push(`bottle_number.eq.${clean}`);
-    if(donorIds.length) orParts.push(`donor_id.in.(${donorIds.join(',')})`);
-    if(orParts.length){
-      const{data}=await db.from('blood_donations')
-        .select('id,bottle_number,bottle_type,blood_type,component_type,status,donation_date,campaign_name,donors(donor_number,full_name,mobile)')
-        .eq('is_deleted',false).or(orParts.join(',')).limit(100).order('created_at',{ascending:false});
-      donationRows=data||[];
+    const donQueries=[];
+    if(isNum) donQueries.push(db.from('blood_donations')
+      .select('id,bottle_number,bottle_type,blood_type,component_type,status,donation_date,campaign_name,donors(donor_number,full_name,mobile)')
+      .eq('is_deleted',false).eq('bottle_number',clean).limit(100));
+    if(donorIds.length) donQueries.push(db.from('blood_donations')
+      .select('id,bottle_number,bottle_type,blood_type,component_type,status,donation_date,campaign_name,donors(donor_number,full_name,mobile)')
+      .eq('is_deleted',false).in('donor_id',donorIds).order('created_at',{ascending:false}).limit(100));
+    if(donQueries.length){
+      const donResults=await Promise.all(donQueries);
+      const seen=new Set();
+      donationRows=donResults.flatMap(r=>r.data||[]).filter(r=>{
+        if(seen.has(r.id)) return false;
+        seen.add(r.id); return true;
+      });
     }
     // 3) Matching rejected donors, by name or reason
     let rejectedRows=[];
@@ -115,11 +127,14 @@ async function loadDonors(page=1){
       const isNum=!isNaN(clean)&&clean!=='';
       let donorIds=[];
       if(clean){
-        let dq=db.from('donors').select('id').eq('is_deleted',false)
-          .or(`national_id.ilike.*${clean}*,full_name.ilike.*${clean}*,mobile.ilike.*${clean}*`+(isNum?`,donor_number.eq.${clean}`:''))
-          .limit(500);
-        const{data:matched}=await dq;
-        donorIds=(matched||[]).map(x=>x.id);
+        // Two separate queries instead of one .or() mixing ilike with an eq condition — that
+        // combination silently fails to match (confirmed while diagnosing the rejected-donor
+        // check in reception.js); three ilike conditions together are fine on their own.
+        const idQueries=[db.from('donors').select('id').eq('is_deleted',false)
+          .or(`national_id.ilike.*${clean}*,full_name.ilike.*${clean}*,mobile.ilike.*${clean}*`).limit(500)];
+        if(isNum) idQueries.push(db.from('donors').select('id').eq('is_deleted',false).eq('donor_number',clean).limit(500));
+        const idResults=await Promise.all(idQueries);
+        donorIds=[...new Set(idResults.flatMap(r=>(r.data||[]).map(x=>x.id)))];
       }
       const orParts=[];
       if(isNum) orParts.push(`bottle_number.eq.${clean}`);
