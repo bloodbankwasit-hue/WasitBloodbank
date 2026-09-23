@@ -87,37 +87,29 @@ function fillDonor(d){
 async function _queryRejectedMatch(nm, nid, mob){
   if(nm.length<3 && nid.length<5 && mob.length<7) return null;
   if(IS_ONLINE){
-    // NOTE: inside .or()'s string filter syntax, PostgREST requires "*" as the ilike wildcard,
-    // not "%" — "%" is a literal character here, so a "%name%" pattern would only ever match a
-    // name that literally contains a percent sign, silently matching nothing for every normal
-    // name.
-    // A name match must NOT depend on the exact whitespace matching character-for-character
-    // (e.g. a double space, or a stray leading/trailing space) — that's invisible to a human
-    // comparing two names on screen but breaks an exact substring match completely. So the
-    // database query casts a WIDE net using just the first word, and the real decision is made
-    // here in JS by comparing both names with their whitespace normalized (collapsed to single
-    // spaces, trimmed) — a donor-safety check should err toward catching a match, not missing
-    // one over a formatting difference.
-    const filters = [];
+    // Three SEPARATE queries instead of one .or() combining ilike with eq conditions — that
+    // combination was silently failing to match on name even when a real match existed (the
+    // ilike-alone query below works correctly by itself; mixing it into .or() with eq siblings
+    // does not, whatever the exact PostgREST-level cause). Separate, simple queries per field
+    // are the reliable way to check all three identifiers.
+    const SEL='full_name,rejection_reason,rejection_type,national_id,mobile';
     const firstWord = nm.trim().split(/\s+/)[0];
-    if(firstWord.length>2) filters.push(`full_name.ilike.*${firstWord}*`);
-    if(nid.length>5) filters.push(`national_id.eq.${nid}`);
-    if(mob.length>6) filters.push(`mobile.eq.${mob}`);
-    if(!filters.length) return null;
-    const{data}=await db.from('rejected_donors')
-      .select('full_name,rejection_reason,rejection_type,national_id,mobile')
-      .or(filters.join(','))
-      .eq('is_deleted',false).limit(20);
-    if(!data||!data.length) return null;
-    // Plain whitespace normalization isn't enough for Arabic names — two visually-identical
-    // names commonly differ in which letter VARIANT was typed (different alef forms, ى vs ي,
-    // ة vs ه), especially when one copy was typed fresh and the other came from an older
-    // record. normalizeAr() (used elsewhere in the app, e.g. rare-donor search) already
-    // collapses exactly these variants — reuse it here instead of a narrower whitespace-only
-    // comparison.
+    const queries=[];
+    if(firstWord.length>2) queries.push(db.from('rejected_donors').select(SEL).eq('is_deleted',false).ilike('full_name','*'+firstWord+'*').limit(20));
+    if(nid.length>5) queries.push(db.from('rejected_donors').select(SEL).eq('is_deleted',false).eq('national_id',nid).limit(1));
+    if(mob.length>6) queries.push(db.from('rejected_donors').select(SEL).eq('is_deleted',false).eq('mobile',mob).limit(1));
+    if(!queries.length) return null;
+    const results = await Promise.all(queries);
+    const data = results.flatMap(r=>r.data||[]);
+    if(!data.length) return null;
+    // A name match must NOT depend on exact whitespace/letter-variant matching — two
+    // visually-identical Arabic names commonly differ in which letter variant was typed
+    // (different alef forms, ى vs ي, ة vs ه) or in stray whitespace, especially when one copy
+    // was typed fresh and the other came from an older record. normalizeAr() (used elsewhere
+    // in the app, e.g. rare-donor search) already collapses exactly these variants.
     const norm=s=>normalizeAr((s||'').replace(/\s+/g,' '));
     const nmNorm=norm(nm);
-    const exact = data.find(r=> nid&&r.national_id===nid || mob&&r.mobile===mob
+    const exact = data.find(r=> (nid&&r.national_id===nid) || (mob&&r.mobile===mob)
       || (nmNorm && (norm(r.full_name)===nmNorm || norm(r.full_name).includes(nmNorm) || nmNorm.includes(norm(r.full_name)))));
     return exact || null;
   }
