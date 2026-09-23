@@ -81,6 +81,40 @@ function fillDonor(d){
   checkDonorSafetyOnSelect(d);
 }
 
+// Finds a matching donor for when the staff typed the name by hand instead of picking a
+// suggestion from the list — without this, a manually-typed name that matches an existing
+// donor silently creates a SECOND, separate donor record (same person, new id), which then
+// breaks every check that depends on donor_id (the 77-day interval, blood-type history...).
+// Matching is tiered by confidence, from strongest to weakest, and stops at the first hit:
+//   1) exact national_id match
+//   2) exact mobile match
+//   3) normalized name match AND matching birth year together (never name alone — a shared
+//      name is common in Iraq and must not silently merge two different people)
+async function _findExistingDonorFallback(nm, by, nid, mob){
+  if(nid){
+    const{data}=await db.from('donors').select('id,full_name,donor_number,blood_type').eq('is_deleted',false).eq('national_id',nid).limit(1);
+    if(data&&data.length) return data[0];
+  }
+  if(mob){
+    const{data}=await db.from('donors').select('id,full_name,donor_number,blood_type').eq('is_deleted',false).eq('mobile',mob).limit(1);
+    if(data&&data.length) return data[0];
+  }
+  if(nm && by){
+    const firstWord=nm.trim().split(/\s+/)[0];
+    if(firstWord.length>2){
+      const{data}=await db.from('donors').select('id,full_name,birth_year,donor_number,blood_type')
+        .eq('is_deleted',false).eq('birth_year',by).ilike('full_name','*'+firstWord+'*').limit(20);
+      if(data&&data.length){
+        const norm=s=>normalizeAr((s||'').replace(/\s+/g,' '));
+        const nmNorm=norm(nm);
+        const hit=data.find(r=>norm(r.full_name)===nmNorm);
+        if(hit) return hit;
+      }
+    }
+  }
+  return null;
+}
+
 // The one place that actually queries rejected_donors — used both by the live-typing check
 // (checkRejectedName) and by the immediate on-select check below, so they can never drift out
 // of sync with each other.
@@ -283,8 +317,16 @@ async function saveReception(){
       resetReception();
     } else {
       // Online: send directly
-      // Check if existing donor selected via autocomplete
-      const existingId = G('s-reception')?.dataset?.existingDonorId;
+      // Check if existing donor selected via autocomplete — or, if not, whether one can be
+      // found anyway (see _findExistingDonorFallback for why this matters).
+      let existingId = G('s-reception')?.dataset?.existingDonorId;
+      if(!existingId){
+        const fallbackMatch = await _findExistingDonorFallback(nm, by, payload.national_id, payload.mobile);
+        if(fallbackMatch){
+          existingId = fallbackMatch.id;
+          toast('ℹ️ تم التعرف على متبرع معروف تلقائياً: '+fallbackMatch.full_name,'info',4000);
+        }
+      }
       let dn;
       if(existingId){
         // Update existing donor with any newly filled fields

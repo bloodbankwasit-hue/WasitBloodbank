@@ -186,6 +186,7 @@ async function loadDonors(page=1){
           <td style="color:${exp?'#BE123C':'inherit'}">${fd(r.expiry_date)}${exp?' ⚠':''}</td>
           <td><span class="pill ${r.serology_result?(r.serology_result==='Negative'?'pg':'pr'):'py'}">${r.serology_result?(r.serology_result==='Negative'?'سالبة ✅':'موجبة ⚠️'):'لم يُفحص'}</span></td>
           <td style="white-space:nowrap">
+            ${r.status==='pending_draw' ? `<button class="ibtn" onclick="withdrawDonation('${r.id}','${sq(r.donors?.full_name)}')" title="انسحب / لم يكمل التبرع" style="color:#757575"><i class="ti ti-door-exit"></i></button>` : ''}
             <button class="ibtn" onclick="printDonorFromList(storeDonorForPrint({donor_name:'${sq(r.donors?.full_name)}',bottle_number:${r.bottle_number||0},bottle_type:'${r.bottle_type||''}',donation_date:'${r.donation_date||''}',donation_type:'${r.donation_type||''}',birth_year:${r.donors?.birth_year||0},gender:'${r.donors?.gender||''}',mobile:'${sq(r.donors?.mobile)}',national_id:'${sq(r.donors?.national_id)}',address:'${sq(r.donors?.address)}',expiry_date:'${r.expiry_date||''}',blood_type:'${r.blood_type||''}' }))" title="طباعة" style="color:#BE123C"><i class="ti ti-printer"></i></button>
             <button class="ibtn" onclick="editDonorRow('${r.id}')" title="تعديل" style="color:#2563EB"><i class="ti ti-edit"></i></button>
             <button class="ibtn" onclick="deleteDonorRow('${r.id}','${sq(r.donors?.full_name)}')" title="حذف هذا التبرع" style="color:#DC2626"><i class="ti ti-trash"></i></button>
