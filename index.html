@@ -1351,8 +1351,9 @@ tbody tr:hover td{background:#fafafa}
         <div id="sepTypeGrid" class="comp-stock-grid" style="margin-bottom:16px"></div>
         <div id="sepBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
           <span id="sepBulkCount">0 محدد</span>
-          <div style="display:flex;gap:6px">
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn" style="background:#0369A1;color:#fff;border:none" onclick="sepBulkSeparate()"><i class="ti ti-git-fork"></i> فصل المحدد</button>
+            <button class="btn" style="background:#7F1D1D;color:#fff;border:none" onclick="sepBulkDamage()"><i class="ti ti-trash"></i> تلف المحدد</button>
             <button class="btn" style="background:#374151;color:#fff;border:none" onclick="document.querySelectorAll('.sep-chk').forEach(c=>c.checked=false);updateSepBulkBar()">إلغاء التحديد</button>
           </div>
         </div>

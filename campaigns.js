@@ -38,12 +38,13 @@ async function loadSeparationBoard(){
 async function loadSeparationList(bottleType){
   _sepSelectedType=bottleType;
   load(true);
-  // Shows the whole lifecycle in one place: un-separated whole blood (fresh from draw, tested
-  // or not) AND its already-separated components (also tested or not) — so nothing here is
-  // gated on lab status; separation itself can happen before or after testing.
+  // Only un-separated whole blood belongs here (tested or not — separation itself can happen
+  // before or after testing). Once a bottle is separated, its resulting components move on to
+  // المخزن المؤقت — they have nothing left to do in الفصل, so they no longer show up here at all
+  // (previously they lingered in this list with no action available, just cluttering it).
   const{data}=await db.from('blood_donations')
     .select('id,bottle_number,bottle_type,blood_type,component_type,status,draw_date,campaign_name,donors(full_name)')
-    .eq('bottle_type', bottleType).eq('is_deleted',false)
+    .eq('bottle_type', bottleType).eq('component_type','دم كامل').eq('is_deleted',false)
     .in('status',['pending_lab','pending_release','in_stock'])
     .order('created_at',{ascending:true});
   load(false);
@@ -57,29 +58,32 @@ async function loadSeparationList(bottleType){
   G('sepBoardList').innerHTML=titleBar+list.map(r=>{
     const name=r.donors?.full_name?esc(r.donors.full_name):(r.campaign_name?'🚐 '+esc(r.campaign_name):'—');
     const tested=r.status==='in_stock'||r.status==='pending_release';
-    const isWhole=r.component_type==='دم كامل' || !r.component_type;
-    const canSeparate=isWhole; // separation works regardless of tested/untested
     return `<div class="flow-card">
-      ${canSeparate?`<input type="checkbox" class="sep-chk" value="${r.id}" data-bt="${r.bottle_type}" onclick="updateSepBulkBar()" style="width:18px;height:18px;flex-shrink:0">`:'<span style="width:18px"></span>'}
+      <input type="checkbox" class="sep-chk" value="${r.id}" data-bt="${r.bottle_type}" onclick="updateSepBulkBar()" style="width:18px;height:18px;flex-shrink:0">
       <div class="fc-av">${tested?'✅':'⏳'}</div>
       <div style="flex:1">
         <div class="fc-name">${name} — قنينة ${r.bottle_number||'—'}</div>
         <div class="fc-sub">${r.bottle_type} | ${r.component_type||'دم كامل'} | ${r.blood_type||'—'} | ${fd(r.draw_date)}</div>
         <div style="margin-top:4px">
           ${tested
-            ? `<span class="pill pg">✅ سليمة${isWhole?' — جاهزة للفصل':''}</span>`
+            ? `<span class="pill pg">✅ سليمة — جاهزة للفصل</span>`
             : `<span class="pill py">⏳ لم تُفحص لحد الآن</span>`}
         </div>
       </div>
-      <div class="fc-act">
-        ${canSeparate
-          ? `<button class="btn btn-p" style="font-size:15px;padding:8px 10px" onclick="openSeparateModalBulk(['${r.id}'],'${r.bottle_type}','${r.bottle_number}')"><i class="ti ti-git-fork"></i> فصل</button>`
-          : ''}
+      <div class="fc-act" style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-p" style="font-size:15px;padding:8px 10px" onclick="openSeparateModalBulk(['${r.id}'],'${r.bottle_type}','${r.bottle_number}')"><i class="ti ti-git-fork"></i> فصل</button>
+        <button class="btn" style="font-size:15px;padding:8px 10px;border-color:#7F1D1D;color:#7F1D1D" onclick="openDamageModal(['${r.id}'])"><i class="ti ti-trash"></i> تلف</button>
       </div>
     </div>`;
   }).join('');
   updateSepBulkBar();
   _sepShowLevel(2);
+}
+
+function sepBulkDamage(){
+  const checked=[...document.querySelectorAll('.sep-chk:checked')].map(c=>c.value);
+  if(!checked.length){ toast('يرجى تحديد قنينة واحدة على الأقل','error'); return; }
+  openDamageModal(checked);
 }
 
 function updateSepBulkBar(){
