@@ -971,19 +971,24 @@ tbody tr:hover td{background:#fafafa}
       <!-- DASHBOARD -->
       <div class="sc on" id="s-dashboard">
         <div class="sg">
-          <div class="sc-card"><div class="sc-ico">🩸</div><div class="sc-val" id="st0">—</div><div class="sc-lbl">متبرعو اليوم</div></div>
-          <div class="sc-card"><div class="sc-ico">📅</div><div class="sc-val" id="st1">—</div><div class="sc-lbl">إجمالي الشهر</div></div>
-          <div class="sc-card"><div class="sc-ico">🤲</div><div class="sc-val" id="st2">—</div><div class="sc-lbl">طوعيون الشهر</div></div>
-          <div class="sc-card"><div class="sc-ico">📊</div><div class="sc-val" id="st3">—</div><div class="sc-lbl">إجمالي السنة</div></div>
-          <div class="sc-card"><div class="sc-ico">✅</div><div class="sc-val" id="st4">—</div><div class="sc-lbl">إجمالي الكل</div></div>
+          <div class="sc-card" style="cursor:pointer" onclick="openDashDrill('متبرعو اليوم — '+fd(new Date().toISOString().split('T')[0]),new Date().toISOString().split('T')[0],new Date().toISOString().split('T')[0])"><div class="sc-ico">🩸</div><div class="sc-val" id="st0">—</div><div class="sc-lbl">متبرعو اليوم</div></div>
+          <div class="sc-card" style="cursor:pointer" onclick="openDashDrill('إجمالي الشهر',_dashMonthStart(),_dashToday())"><div class="sc-ico">📅</div><div class="sc-val" id="st1">—</div><div class="sc-lbl">إجمالي الشهر</div></div>
+          <div class="sc-card" style="cursor:pointer" onclick="openDashDrill('طوعيون الشهر',_dashMonthStart(),_dashToday(),{donation_type:'طوعي'})"><div class="sc-ico">🤲</div><div class="sc-val" id="st2">—</div><div class="sc-lbl">طوعيون الشهر</div></div>
+          <div class="sc-card" style="cursor:pointer" onclick="openDashDrill('تعويضيو الشهر',_dashMonthStart(),_dashToday(),{donation_type:'تعويضي'})"><div class="sc-ico">🩹</div><div class="sc-val" id="st3">—</div><div class="sc-lbl">تعويضيو الشهر</div></div>
+          <div class="sc-card" style="cursor:pointer" onclick="openDashAllTimeChoice()"><div class="sc-ico">✅</div><div class="sc-val" id="st4">—</div><div class="sc-lbl">إجمالي الكل</div></div>
         </div>
-        <div class="sh">
-          <div class="sh-t"><i class="ti ti-clock"></i> آخر تبرعات اليوم</div>
-          <span class="sh-a" onclick="nav('donors',document.querySelector('.ni'))">عرض الكل ←</span>
-        </div>
-        <div id="recentTbl"><div class="empty"><i class="ti ti-clock"></i><p>جاري التحميل...</p></div></div>
-        <div class="sh" style="margin-top:4px"><div class="sh-t"><i class="ti ti-droplet-half"></i> مخزون الفصائل</div></div>
+        <div class="sh" style="margin-top:4px"><div class="sh-t"><i class="ti ti-droplet-half"></i> مخزون الفصائل — اضغط فصيلة لعرض قناني المخزون</div></div>
         <div class="btg" id="btGrid"></div>
+      </div>
+
+      <!-- Dashboard drill-down — one shared modal for every card + stock tile above -->
+      <div class="overlay" id="dashDrillModal">
+        <div class="modal" style="width:640px;max-width:95vw">
+          <div class="modal-title"><span id="ddTitle"></span></div>
+          <div id="ddStats" style="margin-bottom:12px"></div>
+          <div id="ddList" style="max-height:55vh;overflow-y:auto"></div>
+          <div class="modal-foot"><button class="btn" onclick="G('dashDrillModal').classList.remove('on')"><i class="ti ti-x"></i> إغلاق</button></div>
+        </div>
       </div>
 
       <!-- ADD DONOR -->
