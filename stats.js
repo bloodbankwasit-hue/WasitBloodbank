@@ -64,8 +64,7 @@ async function loadStats(){
 function printStats(){
   if(G('stRpt').style.display==='none'){toast('يرجى توليد التقرير أولاً','warning'); return;}
   const c=G('stRpt').innerHTML;
-  const w=window.open('','_blank','width=700,height=900');
-  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>تقرير إحصائي</title>
+  printHtmlDocument(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>تقرير إحصائي</title>
   <style>body{font-family:'Segoe UI',Arial,sans-serif;direction:rtl;padding:20px;background:#fff;font-size:15px}
   .rpt{border:1px solid #ddd;border-radius:8px;overflow:hidden}
   .rpt-hd{background:#BE123C;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:flex-start}
@@ -249,10 +248,8 @@ function printStats(){
 .rare-export-btn{width:100%;padding:12px;background:#1E293B;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px}
 .rare-export-btn:active{background:#0F172A}
 .rare-count-badge{background:#BE123C;color:#fff;border-radius:20px;padding:2px 10px;font-size:14px;font-weight:700;margin-right:auto}
-.close-float{position:sticky;top:0;left:0;right:0;width:100%;z-index:999;background:#BE123C;color:#fff;border:none;padding:16px;font-size:19px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.25);margin-bottom:14px}
-@media print{@page{margin:10mm} .close-float{display:none}}</style></head>
-  <body><button class="close-float" onclick="window.close()">✕ إغلاق والرجوع للتطبيق</button>${c}<script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
-  w.document.close();
+@media print{@page{margin:10mm}}</style></head>
+  <body>${c}<script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
 }
 
 function exportStatsExcel(){

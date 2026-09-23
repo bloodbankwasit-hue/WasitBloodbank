@@ -1992,6 +1992,28 @@ async function shareOrDownloadFile(blob, filename, mimeType){
 // barcode (Code128, encodes the donor number) and the Amiri typeface — printed the same
 // reliable way as the rest of the app's other printouts (a real window + window.print()),
 // rather than hand-drawn canvas text, since Arabic shaping renders correctly that way.
+// Printing without ever opening a new window/tab — avoids browser popup-blocking entirely
+// (which was silently swallowing the FIRST print attempt of a session on iOS, especially when
+// the app is launched from the home-screen icon). A single hidden, reused iframe is written to
+// and printed instead; this leaves the desktop experience completely unchanged (same layout,
+// same native print dialog) while making mobile printing unconditionally reliable.
+function printHtmlDocument(htmlString){
+  let ifr = document.getElementById('_printFrame');
+  if(!ifr){
+    ifr = document.createElement('iframe');
+    ifr.id = '_printFrame';
+    ifr.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;border:0;visibility:hidden';
+    document.body.appendChild(ifr);
+  }
+  const doc = ifr.contentWindow.document;
+  doc.open();
+  doc.write(htmlString);
+  doc.close();
+  // Every print template already ends with its own `<script>setTimeout(()=>window.print(),NNN)`
+  // — that "window" resolves to the iframe's own window when the script runs inside it, so
+  // printing is still triggered automatically without any change to those templates.
+}
+
 async function exportDonorFormPDF(){
   const d = _lastDonation;
   if(!d){ toast('لا توجد بيانات','error'); return; }
@@ -1999,8 +2021,7 @@ async function exportDonorFormPDF(){
   const donorNum = d.donor_number!=null ? String(d.donor_number) : '';
   const N=v=>v?esc(String(v)):'';
 
-  const w=window.open('','_blank','width=850,height=1000');
-  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>استمارة التبرع</title>
+  printHtmlDocument(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>استمارة التبرع</title>
   <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script>
   <style>
@@ -2021,11 +2042,9 @@ async function exportDonorFormPDF(){
     .section-hdr{background:#EDEDED;text-align:center;font-weight:700;font-size:16.5px;padding:6px;border:1px solid #000;border-top:none}
     .vitals td.lbl{width:20%}
     .vitals td.val{width:20%;text-align:center}
-    @media print{@page{margin:10mm} .close-float{display:none}}
-    .close-float{position:sticky;top:0;left:0;right:0;width:100%;z-index:999;background:#BE123C;color:#fff;border:none;padding:16px;font-size:19px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.25);margin-bottom:14px}
+    @media print{@page{margin:10mm}}
   </style></head>
   <body>
-    <button class="close-float" onclick="window.close()">✕ إغلاق والرجوع للتطبيق</button>
     <div class="frame">
       <div class="hdr">
         <div class="dept">دائرة صحة واسط<br>مصرف الدم الرئيسي في واسط</div>
@@ -2079,7 +2098,6 @@ async function exportDonorFormPDF(){
       };
     <\/script>
   </body></html>`);
-  w.document.close();
 }
 
 async function exportBottleStickerPDF(){
@@ -2850,8 +2868,7 @@ function printForm(){
   const nm=G('f-name').value.trim();
   if(!nm){toast('أدخل اسم المتبرع أولاً','warning'); return;}
   const vals={name:nm,by:G('f-by').value,gen:G('f-gen').value,mom:G('f-mom').value,nid:G('f-nid').value,mob:G('f-mob').value,addr:G('f-addr').value,job:G('f-job').value,dtyp:G('f-dtyp').value,btyp:G('f-btyp').value,bnum:G('f-bnum').value,pat:G('f-pat').value,hosp:G('f-hosp').value,ddate:G('f-ddate').value,dtime:G('f-dtime').value,bt:G('f-bt').value,bp:G('f-bp').value,wt:G('f-wt').value,pulse:G('f-pulse').value,hgb:G('f-hgb').value,ser:G('f-ser').value};
-  const w=window.open('','_blank','width=800,height=700');
-  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>استمارة التبرع</title>
+  printHtmlDocument(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>استمارة التبرع</title>
   <style>body{font-family:'Segoe UI',Arial,sans-serif;direction:rtl;padding:20px;font-size:15px}
   .hdr{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #BE123C;padding-bottom:12px;margin-bottom:18px}
   .tc{text-align:center}.tc h2{font-size:18px;color:#BE123C;margin-bottom:4px}.tc p{font-size:13px;color:#757575}
@@ -3036,9 +3053,7 @@ function printForm(){
 .rare-export-btn{width:100%;padding:12px;background:#1E293B;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px}
 .rare-export-btn:active{background:#0F172A}
 .rare-count-badge{background:#BE123C;color:#fff;border-radius:20px;padding:2px 10px;font-size:14px;font-weight:700;margin-right:auto}
-.close-float{position:sticky;top:0;left:0;right:0;width:100%;z-index:999;background:#BE123C;color:#fff;border:none;padding:16px;font-size:19px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.25);margin-bottom:14px}
-@media print{@page{margin:10mm} .close-float{display:none}}</style></head><body>
-  <button class="close-float" onclick="window.close()">✕ إغلاق والرجوع للتطبيق</button>
+@media print{@page{margin:10mm}}</style></head><body>
   <div class="hdr">
     <div class="en">Ministry of Health<br>Wasit Health Directorate<br>Technical Affairs Dept.<br><strong>Blood Donor Questionnaire</strong></div>
     <div class="tc"><h2>استمارة تبرع بالدم</h2><p>شعبة مصرف الدم الرئيسي — واسط</p><p>وزارة الصحة / دائرة صحة واسط</p></div>
@@ -3075,7 +3090,6 @@ function printForm(){
     <div>طابع الشعبة</div>
   </div>
   <script>setTimeout(()=>window.print(),400)<\/script></body></html>`);
-  w.document.close();
 }
 
 // [سجل المتبرعين + الأرشيف الشامل: js/donors.js] — يُحمّل عند فتح القسم لأول مرة
@@ -3087,8 +3101,7 @@ function printForm(){
 function printBC(type){
   const r=BCDATA; if(!r){toast('لا توجد بيانات للطباعة','warning'); return;}
   const showExp=type!=='simple';
-  const w=window.open('','_blank','width=650,height=520');
-  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>باركود</title>
+  printHtmlDocument(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>باركود</title>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
   <style>body{font-family:'Segoe UI',Arial,sans-serif;direction:rtl;padding:20px;background:#fff}
   .card{border:1px solid #ddd;border-radius:10px;padding:18px;max-width:340px;margin:0 auto}
@@ -3273,9 +3286,7 @@ function printBC(type){
 .rare-export-btn{width:100%;padding:12px;background:#1E293B;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px}
 .rare-export-btn:active{background:#0F172A}
 .rare-count-badge{background:#BE123C;color:#fff;border-radius:20px;padding:2px 10px;font-size:14px;font-weight:700;margin-right:auto}
-.close-float{position:sticky;top:0;left:0;right:0;width:100%;z-index:999;background:#BE123C;color:#fff;border:none;padding:16px;font-size:19px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.25);margin-bottom:14px}
-@media print{@page{margin:6mm} .close-float{display:none}}</style></head><body>
-  <button class="close-float" onclick="window.close()">✕ إغلاق والرجوع للتطبيق</button>
+@media print{@page{margin:6mm}}</style></head><body>
   <div class="card">
     <div class="hd"><div class="hd-ico">🩸</div>
       <div><div class="hd-t">مصرف الدم الرئيسي — واسط</div><div class="hd-s">وزارة الصحة</div></div>
@@ -3290,7 +3301,6 @@ function printBC(type){
   </div>
   <script>JsBarcode('#bcs','${String(r.bottle_number).padStart(8,'0')}',{format:'CODE128',width:2,height:50,displayValue:true,font:'Arial',fontSize:12});setTimeout(()=>window.print(),600);<\/script>
   </body></html>`);
-  w.document.close();
 }
 
 // [المصابون + المرفوضون: js/infected-rejected.js] — يُحمّل عند فتح القسم لأول مرة
@@ -4206,12 +4216,11 @@ function exportRowsToExcel(title, headers, rows, filename){
   toast('✅ تم تصدير '+rows.length+' سجل لإكسل','success',3500);
 }
 
-// Generic printable PDF export (same window.print() convention used across the app)
+// Generic printable PDF export (via the shared no-popup print path)
 function exportRowsToPDF(title, headers, rows, filename){
   const headRow = headers.map(h=>`<th>${esc(h)}</th>`).join('');
   const bodyRows = rows.map(r=>'<tr>'+r.map(c=>`<td>${c==null?'':esc(String(c))}</td>`).join('')+'</tr>').join('');
-  const w = window.open('', '_blank');
-  w.document.write(`<html dir="rtl"><head><meta charset="UTF-8"><title>${esc(title)}</title>
+  printHtmlDocument(`<html dir="rtl"><head><meta charset="UTF-8"><title>${esc(title)}</title>
     <style>
       body{font-family:Arial,sans-serif;padding:20px}
       h2{color:#BE123C;text-align:center;margin-bottom:4px}
@@ -4219,17 +4228,14 @@ function exportRowsToPDF(title, headers, rows, filename){
       table{width:100%;border-collapse:collapse;font-size:12px}
       th,td{border:1px solid #ccc;padding:6px 8px;text-align:center}
       th{background:#BE123C;color:#fff}
-      @media print{@page{margin:10mm} .close-float{display:none}}
-      .close-float{position:sticky;top:0;left:0;right:0;width:100%;z-index:999;background:#BE123C;color:#fff;border:none;padding:16px;font-size:19px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.25);margin-bottom:14px}
+      @media print{@page{margin:10mm}}
     </style></head>
     <body>
-      <button class="close-float" onclick="window.close()">✕ إغلاق والرجوع للتطبيق</button>
       <h2>${esc(title)}</h2>
       <p>تاريخ التصدير: ${new Date().toLocaleDateString('en-GB')} | عدد السجلات: ${rows.length}</p>
       <table><thead><tr>${headRow}</tr></thead><tbody>${bodyRows}</tbody></table>
       <script>setTimeout(()=>window.print(),400)<\/script>
     </body></html>`);
-  w.document.close();
 }
 
 // Preserves scroll position across a list re-render triggered by an action (confirm/separate/
