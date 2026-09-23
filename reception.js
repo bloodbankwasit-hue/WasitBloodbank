@@ -109,7 +109,13 @@ async function _queryRejectedMatch(nm, nid, mob){
       .or(filters.join(','))
       .eq('is_deleted',false).limit(20);
     if(!data||!data.length) return null;
-    const norm=s=>(s||'').trim().replace(/\s+/g,' ');
+    // Plain whitespace normalization isn't enough for Arabic names — two visually-identical
+    // names commonly differ in which letter VARIANT was typed (different alef forms, ى vs ي,
+    // ة vs ه), especially when one copy was typed fresh and the other came from an older
+    // record. normalizeAr() (used elsewhere in the app, e.g. rare-donor search) already
+    // collapses exactly these variants — reuse it here instead of a narrower whitespace-only
+    // comparison.
+    const norm=s=>normalizeAr((s||'').replace(/\s+/g,' '));
     const nmNorm=norm(nm);
     const exact = data.find(r=> nid&&r.national_id===nid || mob&&r.mobile===mob
       || (nmNorm && (norm(r.full_name)===nmNorm || norm(r.full_name).includes(nmNorm) || nmNorm.includes(norm(r.full_name)))));
@@ -164,8 +170,8 @@ async function checkDonorSafetyOnSelect(d){
   // containing part of this name, to catch an invisible text mismatch (extra space, different
   // Arabic letter form...) that would make an exact/ilike match silently fail.
   const{data:rjRaw}=await db.from('rejected_donors').select('full_name').eq('is_deleted',false).ilike('full_name','*'+nm.split(' ')[0]+'*').limit(3);
-  const rjDump = (rjRaw||[]).map(r=>'['+r.full_name+']').join(' , ') || 'ولا صف';
-  toast('🔧 تشخيص: مصاب='+(rejHit?'نعم':'لا')+' | id المختار='+d.id+' | تبرعات بهذا id='+byId+' | بنفس الاسم='+byName+' | الاسم المبحوث=['+nm+'] | بجدول المرفوضين وجدت: '+rjDump,'warning',25000);
+  const rjDump = (rjRaw||[]).map(r=>'['+r.full_name+' -> normalized:'+normalizeAr(r.full_name.replace(/\s+/g,' '))+']').join(' , ') || 'ولا صف';
+  toast('🔧 تشخيص: مصاب='+(rejHit?'نعم':'لا')+' | المبحوث الخام=['+nm+'] | المبحوث مطبّع=['+normalizeAr(nm.replace(/\s+/g,' '))+'] | بجدول المرفوضين: '+rjDump,'warning',25000);
 
   // Centered popup — immediate, impossible to miss. Being مصاب/مرفوض always takes priority
   // over a timing issue, since it's the more serious reason and staff need to see it first.
