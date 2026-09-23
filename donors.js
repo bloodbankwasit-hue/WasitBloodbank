@@ -116,7 +116,7 @@ async function loadDonors(page=1){
   const dTo   = G('dDateTo')?.value||'';
   load(true);
   try{
-    const SEL='bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,status,component_type,campaign_name,id,donors(donor_number,full_name,birth_year,national_id)';
+    const SEL='bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,status,component_type,campaign_name,id,donors(id,donor_number,full_name,birth_year,national_id)';
     let q;
     if(s){
       // PostgREST's or()/and() only accepts columns on the table being queried — it cannot
@@ -188,7 +188,8 @@ async function loadDonors(page=1){
           <td style="white-space:nowrap">
             <button class="ibtn" onclick="printDonorFromList(storeDonorForPrint({donor_name:'${sq(r.donors?.full_name)}',bottle_number:${r.bottle_number||0},bottle_type:'${r.bottle_type||''}',donation_date:'${r.donation_date||''}',donation_type:'${r.donation_type||''}',birth_year:${r.donors?.birth_year||0},gender:'${r.donors?.gender||''}',mobile:'${sq(r.donors?.mobile)}',national_id:'${sq(r.donors?.national_id)}',address:'${sq(r.donors?.address)}',expiry_date:'${r.expiry_date||''}',blood_type:'${r.blood_type||''}' }))" title="طباعة" style="color:#BE123C"><i class="ti ti-printer"></i></button>
             <button class="ibtn" onclick="editDonorRow('${r.id}')" title="تعديل" style="color:#2563EB"><i class="ti ti-edit"></i></button>
-            <button class="ibtn" onclick="deleteDonorRow('${r.id}','${sq(r.donors?.full_name)}')" title="حذف" style="color:#DC2626"><i class="ti ti-trash"></i></button>
+            <button class="ibtn" onclick="deleteDonorRow('${r.id}','${sq(r.donors?.full_name)}')" title="حذف هذا التبرع" style="color:#DC2626"><i class="ti ti-trash"></i></button>
+            ${UPROF?.role==='admin' && r.donors?.id ? `<button class="ibtn" onclick="deleteDonorCompletely('${r.donors.id}','${sq(r.donors?.full_name)}')" title="حذف المتبرع بالكامل (كل سجلاته) — للأدمن فقط" style="color:#7F1D1D"><i class="ti ti-user-x"></i></button>` : ''}
           </td>
         </tr>`;}).join('')}</tbody></table></div>`;
       const tp=Math.ceil(count/PS);
@@ -314,6 +315,32 @@ async function deleteDonorRow(id,name){
       record_id:id, new_values:{donor:name}
     });
     toast('تم حذف الإدخال','success');
+    await loadDonors(DPAGE);
+  }catch(e){ toast('خطأ: '+e.message,'error'); }
+  finally{ load(false); }
+}
+
+// Admin-only: removes the donor PROFILE itself, not just one donation — meant for cleaning up
+// test/dummy records (e.g. before real production use) rather than everyday corrections, which
+// is why it's a separate, more clearly-labeled action from "حذف هذا التبرع" above. Soft-deletes
+// the donor row AND cascades to every one of their blood_donations rows, so nothing about that
+// test person is left visible anywhere in the app (donor list, search, stats...) — same
+// reversible is_deleted pattern used everywhere else, not a true permanent SQL delete.
+async function deleteDonorCompletely(donorId, name){
+  if(UPROF?.role!=='admin'){ toast('هذا الإجراء متاح لمدير النظام فقط','error'); return; }
+  if(!confirm(`هل تريد حذف المتبرع "${name}" نهائياً من التطبيق؟ هذا يشمل ملفه الشخصي وكل سجلات تبرعاته — يُستخدم لتنظيف بيانات تجريبية، ولا يمكن التراجع عنه من الواجهة.`)) return;
+  load(true);
+  try{
+    const{error:de}=await db.from('donors').update({is_deleted:true}).eq('id',donorId);
+    if(de) throw de;
+    const{error:be}=await db.from('blood_donations').update({is_deleted:true}).eq('donor_id',donorId);
+    if(be) throw be;
+    await db.from('audit_log').insert({
+      user_id:SES?.user?.id, user_name:UPROF?.full_name,
+      action:'DELETE', table_name:'donors',
+      record_id:donorId, new_values:{donor:name, cascade:'all donations hidden'}
+    });
+    toast('✅ تم حذف المتبرع وكل سجلاته','success',4000);
     await loadDonors(DPAGE);
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }

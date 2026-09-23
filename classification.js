@@ -98,11 +98,81 @@ async function openClassificationModal(id,name,bn,drawDate){
   G('cmModal').classList.add('on');
 }
 
+// Checks whether entering `newBt` for this donation would contradict an already-established
+// blood type — either for this exact donor, or for a likely duplicate donor record (same
+// normalized name + birth year, different donor_id — the kind of duplicate a manually-typed
+// reception used to create before the matching fix in reception.js).
+async function checkBloodTypeConsistency(donationId, newBt){
+  const{data:cur}=await db.from('blood_donations').select('donor_id,donors(full_name,birth_year)').eq('id',donationId).single();
+  if(!cur?.donor_id) return null;
+  const donorName=cur.donors?.full_name, birthYear=cur.donors?.birth_year;
+
+  // 1) same donor, another donation with a different established blood type
+  const{data:sameDonor}=await db.from('blood_donations')
+    .select('blood_type,donation_date')
+    .eq('donor_id',cur.donor_id).eq('is_deleted',false).not('blood_type','is',null).neq('id',donationId)
+    .order('donation_date',{ascending:false}).limit(5);
+  const mismatchSame=(sameDonor||[]).find(r=>r.blood_type && r.blood_type!==newBt);
+  if(mismatchSame) return {establishedType:mismatchSame.blood_type, establishedDate:mismatchSame.donation_date, donorName, isDuplicateDonor:false};
+
+  // 2) possible duplicate donor record (same normalized name + birth year, different donor_id)
+  if(donorName && birthYear){
+    const firstWord=donorName.trim().split(/\s+/)[0];
+    if(firstWord.length>2){
+      const{data:candidates}=await db.from('donors').select('id,full_name')
+        .eq('is_deleted',false).eq('birth_year',birthYear).ilike('full_name','*'+firstWord+'*')
+        .neq('id',cur.donor_id).limit(10);
+      const norm=s=>normalizeAr((s||'').replace(/\s+/g,' '));
+      const nmNorm=norm(donorName);
+      const dupIds=(candidates||[]).filter(c=>norm(c.full_name)===nmNorm).map(c=>c.id);
+      if(dupIds.length){
+        const{data:dupDonations}=await db.from('blood_donations')
+          .select('blood_type,donation_date')
+          .in('donor_id',dupIds).eq('is_deleted',false).not('blood_type','is',null)
+          .order('donation_date',{ascending:false}).limit(5);
+        const mismatchDup=(dupDonations||[]).find(r=>r.blood_type && r.blood_type!==newBt);
+        if(mismatchDup) return {establishedType:mismatchDup.blood_type, establishedDate:mismatchDup.donation_date, donorName, isDuplicateDonor:true};
+      }
+    }
+  }
+  return null;
+}
+
+// Shows the conflict as a blocking choice (not a silent auto-correct or a plain toast) — blood
+// type is too safety-critical to decide automatically either way; the lab staff looking at the
+// actual sample makes the final call, this just makes sure they're making it with full context.
+function confirmBloodTypeConflict(conflict, newBt){
+  return new Promise(resolve=>{
+    const dupNote = conflict.isDuplicateDonor
+      ? '<div style="margin-top:8px;font-size:14px;color:#B45309">⚠️ هذا على الأغلب سجل متبرع مكرر لنفس الشخص (نفس الاسم وسنة التولد بمعرّف مختلف) — يفضّل توحيد السجلين لاحقاً.</div>' : '';
+    G('bctText').innerHTML = 'هذا المتبرع ('+esc(conflict.donorName||'')+') له تبرع سابق بتاريخ <b>'+fd(conflict.establishedDate)+'</b> وفصيلته المثبتة وقتها كانت <b>'+conflict.establishedType+'</b> — مختلفة عن الفصيلة اللي أدخلتها الآن (<b>'+newBt+'</b>).'+dupNote;
+    G('bloodTypeConflictModal').classList.add('on');
+    G('bctProceedBtn').onclick = ()=>{ G('bloodTypeConflictModal').classList.remove('on'); resolve(true); };
+    G('bctCancelBtn').onclick  = ()=>{ G('bloodTypeConflictModal').classList.remove('on'); resolve(false); };
+  });
+}
+
 async function saveClassification(){
   const id=G('cm-id').value, bt=G('cm-bt').value;
   if(!bt){ toast('يرجى اختيار فصيلة الدم','error'); return; }
   load(true);
   try{
+    if(IS_ONLINE){
+      // Blood-type consistency check — this only runs while online since it needs to read
+      // other real records to compare against. Checks two things, both from real prior data:
+      //   1) does THIS donor (by donor_id) already have an established blood type elsewhere
+      //      that differs from what's being entered now?
+      //   2) does another donor RECORD that matches this one's name + birth year (a likely
+      //      duplicate donor record, e.g. created because a past reception was typed by hand
+      //      instead of picked from the suggestion list) have a differing established type?
+      // Either way, a mismatch is flagged but never silently blocks — the final call always
+      // stays with the lab staff actually looking at the sample.
+      const conflict = await checkBloodTypeConsistency(id, bt);
+      if(conflict){
+        const proceed = await confirmBloodTypeConflict(conflict, bt);
+        if(!proceed){ load(false); return; }
+      }
+    }
     if(!IS_ONLINE){
       // Offline: queue the field update — same reasoning as virology's offline path, the
       // completion/rejection decision needs the real server state and is only made for real

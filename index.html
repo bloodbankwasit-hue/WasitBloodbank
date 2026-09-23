@@ -1775,6 +1775,33 @@ function toast(msg, type='info', dur=3200){
   b.appendChild(t); setTimeout(()=>t.remove(),dur);
 }
 function load(v){ G('loader').classList.toggle('on',v); }
+// Donor voluntarily leaves/declines BEFORE any blood is actually drawn (not a medical
+// rejection — there's no reason to flag them, they're free to come back any time). Shared here
+// (not inside draw.js or donors.js, which load independently) since it's triggered from two
+// places: السحب itself, and سجل المتبرعين (for a donor still awaiting draw who reception staff
+// notices has left). Whichever is used first hides the record from BOTH screens at once — it's
+// the exact same row, just two different entry points to the same action.
+async function withdrawDonation(id, donorName){
+  if(!confirm('تأكيد: "'+donorName+'" انسحب ولم يُسحب منه دم؟ سيُحذف سجل الاستمارة ويُعاد رقم القنينة للاستخدام.')) return;
+  load(true);
+  try{
+    const{data:d}=await db.from('blood_donations').select('bottle_number,bottle_type').eq('id',id).single();
+    if(d?.bottle_number && d?.bottle_type){
+      await db.from('bottle_number_pool').insert({
+        bottle_type:d.bottle_type, bottle_number:d.bottle_number, created_by:SES?.user?.id
+      });
+    }
+    const{error}=await db.from('blood_donations').update({is_deleted:true}).eq('id',id);
+    if(error) throw error;
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'withdrawn',released_bottle:d?.bottle_number}});
+    toast('↩️ تم تسجيل الانسحاب — رقم القنينة '+(d?.bottle_number||'')+' أُعيد لإعادة الاستخدام','warning',5000);
+    // Refresh whichever screen this was called from.
+    if(G('s-draw')?.classList.contains('on')){ G('drawModal')?.classList.remove('on'); await loadDraw(); }
+    else if(typeof loadDonors==='function') await loadDonors(DPAGE);
+  }catch(e){ toast('خطأ: '+e.message,'error'); }
+  finally{ load(false); }
+}
+
 function showIntervalBlockModal(message){
   G('ibmText').textContent = message;
   G('intervalBlockModal').classList.add('on');
@@ -4531,6 +4558,24 @@ if('serviceWorker' in navigator){
   </div>
 </div>
 
+<!-- BLOOD TYPE CONFLICT — a choice, not a plain notice: staff must actively decide whether to
+     proceed given the mismatch with an already-established blood type. -->
+<div class="overlay" id="bloodTypeConflictModal">
+  <div class="modal" style="text-align:center;border-top:6px solid #B45309">
+    <div style="font-size:47px;margin-bottom:6px">⚠️</div>
+    <div style="font-size:20px;font-weight:800;color:#B45309;margin-bottom:12px">تضارب بفصيلة الدم</div>
+    <div id="bctText" style="font-size:18px;line-height:1.9;font-weight:600;color:#1a1a1a;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:14px;text-align:right"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button id="bctCancelBtn" class="btn" style="flex:1;justify-content:center;font-size:16px;padding:13px">
+        <i class="ti ti-x"></i> إلغاء وأدقق
+      </button>
+      <button id="bctProceedBtn" class="btn" style="flex:1;justify-content:center;font-size:16px;padding:13px;background:#B45309;color:#fff;border:none">
+        <i class="ti ti-check"></i> متابعة رغم ذلك
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- DRAW MODAL -->
 <div class="overlay" id="drawModal">
   <div class="modal">
@@ -4582,6 +4627,7 @@ if('serviceWorker' in navigator){
       <div id="dm-normal-actions" style="display:flex;gap:7px;width:100%;flex-wrap:wrap">
         <button class="btn" onclick="G('drawModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
         <button class="btn" style="border-color:#DC2626;color:#DC2626" onclick="toggleDmMedSection(true)"><i class="ti ti-ban"></i> غير مؤهل طبياً</button>
+        <button class="btn" style="border-color:#757575;color:#757575" onclick="withdrawDonation(G('dm-id').value, G('dm-donor-name').textContent)"><i class="ti ti-door-exit"></i> انسحب / لم يكمل</button>
         <button class="btn" style="border-color:#D97706;color:#D97706" onclick="confirmDamagedBottle()"><i class="ti ti-alert-triangle"></i> قنينة تالفة</button>
         <button class="btn btn-p" style="margin-right:auto" onclick="confirmDrawSuccess()"><i class="ti ti-check"></i> تأكيد السحب</button>
       </div>
