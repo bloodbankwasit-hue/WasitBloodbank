@@ -302,30 +302,3 @@ async function exportRareExcel(){
   toast('✅ تم تصدير '+filtered.length+' سجل لإكسل','success',3500);
 }
 
-async function loadRareList(bt){
-  load(true);
-  const {data}=await db.from('blood_donations')
-    .select('bottle_number,donation_date,blood_type,donors(donor_number,full_name,mobile,address)')
-    .eq('blood_type',bt).eq('is_deleted',false)
-    .order('donation_date',{ascending:false}).limit(100);
-  load(false);
-  if(data&&data.length){
-    G('rareTbl').innerHTML=`<div style="margin-bottom:8px;font-size:15px;font-weight:700;color:#BE123C">فصيلة ${bt} — ${data.length} سجل</div>
-    <div class="tw"><table><thead><tr>
-      <th>رقم المتبرع</th><th>اسم المتبرع</th><th>الفصيلة</th><th>رقم الموبايل</th><th>تاريخ التبرع</th><th>عنوان السكن</th>
-    </tr></thead><tbody>${data.map(r=>`<tr>
-      <td>${N(r.donors?.donor_number)}</td>
-      <td>${esc(N(r.donors?.full_name))}</td>
-      <td style="font-weight:700;color:#BE123C">${r.blood_type}</td>
-      <td dir="ltr">${esc(N(r.donors?.mobile))}</td>
-      <td>${fd(r.donation_date)}</td>
-      <td>${esc(N(r.donors?.address))}</td>
-    </tr>`).join('')}</tbody></table></div>
-    <div class="abar" style="margin-top:10px">
-      <button class="btn btn-p" onclick="window.print()"><i class="ti ti-printer"></i> طباعة تقرير فصيلة ${bt}</button>
-    </div>`;
-  } else {
-    G('rareTbl').innerHTML='<div class="empty"><i class="ti ti-droplet-half"></i><p>لا توجد سجلات لفصيلة '+bt+'</p></div>';
-  }
-}
-

@@ -75,6 +75,7 @@ async function confirmBulkClassification(){
   const ids=G('bcm-ids').value.split(',').filter(Boolean);
   const bt=G('bcm-bt').value;
   if(!bt){ toast('يرجى اختيار فصيلة الدم','error'); return; }
+  if(!IS_ONLINE){ toast('التصنيف الجماعي يحتاج اتصال بالإنترنت (استخدم التصنيف الفردي بدون نت)','error'); return; }
   load(true);
   try{
     for(const id of ids){
@@ -100,9 +101,21 @@ async function openClassificationModal(id,name,bn,drawDate){
 async function saveClassification(){
   const id=G('cm-id').value, bt=G('cm-bt').value;
   if(!bt){ toast('يرجى اختيار فصيلة الدم','error'); return; }
-  if(!IS_ONLINE){ toast('هذه الخطوة تحتاج اتصال بالإنترنت','error'); return; }
   load(true);
   try{
+    if(!IS_ONLINE){
+      // Offline: queue the field update — same reasoning as virology's offline path, the
+      // completion/rejection decision needs the real server state and is only made for real
+      // when syncQueue() replays this through applyLabUpdate() once back online.
+      await enqueueOp('lab', {donation_id:id, fieldUpdates:{blood_type:bt}});
+      const q = await getPendingQueue();
+      updateOfflineBar('offline', q.length+' عملية معلّقة');
+      toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً عند عودة الإنترنت','warning',5000);
+      G('cmModal').classList.remove('on');
+      await loadClassification();
+      load(false);
+      return;
+    }
     const{complete,effSer}=await applyLabUpdate(id, {blood_type:bt});
     if(complete && effSer==='Positive'){
       toast('⚠️ نتيجة الفحص موجبة — تم نقل المتبرع للمرفوضين دائماً','warning',5000);

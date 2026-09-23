@@ -119,6 +119,7 @@ async function confirmDrawSuccess(){
   const btyp=G('dm-btyp-val').value;
 
   if(btyp==='تريما'){
+    if(!IS_ONLINE){ toast('سحب التريما يحتاج اتصال بالإنترنت (ينشئ عدة قناني دفعة وحدة)','error'); return; }
     const wantBlood=G('dm-trima-blood').checked;
     const wantPlt=G('dm-trima-plt').checked;
     if(!wantBlood && !wantPlt){ toast('يرجى تحديد ناتج واحد على الأقل (دم مضغوط أو صفائح)','error'); return; }
@@ -155,6 +156,19 @@ async function confirmDrawSuccess(){
   load(true);
   try{
     const exp=G('dm-exp').value;
+    if(!IS_ONLINE){
+      // Offline: queue the update instead of blocking — this is a single, well-defined write
+      // (draw_date + expiry_date + status) against an already-existing row, so it's safe to
+      // replay later exactly like reception's offline path does.
+      await enqueueOp('draw', {donation_id:id, draw_date:draw, expiry_date:exp});
+      const q = await getPendingQueue();
+      updateOfflineBar('offline', q.length+' عملية معلّقة');
+      toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً عند عودة الإنترنت','warning',5000);
+      G('drawModal').classList.remove('on');
+      await loadDraw();
+      load(false);
+      return;
+    }
     const{error}=await db.from('blood_donations').update({
       draw_date:draw, expiry_date:exp, status:'pending_lab'
     }).eq('id',id);

@@ -992,7 +992,7 @@ tbody tr:hover td{background:#fafafa}
           <div class="fst"><i class="ti ti-user"></i> البيانات الشخصية للمتبرع</div>
           <div class="fgrid">
             <div class="fgrp s2"><label>الاسم الرباعي واللقب *</label><input type="text" id="f-name" placeholder="علي محمد حسن الموسوي"></div>
-            <div class="fgrp"><label>سنة التولد *</label><input type="number" id="f-by" placeholder="1995" min="1920" max="2007" oninput="calcAge()"></div>
+            <div class="fgrp"><label>سنة التولد *</label><input type="text" inputmode="numeric" id="f-by" placeholder="1995" min="1920" max="2007" oninput="this.value=this.value.replace(/[^0-9]/g,'');calcAge()"></div>
             <div class="fgrp"><label>العمر</label><input type="text" id="f-age" class="ro" readonly placeholder="يحسب تلقائياً"></div>
             <div class="fgrp"><label>الجنس *</label><select id="f-gen"><option value="ذكر">ذكر</option><option value="أنثى">أنثى</option></select></div>
             <div class="fgrp"><label>اسم الأم الثلاثي</label><input type="text" id="f-mom" placeholder="فاطمة حسن علي"></div>
@@ -1021,9 +1021,9 @@ tbody tr:hover td{background:#fafafa}
           <div class="fgrid">
             <div class="fgrp"><label>فصيلة الدم</label><select id="f-bt"><option value="">غير محدد</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select></div>
             <div class="fgrp"><label>ضغط الدم (mmHg)</label><input type="text" id="f-bp" placeholder="120/80"></div>
-            <div class="fgrp"><label>الوزن (كغ)</label><input type="number" id="f-wt" placeholder="70" step="0.5"></div>
-            <div class="fgrp"><label>النبض (ن/دقيقة)</label><input type="number" id="f-pulse" placeholder="72"></div>
-            <div class="fgrp"><label>الهيموكلوبين (g/dL)</label><input type="number" id="f-hgb" placeholder="15.3" step="0.1"></div>
+            <div class="fgrp"><label>الوزن (كغ)</label><input type="text" inputmode="numeric" id="f-wt" placeholder="70" step="0.5" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
+            <div class="fgrp"><label>النبض (ن/دقيقة)</label><input type="text" inputmode="numeric" id="f-pulse" placeholder="72" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
+            <div class="fgrp"><label>الهيموكلوبين (g/dL)</label><input type="text" inputmode="numeric" id="f-hgb" placeholder="15.3" step="0.1" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
             <div class="fgrp"><label>نتيجة الفحوصات *</label><select id="f-ser" onchange="toggleSer()"><option value="Negative">Negative — سالب</option><option value="Positive">Positive — موجب</option></select></div>
             <div class="fgrp" id="serTypGrp" style="display:none"><label>نوع الإصابة</label><select id="f-sert"><option value="HIV">HIV</option><option value="HCV">HCV</option><option value="HBsAg">HBsAg</option><option value="سفلس VDRL">سفلس (VDRL)</option></select></div>
           </div>
@@ -1307,7 +1307,7 @@ tbody tr:hover td{background:#fafafa}
           <div class="setc" style="border-color:#FECDD3" onclick="dangerZone()">
             <div class="setc-ico" style="background:#FFF1F2"><i class="ti ti-alert-triangle" style="color:#BE123C"></i></div>
             <div class="setc-t" style="color:#BE123C">منطقة الخطر</div>
-            <div class="setc-d">الحذف الدائم — يتطلب تأكيداً مزدوجاً ومتاح لمدير النظام فقط</div>
+            <div class="setc-d">الحذف الدائم من قاعدة البيانات — غير متاح من داخل التطبيق، يتطلب التواصل مع مسؤول قاعدة البيانات مباشرة</div>
           </div>
         </div>
       </div>
@@ -1456,7 +1456,7 @@ tbody tr:hover td{background:#fafafa}
               </div>
             </div>
 
-            <div class="fgrp"><label>سنة التولد *</label><input type="number" id="rc-by" placeholder="1995" min="1920" max="2007" oninput="calcRcAge()"></div>
+            <div class="fgrp"><label>سنة التولد *</label><input type="text" inputmode="numeric" id="rc-by" placeholder="1995" min="1920" max="2007" oninput="this.value=this.value.replace(/[^0-9]/g,'');calcRcAge()"></div>
             <div class="fgrp"><label>الجنس *</label><select id="rc-gen"><option value="ذكر">ذكر</option><option value="أنثى">أنثى</option></select></div>
             <div class="fgrp"><label>العمر</label><input type="text" id="rc-age" class="ro" readonly placeholder="تلقائي"></div>
 
@@ -1533,7 +1533,7 @@ tbody tr:hover td{background:#fafafa}
           <div style="font-size:15.5px;font-weight:700;color:#374151;margin:14px 0 8px">العلامات الحيوية (اختياري)</div>
           <div class="fgrid">
             <div class="fgrp"><label>ضغط الدم</label><input type="text" id="rc-bp" placeholder="مثال: 120/80"></div>
-            <div class="fgrp"><label>النبض</label><input type="number" id="rc-pulse" placeholder="نبضة/دقيقة"></div>
+            <div class="fgrp"><label>النبض</label><input type="text" inputmode="numeric" id="rc-pulse" placeholder="نبضة/دقيقة" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
             <div class="fgrp"><label>درجة الحرارة</label><input type="number" step="0.1" id="rc-temp" placeholder="°م"></div>
             <div class="fgrp"><label>الوزن</label><input type="number" step="0.1" id="rc-weight" placeholder="كغم"></div>
             <div class="fgrp"><label>الهيموغلوبين</label><input type="number" step="0.1" id="rc-hgb" placeholder="g/dL"></div>
@@ -1633,6 +1633,9 @@ tbody tr:hover td{background:#fafafa}
     <button class="btn" onclick="newDonor()" style="width:100%;justify-content:center;margin-top:10px">
       ➕ متبرع جديد
     </button>
+    <button class="btn" onclick="G('rcPrintModal').classList.remove('on')" style="width:100%;justify-content:center;margin-top:10px">
+      ✕ إلغاء
+    </button>
   </div>
 </div>
 
@@ -1647,7 +1650,7 @@ tbody tr:hover td{background:#fafafa}
           <div class="ac-list" id="ac-rjnm"></div>
         </div>
       </div>
-      <div class="fgrp"><label>العمر</label><input type="number" id="rj-age" placeholder="العمر"></div>
+      <div class="fgrp"><label>العمر</label><input type="text" inputmode="numeric" id="rj-age" placeholder="العمر" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
       <div class="fgrp s2"><label>سبب الرفض *</label><input type="text" id="rj-rsn" placeholder="سبب الرفض التفصيلي"></div>
       <div class="fgrp"><label>تاريخ الرفض</label><input type="date" id="rj-dt"></div>
       <div class="fgrp"><label>ملاحظات</label><input type="text" id="rj-note" placeholder="ملاحظات إضافية"></div>
@@ -2019,7 +2022,7 @@ async function exportDonorFormPDF(){
     .vitals td.lbl{width:20%}
     .vitals td.val{width:20%;text-align:center}
     @media print{@page{margin:10mm} .close-float{display:none}}
-    .close-float{position:fixed;top:14px;left:14px;z-index:999;background:#1E293B;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-family:'Amiri',serif;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+    .close-float{position:sticky;top:0;left:0;right:0;width:100%;z-index:999;background:#BE123C;color:#fff;border:none;padding:16px;font-size:19px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.25);margin-bottom:14px}
   </style></head>
   <body>
     <button class="close-float" onclick="window.close()">✕ إغلاق والرجوع للتطبيق</button>
@@ -2309,23 +2312,17 @@ async function processQueuedOp(op){
     }
   } else if(op.type==='draw'){
     const{error}=await db.from('blood_donations').update({
-      blood_type:d.blood_type,bottle_type:d.bottle_type,
-      bottle_number:d.bottle_number,draw_date:d.draw_date,
-      expiry_date:d.expiry_date,status:'pending_lab'
+      draw_date:d.draw_date, expiry_date:d.expiry_date, status:'pending_lab'
     }).eq('id',d.donation_id);
     if(error) throw error;
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:d.donation_id,new_values:{status:'pending_lab'}});
   } else if(op.type==='lab'){
-    const{error}=await db.from('blood_donations').update({
-      blood_type:d.blood_type,serology_result:d.serology_result,
-      serology_type:d.serology_type,status:d.status
-    }).eq('id',d.donation_id);
-    if(error) throw error;
-    if(d.status==='rejected_positive' && d.donor_name){
-      await db.from('rejected_donors').insert({
-        full_name:d.donor_name,rejection_reason:'إصابة: '+d.serology_type,
-        rejection_date:d.donation_date,rejection_type:'دائم',created_by:d.created_by
-      });
-    }
+    // Reuses the exact same completion logic saveVirology()/saveClassification() call when
+    // online — reading the donation's CURRENT state to decide whether it's now fully complete
+    // (both blood type and serology known) and whether a positive result needs adding to
+    // rejected_donors, rather than a second, separately-maintained copy of that decision.
+    await loadSectionScript('virology'); // pulls in lab-shared.js (defines applyLabUpdate) + virology.js
+    await applyLabUpdate(d.donation_id, d.fieldUpdates); // throws on its own failure — caught by syncQueue's per-op try/catch
   } else if(op.type==='supply'){
     const{error}=await db.from('blood_donations').update({
       status:'dispatched',hospital_name:d.hospital_name,dispatch_date:d.dispatch_date||new Date().toISOString().split('T')[0]
@@ -2664,6 +2661,19 @@ function setupNotifTabVisibility(){
 let _scrollMemory = {};
 
 async function nav(name, el){
+  // Permission gate — defense in depth. Without this, nav() would happily load ANY section's
+  // data and UI for ANY logged-in user who calls it directly (e.g. from the browser console),
+  // even though the tile to reach it is hidden from them — hiding the tile alone was never
+  // actual enforcement, just a convenience.
+  const _ALWAYS_OK = ['dashboard','workhome','account','dthome'];
+  if(name && !_ALWAYS_OK.includes(name)){
+    const _req = SECTION_PERM[name];
+    if(_req && UPROF?.role!=='admin' && !hasPermission(_req)){
+      toast('⛔ ما عندك صلاحية الوصول لهذا القسم','error');
+      return;
+    }
+  }
+
   const outEl = _activeScrollEl();
   const outgoing = document.querySelector('.sc.on');
   if(outEl && outgoing) _scrollMemory[outgoing.id] = outEl.scrollTop;
@@ -3026,8 +3036,9 @@ function printForm(){
 .rare-export-btn{width:100%;padding:12px;background:#1E293B;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px}
 .rare-export-btn:active{background:#0F172A}
 .rare-count-badge{background:#BE123C;color:#fff;border-radius:20px;padding:2px 10px;font-size:14px;font-weight:700;margin-right:auto}
+.close-float{position:sticky;top:0;left:0;right:0;width:100%;z-index:999;background:#BE123C;color:#fff;border:none;padding:16px;font-size:19px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.25);margin-bottom:14px}
 @media print{@page{margin:10mm} .close-float{display:none}}</style></head><body>
-  <button class="close-float" style="position:fixed;top:14px;left:14px;z-index:999;background:#1E293B;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-family:'Segoe UI',Arial,sans-serif;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2)" onclick="window.close()">✕ إغلاق والرجوع للتطبيق</button>
+  <button class="close-float" onclick="window.close()">✕ إغلاق والرجوع للتطبيق</button>
   <div class="hdr">
     <div class="en">Ministry of Health<br>Wasit Health Directorate<br>Technical Affairs Dept.<br><strong>Blood Donor Questionnaire</strong></div>
     <div class="tc"><h2>استمارة تبرع بالدم</h2><p>شعبة مصرف الدم الرئيسي — واسط</p><p>وزارة الصحة / دائرة صحة واسط</p></div>
@@ -3262,8 +3273,9 @@ function printBC(type){
 .rare-export-btn{width:100%;padding:12px;background:#1E293B;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px}
 .rare-export-btn:active{background:#0F172A}
 .rare-count-badge{background:#BE123C;color:#fff;border-radius:20px;padding:2px 10px;font-size:14px;font-weight:700;margin-right:auto}
+.close-float{position:sticky;top:0;left:0;right:0;width:100%;z-index:999;background:#BE123C;color:#fff;border:none;padding:16px;font-size:19px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.25);margin-bottom:14px}
 @media print{@page{margin:6mm} .close-float{display:none}}</style></head><body>
-  <button class="close-float" style="position:fixed;top:14px;left:14px;z-index:999;background:#1E293B;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-family:'Segoe UI',Arial,sans-serif;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2)" onclick="window.close()">✕ إغلاق والرجوع للتطبيق</button>
+  <button class="close-float" onclick="window.close()">✕ إغلاق والرجوع للتطبيق</button>
   <div class="card">
     <div class="hd"><div class="hd-ico">🩸</div>
       <div><div class="hd-t">مصرف الدم الرئيسي — واسط</div><div class="hd-s">وزارة الصحة</div></div>
@@ -3830,6 +3842,12 @@ const ADMIN_ONLY_CARDS = [
   {key:'users',    icon:'👥', name:'إدارة الحسابات', desc:'الموظفون والصلاحيات'},
 ];
 
+// nav(name) target -> the permission key required to reach it. Built from the same cards that
+// already control which tiles show, so the two can never drift apart.
+const SECTION_PERM = {};
+[...WORK_CARDS, ...ADMIN_ONLY_CARDS].forEach(c=>{ SECTION_PERM[c.key]=c.key; });
+SECTION_PERM.add = 'reception'; // the donor-add flow is part of reception
+
 let CURRENT_MAIN_TAB = 'home';
 
 function switchMainTab(tab, el){
@@ -4105,8 +4123,8 @@ function openAdvExport(cfg){
       </div></div>`;
   }
   if(cfg.filters.includes('bottleRange')){
-    html += `<div class="fgrp"><label>تسلسل القنينة من</label><input type="number" id="ae-bnfrom" placeholder="اختياري"></div>
-             <div class="fgrp"><label>إلى</label><input type="number" id="ae-bnto" placeholder="اختياري"></div>`;
+    html += `<div class="fgrp"><label>تسلسل القنينة من</label><input type="text" inputmode="numeric" id="ae-bnfrom" placeholder="اختياري" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
+             <div class="fgrp"><label>إلى</label><input type="text" inputmode="numeric" id="ae-bnto" placeholder="اختياري" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>`;
   }
   if(cfg.filters.includes('specificBottles')){
     html += `<div class="fgrp s2"><label>أرقام قناني معينة (مفصولة بفاصلة — لو معبّى، يتجاوز فلاتر النوع/الفصيلة/التسلسل فوق)</label>
@@ -4202,7 +4220,7 @@ function exportRowsToPDF(title, headers, rows, filename){
       th,td{border:1px solid #ccc;padding:6px 8px;text-align:center}
       th{background:#BE123C;color:#fff}
       @media print{@page{margin:10mm} .close-float{display:none}}
-      .close-float{position:fixed;top:14px;left:14px;z-index:999;background:#1E293B;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-family:Arial,sans-serif;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+      .close-float{position:sticky;top:0;left:0;right:0;width:100%;z-index:999;background:#BE123C;color:#fff;border:none;padding:16px;font-size:19px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.25);margin-bottom:14px}
     </style></head>
     <body>
       <button class="close-float" onclick="window.close()">✕ إغلاق والرجوع للتطبيق</button>
@@ -4320,8 +4338,8 @@ if('serviceWorker' in navigator){
             <option value="أحادي">أحادي</option>
           </select>
         </div>
-        <div class="fgrp"><label>من رقم *</label><input type="number" id="sq-from" placeholder="21928"></div>
-        <div class="fgrp"><label>إلى رقم *</label><input type="number" id="sq-to" placeholder="25000"></div>
+        <div class="fgrp"><label>من رقم *</label><input type="text" inputmode="numeric" id="sq-from" placeholder="21928" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
+        <div class="fgrp"><label>إلى رقم *</label><input type="text" inputmode="numeric" id="sq-to" placeholder="25000" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
         <div class="fgrp s2"><label>ملاحظات</label><input type="text" id="sq-notes" placeholder="اختياري"></div>
       </div>
     </div>
@@ -4343,8 +4361,8 @@ if('serviceWorker' in navigator){
         <div style="color:#94A3B8;font-size:14px;margin-top:3px" id="esq-current-lbl"></div>
       </div>
       <div class="fgrid">
-        <div class="fgrp"><label>الرقم الحالي</label><input type="number" id="esq-current"></div>
-        <div class="fgrp"><label>إلى رقم (النهاية)</label><input type="number" id="esq-to"></div>
+        <div class="fgrp"><label>الرقم الحالي</label><input type="text" inputmode="numeric" id="esq-current" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
+        <div class="fgrp"><label>إلى رقم (النهاية)</label><input type="text" inputmode="numeric" id="esq-to" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
       </div>
     </div>
     <div class="modal-foot">
@@ -4425,7 +4443,7 @@ if('serviceWorker' in navigator){
         <div class="fst"><i class="ti ti-user"></i> البيانات الشخصية</div>
         <div class="fgrid">
           <div class="fgrp s2"><label>الاسم الرباعي واللقب *</label><input type="text" id="ed-name" placeholder="علي محمد حسن الموسوي"></div>
-          <div class="fgrp"><label>سنة التولد *</label><input type="number" id="ed-by" placeholder="1995" min="1920" max="2007"></div>
+          <div class="fgrp"><label>سنة التولد *</label><input type="text" inputmode="numeric" id="ed-by" placeholder="1995" min="1920" max="2007" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
           <div class="fgrp"><label>الجنس *</label><select id="ed-gen"><option value="ذكر">ذكر</option><option value="أنثى">أنثى</option></select></div>
           <div class="fgrp"><label>اسم الأم الثلاثي</label><input type="text" id="ed-mom" placeholder="فاطمة حسن علي"></div>
           <div class="fgrp"><label>رقم البطاقة الوطنية</label><input type="text" id="ed-nid" placeholder="19XXXXXXXXXX"></div>
@@ -4453,9 +4471,9 @@ if('serviceWorker' in navigator){
         <div class="fgrid">
           <div class="fgrp"><label>فصيلة الدم</label><select id="ed-bt"><option value="">غير محدد</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select></div>
           <div class="fgrp"><label>ضغط الدم (mmHg)</label><input type="text" id="ed-bp" placeholder="120/80"></div>
-          <div class="fgrp"><label>الوزن (كغ)</label><input type="number" id="ed-wt" placeholder="70" step="0.5"></div>
-          <div class="fgrp"><label>النبض (ن/دقيقة)</label><input type="number" id="ed-pulse" placeholder="72"></div>
-          <div class="fgrp"><label>الهيموكلوبين (g/dL)</label><input type="number" id="ed-hgb" placeholder="15.3" step="0.1"></div>
+          <div class="fgrp"><label>الوزن (كغ)</label><input type="text" inputmode="numeric" id="ed-wt" placeholder="70" step="0.5" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
+          <div class="fgrp"><label>النبض (ن/دقيقة)</label><input type="text" inputmode="numeric" id="ed-pulse" placeholder="72" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
+          <div class="fgrp"><label>الهيموكلوبين (g/dL)</label><input type="text" inputmode="numeric" id="ed-hgb" placeholder="15.3" step="0.1" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
           <div class="fgrp"><label>نتيجة الفحوصات *</label><select id="ed-ser" onchange="toggleEdSer()"><option value="Negative">Negative — سالب</option><option value="Positive">Positive — موجب</option></select></div>
           <div class="fgrp" id="edSerTypGrp" style="display:none"><label>نوع الإصابة</label><select id="ed-sert"><option value="HIV">HIV</option><option value="HCV">HCV</option><option value="HBsAg">HBsAg</option><option value="سفلس VDRL">سفلس (VDRL)</option></select></div>
         </div>

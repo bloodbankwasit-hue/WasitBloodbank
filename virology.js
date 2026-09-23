@@ -79,6 +79,7 @@ function openBulkVirologyModal(){
 async function confirmBulkVirology(){
   const ids=G('bvm-ids').value.split(',').filter(Boolean);
   if(!G('bvm-allneg').checked){ toast('يرجى تفعيل All-Negative للمتابعة','error'); return; }
+  if(!IS_ONLINE){ toast('الفحص الجماعي يحتاج اتصال بالإنترنت (استخدم الفحص الفردي بدون نت)','error'); return; }
   load(true);
   try{
     for(const id of ids){
@@ -124,11 +125,26 @@ async function saveVirology(){
   const diseases=[...document.querySelectorAll('.vm-dis:checked')].map(c=>c.value);
   const allNeg=G('vm-allneg').checked;
   if(!allNeg && !diseases.length){ toast('يرجى تحديد All-Negative أو نوع الإصابة على الأقل','error'); return; }
-  if(!IS_ONLINE){ toast('هذه الخطوة تحتاج اتصال بالإنترنت','error'); return; }
   load(true);
   try{
     const ser = diseases.length ? 'Positive' : 'Negative';
     const serType = diseases.length ? diseases.join(', ') : null;
+    if(!IS_ONLINE){
+      // Offline: queue just the field update. The "is this donation now fully complete?" and
+      // "does a positive result need adding to rejected_donors?" decisions both depend on
+      // reading the donation's CURRENT state (e.g. has classification already set blood_type?)
+      // — that can only be answered correctly against the real server state, so syncQueue()
+      // replays this through applyLabUpdate() for real once back online, instead of guessing
+      // the outcome here.
+      await enqueueOp('lab', {donation_id:id, fieldUpdates:{serology_result:ser, serology_type:serType}});
+      const q = await getPendingQueue();
+      updateOfflineBar('offline', q.length+' عملية معلّقة');
+      toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً عند عودة الإنترنت (بما فيها إضافة المرفوضين لو موجبة)','warning',6000);
+      G('vmModal').classList.remove('on');
+      await loadVirology();
+      load(false);
+      return;
+    }
     const{complete}=await applyLabUpdate(id, {serology_result:ser, serology_type:serType});
     if(ser==='Positive'){
       toast('⚠️ نتيجة موجبة — تم نقل المتبرع للمرفوضين دائماً','warning',5000);
