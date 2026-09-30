@@ -432,7 +432,7 @@ tbody tr:hover td{background:#fafafa}
 .bb-card{background:#fff;border:1px solid #F1F5F9;border-radius:14px;padding:10px 6px 8px;text-align:center;cursor:pointer;transition:transform .12s,box-shadow .12s;box-shadow:0 1px 6px rgba(0,0,0,.06)}
 .bb-card:active{transform:scale(.96)}
 .bb-card:hover{box-shadow:0 6px 16px rgba(190,18,60,.12);transform:translateY(-2px)}
-.bb-svg{width:56px;height:80px;display:block;margin:0 auto}
+.bb-svg{width:64px;height:86px;display:block;margin:0 auto}
 .bb-num{font-size:19px;font-weight:800;color:#1a1a1a;margin-top:4px}
 .bb-bt{font-size:14px;font-weight:700;color:#BE123C;margin-top:1px}
 .bb-dates{display:flex;flex-direction:column;gap:1px;font-size:12px;color:#757575;margin-top:4px}
@@ -646,7 +646,7 @@ tbody tr:hover td{background:#fafafa}
 
   .sec-popup-body .bottle-cards-grid{grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:12px}
   .sec-popup-body .bb-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:16px}
-  .sec-popup-body .bb-svg{width:68px;height:96px}
+  .sec-popup-body .bb-svg{width:76px;height:103px}
   .sec-popup-body .bb-num{font-size:21px}
   .sec-popup-body .bottle-card{padding:14px 8px;border-radius:14px}
   .sec-popup-body .bottle-card-num{font-size:22px}
@@ -1673,6 +1673,8 @@ tbody tr:hover td{background:#fafafa}
   </div>
 </div>
 
+<!-- blood-bag art (shared by the dispatch cards via <use>) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><linearGradient id="bb-shell-g" x2="1" y2=".15"><stop stop-color="#e8f8fc" stop-opacity=".76"/><stop offset=".27" stop-color="#fff" stop-opacity=".97"/><stop offset=".72" stop-color="#effbff" stop-opacity=".83"/><stop offset="1" stop-color="#9cc4d3" stop-opacity=".67"/></linearGradient><linearGradient id="bb-shine-g" x1="0" x2="1"><stop stop-color="#fff" stop-opacity=".45"/><stop offset=".5" stop-color="#fff" stop-opacity=".13"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient><linearGradient id="bb-shade-g" x1="0" x2="1" y2=".18"><stop stop-color="#fff" stop-opacity=".10"/><stop offset=".5" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".32"/></linearGradient><linearGradient id="bb-band-g" x2="0" y2="1"><stop stop-color="#e18880"/><stop offset="1" stop-color="#d36a67"/></linearGradient><clipPath id="bb-liq-clip"><path d="M114 76Q108 78 110 93L112 172Q112 210 107 248Q104 268 121 278Q137 287 176 287Q221 289 244 277Q259 269 255 245Q248 202 250 154L255 92Q256 78 245 75Z"/></clipPath><clipPath id="bb-lab-clip"><path d="M138 130Q179 118 222 130V224Q181 235 138 224Z"/></clipPath><g id="bb-shell"><path d="M113 58H246Q268 58 271 81Q269 132 270 167L273 271Q275 292 253 298Q225 309 181 309Q122 309 102 295Q90 290 91 272L94 104Q93 83 101 68Q105 61 113 58Z" fill="#7199a6" opacity=".23" transform="translate(4 3)"/><path d="M113 58H246Q264 58 270 78Q272 86 270 105L271 271Q272 290 254 297Q228 307 181 307Q128 307 104 296Q91 290 91 273L94 106Q94 76 103 65Q107 59 113 58Z" fill="url(#bb-shell-g)" stroke="#f9ffff" stroke-width="4"/><path d="M116 70Q107 70 105 85L106 105L107 241Q102 267 114 278Q130 292 179 295Q230 295 251 281Q264 272 259 244Q256 204 258 153L261 98Q262 79 249 72Q243 69 233 69H114Z" fill="#afd9e5" opacity=".43" stroke="#f6fdff" stroke-width="2"/></g><g id="bb-liquid"><g><path d="M114 76Q108 78 110 93L112 172Q112 210 107 248Q104 268 121 278Q137 287 176 287Q221 289 244 277Q259 269 255 245Q248 202 250 154L255 92Q256 78 245 75Z"/><g clip-path="url(#bb-liq-clip)"><rect x="100" y="70" width="170" height="225" fill="url(#bb-shade-g)"/><path d="M106 81Q130 68 161 75Q186 78 214 76Q238 75 258 80V96Q227 93 205 92Q155 91 129 101L106 106Z" fill="#fff" opacity=".22"/><path d="M112 75L149 75Q143 120 143 179Q143 238 159 264Q168 276 179 287L113 285Q94 255 111 214Q116 134 112 75Z" fill="url(#bb-shine-g)"/><path d="M115 96Q133 110 135 132L133 252Q132 269 146 282Q117 279 112 264Q120 238 120 182Q124 110 115 96Z" fill="#fff" opacity=".11"/><path d="M151 74Q147 130 148 204Q147 266 173 283Q139 281 134 247Q145 177 138 105Z" fill="#fff" opacity=".12"/><path d="M247 88Q254 165 247 236Q244 263 223 276Q250 268 255 249Q249 179 255 102Z" fill="#fff" opacity=".18"/><path d="M108 250Q109 280 148 285Q178 290 213 285Q240 283 254 264" fill="none" stroke="#550b12" stroke-width="3" opacity=".5"/></g><path d="M127 76Q132 111 131 152Q130 231 120 251Q118 265 132 273Q142 279 162 281Q147 265 148 243Q139 202 143 152L145 76Z" fill="#fff" opacity=".19" pointer-events="none"/></g><path d="M109 82Q113 75 122 75M258 97Q262 116 260 147M103 164L101 251Q100 279 117 287Q136 300 180 301Q228 302 253 288" fill="none" stroke="#fff" stroke-width="3" opacity=".66"/></g><g id="bb-label"><g><path d="M136 130Q178 119 224 130V224Q181 237 136 225Z" fill="#fff" stroke="#a25c58" stroke-width="1.6"/><path d="M138 132Q181 123 222 132V148H138Z" fill="url(#bb-band-g)" clip-path="url(#bb-lab-clip)"/><path d="M138 149Q181 143 222 149" fill="none" stroke="#e8c8c7" stroke-width="1"/><path d="M180 128V229" stroke="#a09594" stroke-width="1.2"/><path d="M140 133Q180 125 220 133V221Q180 232 140 222Z" fill="none" stroke="#ded9d8" stroke-width=".7"/><circle cx="160" cy="165" r="10.4" fill="#b81c27" stroke="#fff" stroke-width="1"/><path d="M157.9 158H162.1V162.9H167V167.1H162.1V172H157.9V167.1H153V162.9H157.9Z" fill="#fff"/><g fill="#abb0b0" opacity=".75"><rect x="186" y="154" width="25" height="1.1"/><rect x="186" y="158" width="29" height=".9"/><rect x="186" y="164" width="24" height=".8"/><rect x="186" y="169" width="31" height=".8"/><rect x="186" y="174" width="27" height=".7"/><rect x="186" y="179" width="30" height=".8"/><rect x="186" y="184" width="22" height=".7"/><rect x="186" y="189" width="29" height=".7"/><rect x="186" y="194" width="21" height=".7"/><rect x="186" y="199" width="15" height=".7"/><rect x="203" y="203" width="12" height=".7"/><rect x="208" y="207" width="8" height=".7"/></g><g fill="#262627"><path d="M186 212h1v11h-1zm2 0h.55v11H188zm2 0h1.35v11H190zm3 0h.5v11H193zm2 0h1v11h-1zm2 0h.6v11H197zm2 0h1.5v11H199zm3 0h.6v11H202zm2 0h1.4v11H204zm3 0h.6v11H207zm2 0h1v11h-1zm2 0h.55v11H211zm2 0h1.4v11H213zm3 0h.7v11H216z"/></g></g></g></defs></svg>
 <script>
 // ================================================================
 // ⚠ CONFIG — غيّر هاتين القيمتين بعد إنشاء مشروعك في Supabase
@@ -3628,12 +3630,7 @@ function bloodBagCard(r, onclickJs){
   return `<div class="bb-card-wrap">
     <input type="checkbox" class="sup-chk" value="${r.id}" data-bt="${r.bottle_type}" onclick="event.stopPropagation();updateSupplyBulkBar()">
     <div class="bb-card" onclick="${onclickJs}">
-      <svg viewBox="0 0 90 128" class="bb-svg">
-        <rect x="36" y="0" width="18" height="13" rx="3" fill="#94A3B8"/>
-        <path d="M14 22 Q14 12 24 12 L66 12 Q76 12 76 22 L76 96 Q76 122 45 126 Q14 122 14 96 Z"
-          fill="${color}" stroke="rgba(0,0,0,.15)" stroke-width="1.5"/>
-        <ellipse cx="45" cy="22" rx="31" ry="7" fill="#fff" opacity=".18"/>
-      </svg>
+      <svg viewBox="86 52 194 262" class="bb-svg"><use href="#bb-shell"/><use href="#bb-liquid" fill="${color}"/><use href="#bb-label"/></svg>
       <div class="bb-num">${r.bottle_number||'—'}</div>
       <div class="bb-bt">${r.blood_type||'—'} ${r.component_type&&r.component_type!=='دم كامل'?'· '+r.component_type:''}</div>
       <div class="bb-dates">
