@@ -1,5 +1,5 @@
-// مصرف الدم الرئيسي — واسط | Service Worker v3
-const CACHE = 'bloodbank-wasit-v6';
+// مصرف الدم الرئيسي — واسط | Service Worker v4
+const CACHE = 'bloodbank-wasit-v7';
 
 const CRITICAL = [
   './',
@@ -8,7 +8,27 @@ const CRITICAL = [
 
 const OPTIONAL = [
   './icon.png',
-  './manifest.json'
+  './manifest.json',
+  // Lazy-loaded section scripts - pre-cached so every section works offline even if it
+  // was never opened while online. A failed file is skipped without breaking install.
+  './audit.js',
+  './backup.js',
+  './barcode.js',
+  './campaigns.js',
+  './classification.js',
+  './dashboard.js',
+  './donors.js',
+  './draw.js',
+  './infected-rejected.js',
+  './lab-shared.js',
+  './rare.js',
+  './reception.js',
+  './search.js',
+  './sequences.js',
+  './settings.js',
+  './stats.js',
+  './users.js',
+  './virology.js'
 ];
 
 self.addEventListener('install', e=>{

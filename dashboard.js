@@ -26,17 +26,20 @@ async function loadDash(){
       const el=G(id); if(el) el.textContent=fnum(vals[i]||0);
     });
 
-    // Blood type counts — computed entirely inside the database (blood_type_distribution()),
-    // never pulls the donations table's rows to the device just to count them client-side.
-    const {data:btd}=await db.rpc('blood_type_distribution');
-    const btc={};
-    (btd||[]).forEach(r=>{btc[r.blood_type]=r.cnt;});
-    const bts=['A+','A-','B+','B-','O+','O-','AB+','AB-'];
-    const rare=['O-','AB-','A-','B-'];
-    G('btGrid').innerHTML=bts.map(bt=>`<div class="btc ${rare.includes(bt)?'warn':''}" style="cursor:pointer" onclick="openStockDrill('${bt}')">
-      <div class="btc-t">${bt}</div>
-      <div class="btc-n">${fnum(btc[bt]||0)}${rare.includes(bt)?' ⚠':''}</div>
-    </div>`).join('');
+    // Stock overview — by COMPONENT TYPE first (not just blood type): دم كامل، دم مضغوط،
+    // بلازما، صفائح دموية، بروتين بارد — each a tile showing its total in_stock count. This is
+    // level 1 of a 3-level drill-down (component type → blood type → the actual bottles),
+    // matching the same pattern already used in التجهيز.
+    const{data:stockRows}=await db.from('blood_donations').select('component_type').eq('status','in_stock').eq('is_deleted',false);
+    const compCnt={'دم كامل':0,'دم مضغوط':0,'بلازما':0,'صفائح دموية':0,'بروتين بارد':0};
+    (stockRows||[]).forEach(r=>{ const ct=r.component_type||'دم كامل'; compCnt[ct]=(compCnt[ct]||0)+1; });
+    const compIcons={'دم كامل':BAG,'دم مضغوط':BAG,'بلازما':'💛','صفائح دموية':'🟡','بروتين بارد':'🧊'};
+    G('btGrid').innerHTML=Object.entries(compCnt).map(([name,n])=>`
+      <div class="comp-stock-card ${n===0?'empty-bt':''}" style="cursor:pointer" onclick="openStockByComponent('${name}')">
+        <div class="comp-stock-icon">${compIcons[name]}</div>
+        <div class="comp-stock-name">${name}</div>
+        <div class="comp-stock-count">${fnum(n)}</div>
+      </div>`).join('');
 
     // Infected badge
     const {count:ic}=await db.from('blood_donations').select('*',{count:'exact',head:true}).eq('serology_result','Positive').eq('is_deleted',false);
@@ -118,35 +121,50 @@ function openDashAllTimeChoice(){
   G('dashDrillModal').classList.add('on');
 }
 
-// ── Stock grid drill-down — one blood type's actual in_stock bottles ──
-async function openStockDrill(bt){
-  G('ddTitle').textContent='مخزون فصيلة '+bt;
+// ── Stock drill-down, level 2 — blood types WITHIN one component type ──
+async function openStockByComponent(componentType){
+  G('ddTitle').textContent=componentType+' — اختر الفصيلة';
+  G('ddStats').innerHTML='';
+  G('ddList').innerHTML='<div class="empty"><i class="ti ti-loader"></i><p>جاري التحميل...</p></div>';
+  G('dashDrillModal').classList.add('on');
+
+  const{data}=await db.from('blood_donations').select('blood_type')
+    .eq('component_type',componentType).eq('status','in_stock').eq('is_deleted',false);
+  const cnt={};
+  (data||[]).forEach(r=>{ if(r.blood_type) cnt[r.blood_type]=(cnt[r.blood_type]||0)+1; });
+  const bts=['A+','A-','B+','B-','O+','O-','AB+','AB-'];
+  const rare=['O-','AB-','A-','B-'];
+  G('ddList').innerHTML=`<div class="btg">${bts.map(bt=>`<div class="btc ${rare.includes(bt)?'warn':''} ${!cnt[bt]?'empty-bt':''}" style="cursor:pointer" onclick="openStockDrill('${componentType}','${bt}')">
+    <div class="btc-t">${bt}</div>
+    <div class="btc-n">${fnum(cnt[bt]||0)}${rare.includes(bt)&&cnt[bt]?' ⚠':''}</div>
+  </div>`).join('')}</div>`;
+}
+
+// ── Stock drill-down, level 3 — one component+blood-type combo's actual in_stock bottles ──
+async function openStockDrill(componentType, bt){
+  G('ddTitle').textContent=componentType+' — فصيلة '+bt;
   G('ddStats').innerHTML='<div class="empty"><i class="ti ti-loader"></i><p>جاري التحميل...</p></div>';
   G('ddList').innerHTML='';
   G('dashDrillModal').classList.add('on');
 
   const{data}=await db.from('blood_donations')
-    .select('bottle_number,bottle_type,component_type,expiry_date,donors(full_name)')
-    .eq('blood_type',bt).eq('status','in_stock').eq('is_deleted',false)
+    .select('bottle_number,bottle_type,expiry_date,donors(full_name)')
+    .eq('blood_type',bt).eq('component_type',componentType).eq('status','in_stock').eq('is_deleted',false)
     .order('expiry_date',{ascending:true}).limit(300);
   const list=data||[];
 
   if(!list.length){
     G('ddStats').innerHTML='';
-    G('ddList').innerHTML='<div class="empty"><i class="ti ti-package-off"></i><p>لا يوجد مخزون حالياً لفصيلة '+bt+'</p></div>';
+    G('ddList').innerHTML='<div class="empty"><i class="ti ti-package-off"></i><p>لا يوجد مخزون حالياً بهذا النوع والفصيلة</p></div>';
     return;
   }
 
-  const byComp={};
-  list.forEach(r=>{ const c=r.component_type||'دم كامل'; byComp[c]=(byComp[c]||0)+1; });
-  G('ddStats').innerHTML=`<div style="font-weight:700;color:#BE123C;margin-bottom:6px">الإجمالي: ${fnum(list.length)} قنينة</div>
-    <div>${Object.entries(byComp).map(([k,v])=>`<span class="pill py" style="margin:2px">${k}: ${fnum(v)}</span>`).join('')}</div>`;
+  G('ddStats').innerHTML=`<div style="font-weight:700;color:#BE123C;margin-bottom:6px">الإجمالي: ${fnum(list.length)} قنينة</div>`;
 
   G('ddList').innerHTML=`<div class="tw"><table><thead><tr>
-      <th>رقم القنينة</th><th>المكوّن</th><th>نوع القنينة</th><th>اسم المتبرع</th><th>تاريخ النفاد</th>
+      <th>رقم القنينة</th><th>نوع القنينة</th><th>اسم المتبرع</th><th>تاريخ النفاد</th>
     </tr></thead><tbody>${list.map(r=>`<tr>
       <td style="font-weight:700;color:#BE123C">${r.bottle_number}</td>
-      <td>${r.component_type||'دم كامل'}</td>
       <td>${r.bottle_type}</td>
       <td>${esc(N(r.donors?.full_name))}</td>
       <td>${fd(r.expiry_date)}</td>

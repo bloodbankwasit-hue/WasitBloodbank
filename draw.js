@@ -20,7 +20,7 @@ async function loadDraw(){
       const isTrima=r.bottle_type==='تريما';
       return `<div class="flow-card">
       ${isTrima?'<span style="width:18px"></span>':`<input type="checkbox" class="dr-chk" value="${r.id}" onclick="updateDrawBulkBar()" style="width:18px;height:18px;flex-shrink:0">`}
-      <div class="fc-av">🩸</div>
+      <div class="fc-av">${BAG}</div>
       <div style="flex:1">
         <div class="fc-name">${esc(r.donors?.full_name||'—')}</div>
         <div class="fc-sub">قنينة: ${r.bottle_number||'—'} (${r.bottle_type||'—'}) | ${r.donation_type}</div>

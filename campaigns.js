@@ -28,10 +28,10 @@ async function loadSeparationBoard(){
   load(false);
   const cnt={};
   (data||[]).forEach(r=>{ cnt[r.bottle_type]=(cnt[r.bottle_type]||0)+1; });
-  const typeIcons={'مفلتر':'🩸','ريفيوس':'🩸','رباعي':'🩸','رباعي SAG':'🩸','ثنائي':'🩸'};
+  const typeIcons={'مفلتر':BAG,'ريفيوس':BAG,'رباعي':BAG,'رباعي SAG':BAG,'ثنائي':BAG};
   G('sepTypeGrid').innerHTML=separableTypes.map(t=>`
     <div class="comp-stock-card ${(cnt[t]||0)===0?'empty-bt':''}" onclick="loadSeparationList('${t}')" style="cursor:pointer">
-      <div class="comp-stock-icon">${typeIcons[t]||'🩸'}</div>
+      <div class="comp-stock-icon">${typeIcons[t]||BAG}</div>
       <div class="comp-stock-name">${t}</div>
       <div class="comp-stock-count">${cnt[t]||0}</div>
     </div>`).join('');
@@ -151,7 +151,7 @@ async function loadPendingRelease(){
     const ct=r.component_type||'دم كامل';
     counts[ct]=(counts[ct]||0)+1;
   });
-  const catIcons={'دم كامل':'🩸','دم مضغوط':'🧪','بلازما':'💛','صفائح دموية':'🟡','بروتين بارد':'🧊'};
+  const catIcons={'دم كامل':BAG,'دم مضغوط':BAG,'بلازما':'💛','صفائح دموية':'🟡','بروتين بارد':'🧊'};
   const tiles = PR_CATEGORIES.map(c=>`
     <div class="comp-stock-card ${counts[c]===0?'empty-bt':''}" onclick="loadPendingReleaseList('${c}')" style="cursor:pointer">
       <div class="comp-stock-icon">${catIcons[c]}</div>
@@ -403,7 +403,7 @@ async function refreshCampaignSlots(){
   G('campSlotsList').innerHTML=pending.map(s=>`
     <div class="flow-card">
       <input type="checkbox" class="camp-chk" value="${s.id}" onclick="updateCampBulkBar()" style="width:18px;height:18px;flex-shrink:0">
-      <div class="fc-av">🩸</div>
+      <div class="fc-av">${BAG}</div>
       <div style="flex:1">
         <div class="fc-name">قنينة رقم ${s.bottle_number}</div>
         <div class="fc-sub">${s.bottle_type}</div>

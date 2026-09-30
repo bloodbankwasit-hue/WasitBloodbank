@@ -85,7 +85,7 @@ async function runGlobalSearch(){
     if(donationRows.length){
       sections.push(`<div class="sh-t" style="font-size:17px;margin:14px 0 8px"><i class="ti ti-droplet"></i> تبرعات (${donationRows.length})</div>` +
         donationRows.map(r=>`<div class="flow-card">
-          <div class="fc-av">🩸</div>
+          <div class="fc-av">${BAG}</div>
           <div style="flex:1">
             <div class="fc-name">${r.donors?.full_name?esc(r.donors.full_name):(r.campaign_name?'متبرع حملة — '+esc(r.campaign_name):'—')} — قنينة ${r.bottle_number||'—'}</div>
             <div class="fc-sub">${r.blood_type||'—'} | ${r.component_type||'دم كامل'} | ${AUDIT_STATUS_LABELS[r.status]||r.status} | ${fd(r.donation_date)}</div>

@@ -44,7 +44,7 @@ async function loadVirology(){
   </div>`;
   G('virologyList').innerHTML=bar+dedup.map(r=>`<div class="flow-card">
     <input type="checkbox" class="vm-chk" value="${r.id}" onclick="updateVmBulkBar()" style="width:18px;height:18px;flex-shrink:0">
-    <div class="fc-av">🧪</div>
+    <div class="fc-av">${BAG}</div>
     <div style="flex:1">
       <div class="fc-name">${esc(r.donors?.full_name||'—')}</div>
       <div class="fc-sub">قنينة: ${r.bottle_number||'—'} | ${r.bottle_type}</div>
