@@ -59,7 +59,7 @@ async function loadSeparationList(bottleType){
     _sepShowLevel(2);
     return;
   }
-  G('sepBoardList').innerHTML=titleBar+list.map(r=>{
+  G('sepBoardList').innerHTML=titleBar+selAllRow('sep-chk','updateSepBulkBar')+list.map(r=>{
     const name=r.donors?.full_name?esc(r.donors.full_name):(r.campaign_name?'🚐 '+esc(r.campaign_name):'—');
     const tested=r.status==='in_stock'||r.status==='pending_release';
     return `<div class="flow-card">
@@ -91,6 +91,7 @@ function sepBulkDamage(){
 }
 
 function updateSepBulkBar(){
+  syncSelAll('sep-chk');
   const n=document.querySelectorAll('.sep-chk:checked').length;
   const bar=G('sepBulkBar'); if(!bar) return;
   bar.style.display=n?'flex':'none';
@@ -183,7 +184,7 @@ function loadPendingReleaseList(cat){
     return;
   }
 
-  G('prList').innerHTML=titleBar+list.map(r=>{
+  G('prList').innerHTML=titleBar+selAllRow('pr-chk','updatePrBulkBar',list.some(r=>r.status==='pending_release'))+list.map(r=>{
     const name=r.donors?.full_name?esc(r.donors.full_name):'—';
     const infected=r.status==='rejected_positive';
     const complete=r.status==='pending_release'||infected; // both blood type + serology known
@@ -227,6 +228,7 @@ async function _prRefreshCurrentLevel(){
 }
 
 function updatePrBulkBar(){
+  syncSelAll('pr-chk');
   const n=document.querySelectorAll('.pr-chk:checked').length;
   const bar=G('prBulkBar'); if(!bar) return;
   bar.style.display=n?'flex':'none';
@@ -400,7 +402,7 @@ async function refreshCampaignSlots(){
     updateCampBulkBar();
     return;
   }
-  G('campSlotsList').innerHTML=pending.map(s=>`
+  G('campSlotsList').innerHTML=selAllRow('camp-chk','updateCampBulkBar')+pending.map(s=>`
     <div class="flow-card">
       <input type="checkbox" class="camp-chk" value="${s.id}" onclick="updateCampBulkBar()" style="width:18px;height:18px;flex-shrink:0">
       <div class="fc-av">${BAG}</div>
@@ -418,6 +420,7 @@ async function refreshCampaignSlots(){
 }
 
 function updateCampBulkBar(){
+  syncSelAll('camp-chk');
   const n=document.querySelectorAll('.camp-chk:checked').length;
   const bar=G('campBulkBar'); if(!bar) return;
   bar.style.display=n?'flex':'none';

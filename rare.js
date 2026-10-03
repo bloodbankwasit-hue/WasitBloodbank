@@ -134,10 +134,7 @@ async function filterRare(){
       <button class="btn" style="background:#374151;color:#fff;border:none;font-size:15px" onclick="document.querySelectorAll('.rare-chk').forEach(c=>c.checked=false);updateRareBulkBar()">إلغاء التحديد</button>
     </div>
   </div>
-  <label style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:15.5px;color:#374151;cursor:pointer">
-    <input type="checkbox" id="rareSelAll" onchange="document.querySelectorAll('.rare-chk').forEach(c=>c.checked=this.checked);updateRareBulkBar()">
-    تحديد كل النتائج المعروضة (${filtered.length})
-  </label>`;
+  ${selAllRow('rare-chk','updateRareBulkBar')}`;
 
   G('rareList').innerHTML = bar + filtered.map(d=>`
     <div class="rare-row">
@@ -163,6 +160,7 @@ async function filterRare(){
 }
 
 function updateRareBulkBar(){
+  syncSelAll('rare-chk');
   const n=document.querySelectorAll('.rare-chk:checked').length;
   const bar=G('rareBulkBar'); if(!bar) return;
   bar.style.display=n?'flex':'none';

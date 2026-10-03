@@ -42,7 +42,7 @@ async function loadVirology(){
       <button class="btn" style="background:#374151;color:#fff;border:none" onclick="document.querySelectorAll('.vm-chk').forEach(c=>c.checked=false);updateVmBulkBar()">إلغاء التحديد</button>
     </div>
   </div>`;
-  G('virologyList').innerHTML=bar+dedup.map(r=>`<div class="flow-card">
+  G('virologyList').innerHTML=bar+selAllRow('vm-chk','updateVmBulkBar')+dedup.map(r=>`<div class="flow-card">
     <input type="checkbox" class="vm-chk" value="${r.id}" onclick="updateVmBulkBar()" style="width:18px;height:18px;flex-shrink:0">
     <div class="fc-av">${BAG}</div>
     <div style="flex:1">
@@ -59,6 +59,7 @@ async function loadVirology(){
 }
 
 function updateVmBulkBar(){
+  syncSelAll('vm-chk');
   const n=document.querySelectorAll('.vm-chk:checked').length;
   const bar=G('vmBulkBar'); if(!bar) return;
   bar.style.display=n?'flex':'none';

@@ -26,17 +26,18 @@ const ALL_PERMS = [
 function renderPermCheckboxes(containerId, selected=[]){
   const box = G(containerId);
   if(!box) return;
-  box.innerHTML = ALL_PERMS.map(p=>`
+  box.innerHTML = selAllRow('perm-chk','',true,containerId) + ALL_PERMS.map(p=>`
     <label style="display:flex;align-items:center;gap:6px;font-size:15px;cursor:pointer;background:#fafafa;border:1px solid #e0e0e0;border-radius:8px;padding:7px 10px">
-      <input type="checkbox" value="${p.key}" ${selected.includes(p.key)?'checked':''} style="width:16px;height:16px;accent-color:#BE123C">
+      <input type="checkbox" class="perm-chk" value="${p.key}" ${selected.includes(p.key)?'checked':''} style="width:16px;height:16px;accent-color:#BE123C">
       ${p.label}
     </label>`).join('');
+  syncSelAll('perm-chk');
 }
 
 function getCheckedPerms(containerId){
   const box = G(containerId);
   if(!box) return [];
-  return Array.from(box.querySelectorAll('input[type=checkbox]:checked')).map(cb=>cb.value);
+  return Array.from(box.querySelectorAll('input[type=checkbox]:checked:not([data-selall])')).map(cb=>cb.value);
 }
 
 // ================================================================

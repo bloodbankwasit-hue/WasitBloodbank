@@ -39,7 +39,7 @@ async function loadClassification(){
       <button class="btn" style="background:#374151;color:#fff;border:none" onclick="document.querySelectorAll('.cm-chk').forEach(c=>c.checked=false);updateCmBulkBar()">إلغاء التحديد</button>
     </div>
   </div>`;
-  G('classificationList').innerHTML=bar+dedup.map(r=>`<div class="flow-card">
+  G('classificationList').innerHTML=bar+selAllRow('cm-chk','updateCmBulkBar')+dedup.map(r=>`<div class="flow-card">
     <input type="checkbox" class="cm-chk" value="${r.id}" onclick="updateCmBulkBar()" style="width:18px;height:18px;flex-shrink:0">
     <div class="fc-av">${BAG}</div>
     <div style="flex:1">
@@ -56,6 +56,7 @@ async function loadClassification(){
 }
 
 function updateCmBulkBar(){
+  syncSelAll('cm-chk');
   const n=document.querySelectorAll('.cm-chk:checked').length;
   const bar=G('cmBulkBar'); if(!bar) return;
   bar.style.display=n?'flex':'none';

@@ -16,7 +16,7 @@ async function loadDraw(){
         <button class="btn" style="background:#374151;color:#fff;border:none" onclick="document.querySelectorAll('.dr-chk').forEach(c=>c.checked=false);updateDrawBulkBar()">إلغاء التحديد</button>
       </div>
     </div>`;
-    G('drawList').innerHTML=bar+data.map(r=>{
+    G('drawList').innerHTML=bar+selAllRow('dr-chk','updateDrawBulkBar',data.some(r=>r.bottle_type!=='تريما'))+data.map(r=>{
       const isTrima=r.bottle_type==='تريما';
       return `<div class="flow-card">
       ${isTrima?'<span style="width:18px"></span>':`<input type="checkbox" class="dr-chk" value="${r.id}" onclick="updateDrawBulkBar()" style="width:18px;height:18px;flex-shrink:0">`}
@@ -37,6 +37,7 @@ async function loadDraw(){
 }
 
 function updateDrawBulkBar(){
+  syncSelAll('dr-chk');
   const n=document.querySelectorAll('.dr-chk:checked').length;
   const bar=G('drawBulkBar'); if(!bar) return;
   bar.style.display=n?'flex':'none';
