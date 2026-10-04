@@ -89,21 +89,17 @@ async function createUser(){
   if(pw.length<8){toast('كلمة المرور يجب أن تكون 8 أحرف على الأقل','error');return;}
   load(true);
   try{
-    // حفظ جلسة الأدمن قبل إنشاء الحساب الجديد
-    const adminAccess  = SES?.access_token;
-    const adminRefresh = SES?.refresh_token;
-
-    const{data,error}=await db.auth.signUp({email:em,password:pw});
+    // The new auth user is created with a SEPARATE throw-away client (no stored session, no refresh).
+    // The old way called db.auth.signUp() on the main client, which swapped the browser session to the
+    // NEW user for a moment: the app's auth listener then loaded that user's profile and showed
+    // "no permission" messages even though the admin was logged in. Now the admin session is never touched.
+    const tmp=createClient(SURL,SKEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false,storageKey:'bb-signup-tmp'}});
+    const{data,error}=await tmp.auth.signUp({email:em,password:pw});
     if(error) throw error;
     const uid=data.user?.id;
     if(!uid) throw new Error('فشل الإنشاء — تأكد من تعطيل "Confirm email" في إعدادات Supabase');
-
-    // إعادة جلسة الأدمن فوراً
-    if(adminAccess&&adminRefresh){
-      await db.auth.setSession({access_token:adminAccess,refresh_token:adminRefresh});
-      const s=await db.auth.getSession();
-      if(s.data.session) SES=s.data.session;
-    }
+    // Supabase answers "success" with no identities when the e-mail is already registered
+    if(Array.isArray(data.user?.identities) && data.user.identities.length===0) throw new Error('هذا الإيميل مسجّل مسبقاً');
 
     const perms=getCheckedPerms('au-perms');
     const{error:pe}=await db.from('user_profiles').insert({
