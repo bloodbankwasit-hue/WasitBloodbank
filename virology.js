@@ -101,24 +101,32 @@ async function openVirologyModal(id,name,bn,drawDate){
   G('vm-draw-date').textContent=drawDate?fd(drawDate):'—';
   G('vm-allneg').checked=false;
   document.querySelectorAll('.vm-dis').forEach(c=>c.checked=false);
+  G('vm-note').value=''; vmNoteToggle();
   G('vmModal').classList.add('on');
   // Pre-fill if a previous employee already saved a result for this bottle (should be rare
   // since this unit only lists untested ones, but a sibling could have just been resolved).
   try{
-    const{data}=await db.from('blood_donations').select('serology_result,serology_type').eq('id',id).single();
+    const{data}=await db.from('blood_donations').select('serology_result,serology_type,bottle_note').eq('id',id).single();
     if(data?.serology_result==='Negative') G('vm-allneg').checked=true;
     else if(data?.serology_result==='Positive' && data.serology_type){
       const parts=data.serology_type.split(',').map(s=>s.trim());
       document.querySelectorAll('.vm-dis').forEach(c=>{ if(parts.includes(c.value)) c.checked=true; });
+      G('vm-note').value=data.bottle_note||''; vmNoteToggle();
     }
   }catch(e){ /* pre-fill is a convenience only */ }
 }
 
+// The note box exists only for a POSITIVE result (some disease ticked).
+function vmNoteToggle(){
+  G('vm-note-grp').style.display = [...document.querySelectorAll('.vm-dis')].some(c=>c.checked) ? 'block' : 'none';
+}
 function vmAllNegChange(){
   if(G('vm-allneg').checked) document.querySelectorAll('.vm-dis').forEach(c=>c.checked=false);
+  vmNoteToggle();
 }
 function vmDiseaseChange(){
   if([...document.querySelectorAll('.vm-dis')].some(c=>c.checked)) G('vm-allneg').checked=false;
+  vmNoteToggle();
 }
 
 async function saveVirology(){
@@ -130,6 +138,9 @@ async function saveVirology(){
   try{
     const ser = diseases.length ? 'Positive' : 'Negative';
     const serType = diseases.length ? diseases.join(', ') : null;
+    const fieldUpdates = {serology_result:ser, serology_type:serType};
+    const note = G('vm-note').value.trim();
+    if(ser==='Positive' && note) fieldUpdates.bottle_note = note;   // only sent when written
     if(!IS_ONLINE){
       // Offline: queue just the field update. The "is this donation now fully complete?" and
       // "does a positive result need adding to rejected_donors?" decisions both depend on
@@ -137,7 +148,7 @@ async function saveVirology(){
       // — that can only be answered correctly against the real server state, so syncQueue()
       // replays this through applyLabUpdate() for real once back online, instead of guessing
       // the outcome here.
-      await enqueueOp('lab', {donation_id:id, fieldUpdates:{serology_result:ser, serology_type:serType}});
+      await enqueueOp('lab', {donation_id:id, fieldUpdates});
       const q = await getPendingQueue();
       updateOfflineBar('offline', q.length+' عملية معلّقة');
       toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً عند عودة الإنترنت (بما فيها إضافة المرفوضين لو موجبة)','warning',6000);
@@ -146,7 +157,7 @@ async function saveVirology(){
       load(false);
       return;
     }
-    const{complete}=await applyLabUpdate(id, {serology_result:ser, serology_type:serType});
+    const{complete}=await applyLabUpdate(id, fieldUpdates);
     if(ser==='Positive'){
       toast('⚠️ نتيجة موجبة — تم نقل المتبرع للمرفوضين دائماً','warning',5000);
     } else if(complete){
@@ -154,7 +165,7 @@ async function saveVirology(){
     } else {
       toast('✅ تم حفظ نتيجة الفحوصات — بانتظار وحدة التصنيف','success',4000);
     }
-    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{serology_result:ser,serology_type:serType}});
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:fieldUpdates});
     G('vmModal').classList.remove('on');
     await loadVirology();
   }catch(e){ toast('خطأ: '+e.message,'error'); }

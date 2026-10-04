@@ -41,7 +41,7 @@ async function loadInfected(type, tabEl, page=1){
   _infPage=page;
   load(true);
   let q=db.from('blood_donations')
-    .select('bottle_number,serology_result,serology_type,donation_date,id,donors(donor_number,full_name,mobile)',{count:'exact'})
+    .select('bottle_number,serology_result,serology_type,donation_date,bottle_note,id,donors(donor_number,full_name,mobile)',{count:'exact'})
     .eq('serology_result','Positive').eq('is_deleted',false).order('created_at',{ascending:false});
   if(_infType) q=q.eq('serology_type',_infType);
   q=q.range((page-1)*PS, page*PS-1);
@@ -49,7 +49,7 @@ async function loadInfected(type, tabEl, page=1){
   if(data&&data.length){
     G('infTbl').innerHTML=`<div class="tw"><table><thead><tr>
       <th>رقم المتبرع</th><th>اسم المتبرع</th><th>رقم القنينة</th>
-      <th>نوع الإصابة</th><th>تاريخ الاكتشاف</th><th>رقم الموبايل</th>
+      <th>نوع الإصابة</th><th>تاريخ الاكتشاف</th><th>رقم الموبايل</th><th>ملاحظة</th>
     </tr></thead><tbody>${data.map(r=>`<tr>
       <td>${N(r.donors?.donor_number)}</td>
       <td>${esc(N(r.donors?.full_name))}</td>
@@ -57,6 +57,7 @@ async function loadInfected(type, tabEl, page=1){
       <td><span class="pill pr">${r.serology_type||'موجب'}</span></td>
       <td>${fd(r.donation_date)}</td>
       <td dir="ltr">${esc(N(r.donors?.mobile))}</td>
+      <td style="min-width:140px">${r.bottle_note?esc(r.bottle_note):'—'}</td>
     </tr>`).join('')}</tbody></table></div>`;
     G('infPag').innerHTML=_pagHtml(count,page,'goInfPage');
   } else {

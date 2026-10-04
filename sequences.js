@@ -9,7 +9,7 @@ async function loadSeqGrid(){
   if(!data.length){ grid.innerHTML='<div class="empty"><p>لا توجد تسلسلات</p></div>'; return; }
 
   grid.innerHTML = data.map(s=>{
-    const remain = s.end_number - s.current_number;
+    const remain = Math.max(0, s.end_number - s.current_number + 1);   // current_number is the NEXT unused number
     const pct = ((s.current_number - s.start_number)/(s.end_number - s.start_number)*100).toFixed(0);
     const cls = remain > 500 ? 'ok' : remain > 100 ? 'warn' : 'danger';
     return `<div class="seq-card ${s.is_active?'active':''}">
@@ -44,6 +44,7 @@ async function saveNewSeq(){
   toast('✅ تم إضافة تسلسل '+type,'success');
   G('addSeqModal').classList.remove('on');
   await loadSeqGrid();
+  refreshExpiryNotifications();
 }
 
 function openEditSeq(id,type,current,end){
@@ -67,4 +68,5 @@ async function saveEditSeq(){
   toast('✅ تم تحديث التسلسل','success');
   G('editSeqModal').classList.remove('on');
   await loadSeqGrid();
+  refreshExpiryNotifications();
 }

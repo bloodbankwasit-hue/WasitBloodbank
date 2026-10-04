@@ -1402,13 +1402,14 @@ tbody tr:hover td{background:#fafafa}
               <div class="fgrp"><label>تاريخ الحملة *</label><input type="date" id="camp-date"></div>
               <div class="fgrp"><label>المكان / الدائرة</label><input type="text" id="camp-location" placeholder="مثال: كلية الهندسة"></div>
             </div>
-            <div style="font-size:15.5px;font-weight:700;color:#374151;margin:14px 0 8px">حجز تسلسلات القناني</div>
+            <div style="font-size:15.5px;font-weight:700;color:#374151;margin:14px 0 4px">تسلسلات القناني</div>
+            <div style="font-size:13.5px;color:#6B7280;margin-bottom:8px">اكتب أول رقم وآخر رقم من التسلسل المطبوع لكل نوع قنينة</div>
             <div id="campReserveRows"></div>
             <button class="btn" style="font-size:15px;padding:7px 12px;margin-top:6px" onclick="addCampReserveRow()"><i class="ti ti-plus"></i> إضافة نوع قنينة</button>
           </div>
           <div style="display:flex;gap:8px;margin-top:14px">
             <button class="btn" style="flex:1;justify-content:center" onclick="G('camp-add-view').style.display='none';G('camp-archive-view').style.display='block'"><i class="ti ti-x"></i> إلغاء</button>
-            <button class="btn btn-p" style="flex:1;justify-content:center" onclick="saveCampaign()"><i class="ti ti-check"></i> حفظ وحجز التسلسلات</button>
+            <button class="btn btn-p" style="flex:1;justify-content:center" onclick="saveCampaign()"><i class="ti ti-check"></i> حفظ الحملة</button>
           </div>
         </div>
 
@@ -1423,7 +1424,6 @@ tbody tr:hover td{background:#fafafa}
             <div style="display:flex;gap:6px;flex-wrap:wrap">
               <button class="btn" style="background:#166534;color:#fff;border:none" onclick="bulkCampAction('drawn')"><i class="ti ti-check"></i> نجح السحب</button>
               <button class="btn" style="background:#7F1D1D;color:#fff;border:none" onclick="bulkCampAction('damaged')"><i class="ti ti-trash"></i> تلفت</button>
-              <button class="btn" style="background:#0369A1;color:#fff;border:none" onclick="bulkCampAction('returned')"><i class="ti ti-corner-up-left"></i> إرجاع للمخزون</button>
             </div>
           </div>
           <div id="campSlotsList"></div>
@@ -3462,10 +3462,36 @@ function humanizeAuditValues(v){
 // one row PER bottle (not grouped). An account with both 'separation' and 'supply' sees both
 // sets merged in one feed. Admin always sees everything.
 // ================================================================
+
+// ── Low-sequence alerts (for whoever adds sequences: admin or 'settings' permission) ──────────
+// Remaining = numbers left in the sequence reception is using NOW (current_number is the NEXT
+// number to be issued, so end-current+1) + numbers waiting in the reuse pool for that type.
+// An alert exists while remaining <= 50. It moves down one "rung" every 10 bottles
+// (50,40,30,20,10,0); the bell badge lights up again only when the rung changes.
+function seqRung(rem){ return rem<=0 ? 0 : Math.ceil(rem/10)*10; }
+function _seqSeenGet(){ try{ return JSON.parse(localStorage.getItem('bb_seq_seen')||'{}'); }catch(e){ return {}; } }
+function _seqSeenSet(o){ try{ localStorage.setItem('bb_seq_seen', JSON.stringify(o)); }catch(e){} }
+async function computeSeqAlerts(){
+  const{data:seqs}=await db.from('bottle_sequences').select('bottle_type,current_number,end_number,is_active,created_at');
+  const{data:pool}=await db.from('bottle_number_pool').select('bottle_type');
+  const poolCnt={}; (pool||[]).forEach(p=>{ poolCnt[p.bottle_type]=(poolCnt[p.bottle_type]||0)+1; });
+  const byType={};
+  (seqs||[]).forEach(s=>{ (byType[s.bottle_type]=byType[s.bottle_type]||[]).push(s); });
+  const out=[];
+  Object.entries(byType).forEach(([type,list])=>{
+    // same pick as reception: the newest ACTIVE sequence of that type
+    const cur=list.filter(s=>s.is_active).sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)))[0];
+    const left=cur ? Math.max(0, cur.end_number-cur.current_number+1) : 0;
+    const rem=left+(poolCnt[type]||0);
+    if(rem<=50) out.push({type, remaining:rem, rung:seqRung(rem)});
+  });
+  return out.sort((a,b)=>a.remaining-b.remaining);
+}
 async function refreshExpiryNotifications(){
   const badge=G('notifBadge');
   if(!badge) return;
   const isAdmin = UPROF?.role==='admin';
+  const wantSeq = isAdmin || hasPermission('settings');
   const wantExpiry   = isAdmin || hasPermission('supply');
   const wantInfected = isAdmin || hasPermission('separation') || hasPermission('classification');
 
@@ -3481,17 +3507,29 @@ async function refreshExpiryNotifications(){
   }
   if(wantInfected){
     const{data}=await db.from('blood_donations')
-      .select('id,bottle_number,blood_type,serology_type')
+      .select('id,bottle_number,blood_type,serology_type,bottle_note')
       .eq('status','rejected_positive').eq('is_deleted',false);
     infectedList=data||[];
   }
+  let seqList=[], seqNew=0;
+  if(wantSeq){
+    try{
+      seqList=await computeSeqAlerts();
+      const seen=_seqSeenGet(); let changed=false;
+      // a type that is back above 50 (new sequence added) forgets its old rung
+      Object.keys(seen).forEach(t=>{ if(!seqList.some(a=>a.type===t)){ delete seen[t]; changed=true; } });
+      if(changed) _seqSeenSet(seen);
+      seqNew=seqList.filter(a=>seen[a.type]!==a.rung).length;
+    }catch(e){ console.log('seq alerts:', e); }
+  }
   window._EXPIRY_NOTIFS=expiryList;
   window._INFECTED_NOTIFS=infectedList;
+  window._SEQ_NOTIFS=seqList;
 
   // Each distinct (blood type + content type + date) combination is its own expiry alert —
   // e.g. 5 B+ and 6 A+ expiring the same day are two separate alerts, not one merged alert.
   const groupKeys=new Set(expiryList.map(r=>(r.blood_type||'—')+'|'+(r.component_type||'دم كامل')+'|'+r.expiry_date));
-  const total = groupKeys.size + infectedList.length;
+  const total = groupKeys.size + infectedList.length + seqNew;
   if(total){
     badge.textContent=total>99?'99+':total;
     badge.style.display='flex';
@@ -3502,9 +3540,22 @@ async function refreshExpiryNotifications(){
 
 function openNotifPanel(){
   const badge=G('notifBadge'); if(badge) badge.style.display='none'; // seen — dismiss until next refresh
+  const seqList=window._SEQ_NOTIFS||[];
+  if(seqList.length){ const seen=_seqSeenGet(); seqList.forEach(a=>{ seen[a.type]=a.rung; }); _seqSeenSet(seen); }
   const expList=window._EXPIRY_NOTIFS||[];
   const infList=window._INFECTED_NOTIFS||[];
   const today=new Date(); today.setHours(0,0,0,0);
+
+  // Low / finished bottle-number sequences — shown first because only a refill fixes them
+  const seqRows=seqList.map(a=>{
+    const done=a.remaining<=0, red=a.remaining<=20;
+    return `<div onclick="G('notifModal').classList.remove('on');nav('settings',null)" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid ${red?'#FECACA':'#FDE68A'};background:${red?'#FEF2F2':'#FFFBEB'};border-radius:10px;margin-bottom:8px">
+      <div>
+        <div style="font-weight:700;font-size:16.5px;color:${red?'#7F1D1D':'#92400E'}">${done?'⛔ انتهى تسلسل «'+esc(a.type)+'»':'⚠️ تسلسل «'+esc(a.type)+'»: بقي '+a.remaining+' قنينة فقط'}</div>
+        <div style="font-size:14.5px;color:#757575;margin-top:2px">املأ تسلسلاً جديداً من الإعدادات${done?' — الاستقبال متوقف لهذا النوع':''}</div>
+      </div>
+    </div>`;
+  }).join('');
 
   // Infected bottles — one row per bottle, always on top (more urgent than expiry warnings)
   const infRows=infList.map(r=>`
@@ -3512,6 +3563,7 @@ function openNotifPanel(){
       <div>
         <div style="font-weight:700;font-size:16.5px;color:#7F1D1D">⛔ القنينة رقم ${r.bottle_number||'—'} مصابة</div>
         <div style="font-size:14.5px;color:#757575;margin-top:2px">${r.blood_type||'—'}${r.serology_type?' — '+esc(r.serology_type):''} — بانتظار الفرز بالمخزن المؤقت</div>
+        ${r.bottle_note?`<div style="font-size:14px;color:#92400E;background:#FFFBEB;border-radius:8px;padding:6px 8px;margin-top:6px">📝 ${esc(r.bottle_note)}</div>`:''}
       </div>
     </div>`).join('');
 
@@ -3535,7 +3587,7 @@ function openNotifPanel(){
     </div>`;
   }).join('');
 
-  G('notifList').innerHTML = (infRows+expRows) || '<div class="empty"><i class="ti ti-bell-off"></i><p>لا توجد تنبيهات حالياً</p></div>';
+  G('notifList').innerHTML = (seqRows+infRows+expRows) || '<div class="empty"><i class="ti ti-bell-off"></i><p>لا توجد تنبيهات حالياً</p></div>';
   G('notifModal').classList.add('on');
 }
 setInterval(refreshExpiryNotifications, 5*60*1000);
@@ -3840,7 +3892,7 @@ function openDamageModal(ids){
   ids=ids.filter(Boolean);
   if(!ids.length){ toast('يرجى تحديد قنينة واحدة على الأقل','error'); return; }
   G('dmg-ids').value=ids.join(',');
-  G('dmg-reason').value='';
+  G('dmg-reason').value=''; G('dmg-note').value='';
   G('dmg-count-info').textContent = ids.length===1 ? 'قنينة واحدة' : ids.length+' قناني محددة';
   G('bottleDetailModal').classList.remove('on');
   G('damageModal').classList.add('on');
@@ -3848,12 +3900,13 @@ function openDamageModal(ids){
 async function confirmDamage(){
   const ids=G('dmg-ids').value.split(',').filter(Boolean);
   const reason=G('dmg-reason').value.trim();
+  const note=G('dmg-note').value.trim();
   if(!reason){ toast('يرجى إدخال سبب التلف','error'); return; }
   load(true);
   try{
-    const{error}=await db.from('blood_donations').update({
-      status:'damaged', damage_reason:reason, damaged_date:new Date().toISOString().split('T')[0]
-    }).in('id',ids);
+    const upd={status:'damaged', damage_reason:reason, damaged_date:new Date().toISOString().split('T')[0]};
+    if(note) upd.bottle_note=note;     // only sent when written, so saving without a note never depends on the column
+    const{error}=await db.from('blood_donations').update(upd).in('id',ids);
     if(error) throw error;
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:ids[0],new_values:{status:'damaged',reason,count:ids.length}});
     toast('⚠️ تم تسجيل '+ids.length+' قنينة كتالفة','warning',4000);
@@ -3872,7 +3925,7 @@ async function confirmDamage(){
 async function openDamagedList(){
   load(true);
   const{data}=await db.from('blood_donations')
-    .select('id,bottle_number,bottle_type,blood_type,component_type,damage_reason,damaged_date,donors(full_name)')
+    .select('id,bottle_number,bottle_type,blood_type,component_type,damage_reason,damaged_date,bottle_note,donors(full_name)')
     .eq('status','damaged').eq('is_deleted',false)
     .order('damaged_date',{ascending:false});
   load(false);
@@ -3887,10 +3940,32 @@ async function openDamagedList(){
         <div style="flex:1">
           <div style="font-weight:700;font-size:16px">قنينة ${r.bottle_number} — ${r.blood_type||'—'} — ${r.component_type||'دم كامل'}</div>
           <div style="font-size:14px;color:#757575;margin-top:2px">السبب: ${esc(r.damage_reason||'—')} | ${fd(r.damaged_date)} | ${esc(r.donors?.full_name||'—')}</div>
+          ${r.bottle_note?`<div style="font-size:14px;color:#92400E;background:#FFFBEB;border-radius:8px;padding:6px 8px;margin-top:6px">📝 ${esc(r.bottle_note)}</div>`:''}
         </div>
+        <button type="button" class="btn" style="font-size:14px;padding:6px 10px;flex-shrink:0" data-n="${esc(r.bottle_note||'')}" onclick="event.preventDefault();event.stopPropagation();openNoteModal('${r.id}',this.dataset.n,openDamagedList)"><i class="ti ti-notes"></i> ${r.bottle_note?'تعديل':'ملاحظة'}</button>
       </label>`).join('');
   }
   G('damagedListModal').classList.add('on');
+}
+// ── Bottle note editor: used from the damaged list (any bottle, including ones that were
+// moved to damaged automatically on expiry and never got a prompt). Empty text clears the note.
+let _noteAfter=null;
+function openNoteModal(id, current, after){
+  G('nt-id').value=id; G('nt-text').value=current||''; _noteAfter=after||null;
+  G('noteModal').classList.add('on');
+}
+async function saveNote(){
+  const id=G('nt-id').value, note=G('nt-text').value.trim();
+  load(true);
+  try{
+    const{error}=await db.from('blood_donations').update({bottle_note:note||null}).eq('id',id);
+    if(error) throw error;
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{bottle_note:note||null}});
+    G('noteModal').classList.remove('on');
+    toast('✅ تم حفظ الملاحظة','success',2500);
+    if(_noteAfter) await _noteAfter();
+  }catch(e){ toast('خطأ: '+e.message,'error'); }
+  finally{ load(false); }
 }
 async function finalizeDamagedSelected(){
   const ids=[...document.querySelectorAll('.dmg-chk:checked')].map(c=>c.value);
@@ -3944,7 +4019,7 @@ async function saveDispatch(){
 // ================================================================
 const WORK_CARDS = [
   {key:'reception', icon:'➕', name:'إضافة متبرع',  desc:'تسجيل متبرع جديد'},
-  {key:'campaigns', icon:'🚐', name:'حملات التبرع',  desc:'حجز تسلسلات ومتابعة الحملات'},
+  {key:'campaigns', icon:'🚐', name:'حملات التبرع',  desc:'تسلسلات ومتابعة الحملات'},
   {key:'draw',      icon:'💉', name:'السحب',        desc:'وحدة سحب الدم'},
   {key:'virology',      icon:'🧪', name:'وحدة الفيروسات', desc:'فحص العينات'},
   {key:'classification',icon:'🩸', name:'وحدة التصنيف',  desc:'تحديد فصيلة القناني'},
@@ -4191,14 +4266,24 @@ async function fetchNextBN(){
     .order('created_at',{ascending:false})
     .limit(1);
   if(error||!data||!data.length){
-    inp.value=''; toast('لا يوجد تسلسل لهذا النوع — أضفه من الإعدادات','warning'); return;
+    inp.value=''; showSeqEndModal(btype,false); return;
   }
   const seq = data[0];
   if(seq.current_number > seq.end_number){
-    inp.value=''; toast('انتهى تسلسل '+btype+' — أضف تسلسلاً جديداً','error'); return;
+    inp.value=''; showSeqEndModal(btype,true); return;
   }
   inp.value = seq.current_number;
   inp.dataset.seqId = seq.id;
+}
+
+// Stays on screen until the user taps OK (a 4-second toast was too easy to miss at the desk).
+function showSeqEndModal(btype, finished){
+  const isAdmin=UPROF?.role==='admin' || hasPermission('settings');
+  G('seqEndMsg').innerHTML = (finished ? '⛔ انتهى تسلسل «'+esc(btype)+'»' : '⛔ لا يوجد تسلسل لنوع «'+esc(btype)+'»')
+    + '<div style="font-size:15.5px;font-weight:400;color:#6B7280;margin-top:8px">'
+    + (isAdmin ? 'املأ تسلسلاً جديداً من الإعدادات للمتابعة.' : 'أبلغ المسؤول لإضافة تسلسل جديد لهذا النوع.') + '</div>';
+  G('seqEndGo').style.display = isAdmin ? '' : 'none';
+  G('seqEndModal').classList.add('on');
 }
 
 // Update dept badge in header
@@ -4671,6 +4756,7 @@ if('serviceWorker' in navigator){
           <input type="checkbox" id="dm-trima-plt" style="width:17px;height:17px"><span style="font-weight:600">صفائح دموية <span style="color:#757575;font-weight:400">(إكسباير ٥ أيام)</span></span>
         </label>
       </div>
+      <div class="fgrp" id="dm-note-grp" style="margin-top:10px"><label>📝 ملاحظة (اختيارية — تُحفظ مع القنينة إذا تلفت)</label><textarea id="dm-note" rows="2" placeholder="مثال: تسرّب أثناء السحب" style="width:100%;padding:10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:16px;resize:vertical;box-sizing:border-box"></textarea></div>
       <div id="dm-med-section" style="display:none;margin-top:10px;background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px">
         <div class="fgrid">
           <div class="fgrp"><label>سبب عدم الأهلية *</label>
@@ -4742,6 +4828,10 @@ if('serviceWorker' in navigator){
           <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #FECACA;background:#FEF2F2;border-radius:10px;cursor:pointer;grid-column:1/3">
             <input type="checkbox" class="vm-dis" value="Syphilis" onchange="vmDiseaseChange()" style="width:18px;height:18px"><span style="font-weight:600;color:#991B1B">Syphilis</span>
           </label>
+        </div>
+        <div id="vm-note-grp" style="display:none;margin-top:12px">
+          <label style="font-size:16px;color:#991B1B;font-weight:700;display:block;margin-bottom:6px">📝 ملاحظة على الإصابة (اختيارية)</label>
+          <textarea id="vm-note" rows="3" placeholder="اكتب أي ملاحظة عن هذه القنينة..." style="width:100%;padding:10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:16px;resize:vertical;box-sizing:border-box"></textarea>
         </div>
       </div>
     </div>
@@ -4870,6 +4960,18 @@ if('serviceWorker' in navigator){
   </div>
 </div>
 
+<!-- BOTTLE SEQUENCE FINISHED (reception) -->
+<div class="overlay" id="seqEndModal">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-alert-triangle"></i> تنبيه التسلسل</div>
+    <div class="modal-body"><div id="seqEndMsg" style="font-size:18px;font-weight:700;color:#7F1D1D;line-height:1.7"></div></div>
+    <div class="modal-foot" style="display:flex;gap:8px">
+      <button class="btn" style="flex:1;justify-content:center" onclick="G('seqEndModal').classList.remove('on')">موافق</button>
+      <button class="btn btn-p" id="seqEndGo" style="flex:1;justify-content:center" onclick="G('seqEndModal').classList.remove('on');nav('settings',null)"><i class="ti ti-settings"></i> فتح الإعدادات</button>
+    </div>
+  </div>
+</div>
+
 <!-- NOTIFICATIONS PANEL -->
 <div class="overlay" id="notifModal">
   <div class="modal">
@@ -4889,6 +4991,7 @@ if('serviceWorker' in navigator){
       <input type="hidden" id="dmg-ids">
       <div id="dmg-count-info" style="margin-bottom:10px;font-size:16px;color:#757575;text-align:center"></div>
       <div class="fgrp"><label>سبب التلف *</label><input type="text" id="dmg-reason" placeholder="مثال: انقطاع كهرباء، كسر، تلوث..."></div>
+      <div class="fgrp"><label>📝 ملاحظة (اختيارية)</label><textarea id="dmg-note" rows="2" placeholder="ملاحظة تُحفظ مع القنينة" style="width:100%;padding:10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:16px;resize:vertical;box-sizing:border-box"></textarea></div>
     </div>
     <div class="modal-foot">
       <button class="btn" onclick="G('damageModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
@@ -4905,6 +5008,21 @@ if('serviceWorker' in navigator){
     <div class="modal-foot">
       <button class="btn" onclick="G('damagedListModal').classList.remove('on')"><i class="ti ti-x"></i> إغلاق</button>
       <button class="btn" style="background:#7F1D1D;color:#fff;border-color:#7F1D1D" onclick="finalizeDamagedSelected()"><i class="ti ti-trash"></i> تلف نهائي للمحدد</button>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTLE NOTE EDITOR (damaged list) -->
+<div class="overlay" id="noteModal">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-notes"></i> ملاحظة على القنينة</div>
+    <div class="modal-body">
+      <input type="hidden" id="nt-id">
+      <textarea id="nt-text" rows="4" placeholder="اكتب الملاحظة..." style="width:100%;padding:10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:16px;resize:vertical;box-sizing:border-box"></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="G('noteModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
+      <button class="btn btn-p" onclick="saveNote()"><i class="ti ti-device-floppy"></i> حفظ</button>
     </div>
   </div>
 </div>

@@ -132,7 +132,7 @@ function _prShowLevel(n){
 async function loadPendingRelease(){
   load(true);
   const nonSeparableTypes=Object.keys(WHOLE_BLOOD_DAYS).filter(t=>!COMPONENT_RULES[t]);
-  const sel='id,bottle_number,bottle_type,blood_type,component_type,status,draw_date,serology_result,serology_type,donors(full_name)';
+  const sel='id,bottle_number,bottle_type,blood_type,component_type,status,draw_date,serology_result,serology_type,bottle_note,donors(full_name)';
   // (1) fully complete — either outcome, any type/component
   const{data:d1}=await db.from('blood_donations').select(sel)
     .in('status',['pending_release','rejected_positive']).eq('is_deleted',false);
@@ -206,6 +206,7 @@ function loadPendingReleaseList(cat){
           ${complete && !infected ? `<span class="pill py">⏳ بانتظار التأكيد</span>` : ''}
           ${infected ? `<span class="pill pr">⛔ مصابة${r.serology_type?' — '+esc(r.serology_type):''}</span>` : ''}
         </div>
+        ${infected && r.bottle_note?`<div style="font-size:14px;color:#92400E;background:#FFFBEB;border-radius:8px;padding:6px 8px;margin-top:6px">📝 ${esc(r.bottle_note)}</div>`:''}
       </div>
       <div class="fc-act" style="display:flex;gap:6px;flex-wrap:wrap">
         ${canSeparate?`<button class="btn" style="font-size:15px;padding:8px 10px;border-color:#0369A1;color:#0369A1" onclick="openSeparateModalBulk(['${r.id}'],'${r.bottle_type}','${r.bottle_number}')"><i class="ti ti-git-fork"></i> فصل</button>`:''}
@@ -284,7 +285,7 @@ async function loadCampaigns(){
       <div class="fc-av">🚐</div>
       <div style="flex:1">
         <div class="fc-name">${esc(c.name)}</div>
-        <div class="fc-sub">${fd(c.campaign_date)} ${c.location?'| '+esc(c.location):''} | إجمالي: ${total} — بانتظار: ${cnt.reserved} — نجح: ${cnt.drawn} — تالف: ${cnt.damaged} — مرجّع: ${cnt.returned}</div>
+        <div class="fc-sub">${fd(c.campaign_date)} ${c.location?'| '+esc(c.location):''} | إجمالي: ${total} — بانتظار: ${cnt.reserved} — نجح: ${cnt.drawn} — تالف: ${cnt.damaged}${cnt.returned?' — مرجّع: '+cnt.returned:''}</div>
       </div>
     </div>`;
   }).join('');
@@ -302,42 +303,50 @@ function showAddCampaignForm(){
 function addCampReserveRow(){
   const div=document.createElement('div');
   div.className='camp-reserve-row';
-  div.style.cssText='display:grid;grid-template-columns:2fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center';
+  div.style.cssText='display:grid;grid-template-columns:1.5fr 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center';
+  const inp='padding:10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;min-width:0;text-align:center';
   div.innerHTML=`
-    <select class="crr-type" style="padding:10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;background:#fff">
+    <select class="crr-type" style="padding:10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;background:#fff;min-width:0">
       <option value="مفلتر">مفلتر</option><option value="ريفيوس">ريفيوس</option>
       <option value="رباعي">رباعي</option><option value="رباعي SAG">رباعي SAG</option>
       <option value="ثنائي">ثنائي</option><option value="أحادي">أحادي</option>
     </select>
-    <input type="number" class="crr-qty" placeholder="العدد" min="1" style="padding:10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit">
+    <input type="text" inputmode="numeric" class="crr-from" placeholder="من" style="${inp}">
+    <input type="text" inputmode="numeric" class="crr-to" placeholder="إلى" style="${inp}">
     <button class="ibtn" onclick="this.parentElement.remove()" style="color:#DC2626"><i class="ti ti-trash"></i></button>`;
   G('campReserveRows').appendChild(div);
 }
 
-// Reserves N bottle numbers for a given type: takes from the shared reuse pool first (numbers
-// released earlier, e.g. from a medically-rejected draw), then draws the rest fresh from the
-// active sequence, advancing it so normal reception automatically continues after this block.
-async function reserveBottleNumbers(bottleType, qty){
-  const numbers=[];
-  const{data:pooled}=await db.from('bottle_number_pool').select('id,bottle_number')
-    .eq('bottle_type',bottleType).order('bottle_number',{ascending:true}).limit(qty);
-  if(pooled && pooled.length){
-    for(const p of pooled){
-      numbers.push(p.bottle_number);
-      await db.from('bottle_number_pool').delete().eq('id',p.id);
-    }
+// ── Campaign sequences are typed by hand (the numbers printed on the sheets taken to the field).
+// They are completely separate from the reception sequences in Settings: nothing here reads or
+// moves a bottle_sequences counter, and the reuse pool is not involved.
+// Accepts Arabic-Indic digits too. Returns NaN for anything that is not a whole number.
+function campNum(v){
+  const s=String(v||'').trim().replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+  return /^\d+$/.test(s)?parseInt(s,10):NaN;
+}
+// Pure validation (no DOM). rows: [{n,type,from,to}] with from/to already parsed.
+// Detects overlapping ranges of the SAME bottle type inside this one campaign only.
+function campAnalyzeRanges(rows){
+  const out={error:null, overlaps:[], big:[], tooBig:null};
+  for(const r of rows){
+    if(!Number.isInteger(r.from)||!Number.isInteger(r.to)||r.from<1||r.to<1){ out.error='السطر '+r.n+': اكتب رقمي "من" و"إلى" بشكل صحيح'; return out; }
+    if(r.from>r.to){ out.error='السطر '+r.n+': رقم "من" أكبر من رقم "إلى"'; return out; }
+    const len=r.to-r.from+1;
+    if(len>50000){ out.tooBig=r; return out; }
+    if(len>1000) out.big.push(r);
   }
-  const remaining=qty-numbers.length;
-  if(remaining>0){
-    const{data:seqs}=await db.from('bottle_sequences').select('id,current_number,end_number')
-      .eq('bottle_type',bottleType).eq('is_active',true).order('created_at',{ascending:false}).limit(1);
-    if(!seqs||!seqs.length) throw new Error('لا يوجد تسلسل نشط لنوع '+bottleType);
-    const seq=seqs[0];
-    if(seq.current_number+remaining-1>seq.end_number) throw new Error('التسلسل المتبقي لنوع '+bottleType+' غير كافٍ لحجز '+remaining+' رقم');
-    for(let i=0;i<remaining;i++) numbers.push(seq.current_number+i);
-    await db.from('bottle_sequences').update({current_number:seq.current_number+remaining}).eq('id',seq.id);
+  for(let i=0;i<rows.length;i++) for(let j=i+1;j<rows.length;j++){
+    const a=rows[i], b=rows[j];
+    if(a.type===b.type && a.from<=b.to && b.from<=a.to) out.overlaps.push({a,b});
   }
-  return numbers;
+  return out;
+}
+// Every number once per bottle type (so an overlap the user chose to keep is not stored twice).
+function campExpandRanges(rows){
+  const by={};
+  rows.forEach(r=>{ const s=by[r.type]||(by[r.type]=new Set()); for(let k=r.from;k<=r.to;k++) s.add(k); });
+  return Object.entries(by).map(([type,s])=>({type, numbers:[...s].sort((x,y)=>x-y)}));
 }
 
 async function saveCampaign(){
@@ -345,27 +354,43 @@ async function saveCampaign(){
   const date=G('camp-date').value;
   const location=G('camp-location').value.trim();
   if(!name||!date){ toast('يرجى تعبئة اسم الحملة وتاريخها','error'); return; }
-  const reservations=[...document.querySelectorAll('.camp-reserve-row')].map(r=>({
-    bottleType:r.querySelector('.crr-type').value,
-    qty:parseInt(r.querySelector('.crr-qty').value)||0
-  })).filter(r=>r.qty>0);
-  if(!reservations.length){ toast('يرجى إضافة نوع قنينة وعدد صحيح على الأقل','error'); return; }
+  const rows=[]; let n=0;
+  for(const r of document.querySelectorAll('.camp-reserve-row')){
+    n++;
+    const f=r.querySelector('.crr-from').value.trim(), t=r.querySelector('.crr-to').value.trim();
+    if(!f && !t) continue;                       // empty optional row — ignore
+    rows.push({n, type:r.querySelector('.crr-type').value, from:campNum(f), to:campNum(t)});
+  }
+  if(!rows.length){ toast('اكتب تسلسلاً واحداً على الأقل (من — إلى) مع نوع القنينة','error'); return; }
+  const an=campAnalyzeRanges(rows);
+  if(an.error){ toast(an.error,'error'); return; }
+  if(an.tooBig){ toast('السطر '+an.tooBig.n+': المدى كبير جداً (أكثر من 50,000 رقم) — راجع الأرقام','error'); return; }
+  if(an.overlaps.length){
+    const lines=an.overlaps.map(o=>'• '+o.a.type+': السطر '+o.a.n+' ('+o.a.from+'–'+o.a.to+') مع السطر '+o.b.n+' ('+o.b.from+'–'+o.b.to+')').join('\n');
+    if(!confirm('⚠️ التسلسل متداخل داخل هذه الحملة:\n'+lines+'\n\nالأرقام المتداخلة تُسجَّل مرة واحدة فقط.\nهل تريد الحفظ رغم ذلك؟')) return;
+  }
+  if(an.big.length){
+    const lines=an.big.map(r=>'• السطر '+r.n+': '+(r.to-r.from+1).toLocaleString('en')+' رقم').join('\n');
+    if(!confirm('المدى التالي كبير:\n'+lines+'\n\nهل الأرقام صحيحة؟')) return;
+  }
+  const groups=campExpandRanges(rows);
   load(true);
   try{
     const{data:camp,error:ce}=await db.from('campaigns').insert({
       name, campaign_date:date, location:location||null, created_by:SES?.user?.id
     }).select().single();
     if(ce) throw ce;
-    let totalReserved=0;
-    for(const r of reservations){
-      const numbers=await reserveBottleNumbers(r.bottleType, r.qty);
-      const slotRows=numbers.map(n=>({campaign_id:camp.id, bottle_type:r.bottleType, bottle_number:n, status:'reserved'}));
-      const{error:se}=await db.from('campaign_slots').insert(slotRows);
-      if(se) throw se;
-      totalReserved+=numbers.length;
+    let total=0;
+    for(const g of groups){
+      const slotRows=g.numbers.map(x=>({campaign_id:camp.id, bottle_type:g.type, bottle_number:x, status:'reserved'}));
+      for(let i=0;i<slotRows.length;i+=500){
+        const{error:se}=await db.from('campaign_slots').insert(slotRows.slice(i,i+500));
+        if(se) throw se;
+      }
+      total+=g.numbers.length;
     }
-    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'INSERT',table_name:'campaigns',record_id:camp.id,new_values:{name,reserved:totalReserved}});
-    toast('✅ تم إنشاء الحملة وحجز '+totalReserved+' تسلسل','success',4000);
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'INSERT',table_name:'campaigns',record_id:camp.id,new_values:{name,numbers:total}});
+    toast('✅ تم إنشاء الحملة وتسجيل '+total+' رقم','success',4000);
     G('camp-add-view').style.display='none';
     G('camp-archive-view').style.display='block';
     await loadCampaigns();
@@ -394,7 +419,7 @@ async function refreshCampaignSlots(){
     <span class="pill py">بانتظار: ${cnt.reserved}</span>
     <span class="pill pg">نجح: ${cnt.drawn}</span>
     <span class="pill pr">تالف: ${cnt.damaged}</span>
-    <span class="pill pb">مرجّع: ${cnt.returned}</span>
+    ${cnt.returned?`<span class="pill pb">مرجّع: ${cnt.returned}</span>`:''}
   </div>`;
   const pending=list.filter(s=>s.status==='reserved');
   if(!pending.length){
@@ -402,7 +427,9 @@ async function refreshCampaignSlots(){
     updateCampBulkBar();
     return;
   }
-  G('campSlotsList').innerHTML=selAllRow('camp-chk','updateCampBulkBar')+pending.map(s=>`
+  // Grouped by bottle type: each type is its own block with its own count and select-all.
+  const types=[...new Set(pending.map(s=>s.bottle_type))];
+  const card=s=>`
     <div class="flow-card">
       <input type="checkbox" class="camp-chk" value="${s.id}" onclick="updateCampBulkBar()" style="width:18px;height:18px;flex-shrink:0">
       <div class="fc-av">${BAG}</div>
@@ -413,9 +440,16 @@ async function refreshCampaignSlots(){
       <div class="fc-act" style="display:flex;gap:4px">
         <button class="ibtn" style="color:#166534" onclick="resolveCampSlots(['${s.id}'],'drawn')" title="نجح السحب"><i class="ti ti-check"></i></button>
         <button class="ibtn" style="color:#7F1D1D" onclick="resolveCampSlots(['${s.id}'],'damaged')" title="تلفت"><i class="ti ti-trash"></i></button>
-        <button class="ibtn" style="color:#0369A1" onclick="resolveCampSlots(['${s.id}'],'returned')" title="إرجاع للمخزون"><i class="ti ti-corner-up-left"></i></button>
       </div>
-    </div>`).join('');
+    </div>`;
+  G('campSlotsList').innerHTML=(types.length>1?selAllRow('camp-chk','updateCampBulkBar'):'')+types.map((tp,i)=>{
+    const items=pending.filter(s=>s.bottle_type===tp);
+    return `<div id="campGrp${i}" style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:8px;margin:6px 0 8px;font-size:17px;font-weight:800;color:#1F2937">${esc(tp)} <span class="pill pb">${items.length}</span></div>
+      ${selAllRow('camp-chk','updateCampBulkBar',true,'campGrp'+i)}
+      ${items.map(card).join('')}
+    </div>`;
+  }).join('');
   updateCampBulkBar();
 }
 
@@ -436,11 +470,8 @@ function bulkCampAction(outcome){
 // drawn    → creates the real blood_donations row (no donor — "متبرع حملة") and sends it to
 //            the lab queue, exactly like a normal draw.
 // damaged  → just recorded on the slot; no blood_donations row (nothing was actually usable).
-// returned → the unused reserved number goes back into the shared reuse pool for the next
-//            normal reception entry of that bottle type.
 async function resolveCampSlots(slotIds, outcome){
   if(outcome==='damaged' && !confirm('تأكيد: '+slotIds.length+' قنينة تلفت أثناء السحب؟')) return;
-  if(outcome==='returned' && !confirm('تأكيد إرجاع '+slotIds.length+' رقم غير مستخدم للمخزون العام؟')) return;
   load(true);
   try{
     const{data:campaign}=await db.from('campaigns').select('name,campaign_date,location').eq('id',_currentCampaignId).single();
@@ -461,9 +492,6 @@ async function resolveCampSlots(slotIds, outcome){
         await db.from('campaign_slots').update({status:'drawn', donation_id:don.id}).eq('id',id);
       } else if(outcome==='damaged'){
         await db.from('campaign_slots').update({status:'damaged'}).eq('id',id);
-      } else if(outcome==='returned'){
-        await db.from('bottle_number_pool').insert({bottle_type:slot.bottle_type, bottle_number:slot.bottle_number, created_by:SES?.user?.id});
-        await db.from('campaign_slots').update({status:'returned'}).eq('id',id);
       }
     }
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'campaign_slots',record_id:slotIds[0],new_values:{outcome,count:slotIds.length}});

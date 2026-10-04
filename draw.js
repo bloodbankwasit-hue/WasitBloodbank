@@ -82,6 +82,7 @@ async function openDrawModal(id,name,dtype,bn,btyp){
   G('dm-draw').value=new Date().toISOString().split('T')[0];
   G('dm-med-reason').value='سكري';
   G('dm-med-other').value='';
+  if(G('dm-note')) G('dm-note').value='';
   G('dm-med-other-grp').style.display='none';
   toggleDmMedSection(false);
   const isTrima = btyp==='تريما';
@@ -194,11 +195,12 @@ async function confirmDamagedBottle(){
   if(!confirm('تأكيد: القنينة تالفة؟ يُسمح لهذا المتبرع بالتبرع مجدداً بعد أسبوعين بدل 77 يوماً.')) return;
   load(true);
   try{
-    const{error}=await db.from('blood_donations').update({
-      draw_date:draw, status:'damaged'
-    }).eq('id',id);
+    const upd={draw_date:draw, status:'damaged'};
+    const note=(G('dm-note')?.value||'').trim();
+    if(note) upd.bottle_note=note;     // only sent when written
+    const{error}=await db.from('blood_donations').update(upd).eq('id',id);
     if(error) throw error;
-    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'damaged'}});
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'damaged',bottle_note:note||null}});
     toast('⚠️ سُجّلت القنينة كتالفة — يُسمح بالتبرع مجدداً بعد أسبوعين','warning',5500);
     G('drawModal').classList.remove('on');
     await loadDraw();
