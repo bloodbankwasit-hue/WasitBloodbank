@@ -136,7 +136,7 @@ async function openStockByComponent(componentType){
   const rare=['O-','AB-','A-','B-'];
   G('ddList').innerHTML=`<div class="btg">${bts.map(bt=>`<div class="btc ${rare.includes(bt)?'warn':''} ${!cnt[bt]?'empty-bt':''}" style="cursor:pointer" onclick="openStockDrill('${componentType}','${bt}')">
     <div class="btc-t">${bt}</div>
-    <div class="btc-n">${fnum(cnt[bt]||0)}${rare.includes(bt)&&cnt[bt]?' ⚠':''}</div>
+    <div class="btc-n">${fnum(cnt[bt]||0)}</div>
   </div>`).join('')}</div>`;
 }
 
