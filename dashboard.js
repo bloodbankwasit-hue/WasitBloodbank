@@ -30,6 +30,13 @@ async function loadDash(){
     // بلازما، صفائح دموية، بروتين بارد — each a tile showing its total in_stock count. This is
     // level 1 of a 3-level drill-down (component type → blood type → the actual bottles),
     // matching the same pattern already used in التجهيز.
+    // Accounts flagged "hide stock" see only the statistics cards above: the stock section is hidden
+    // and its query is not even run.
+    const hideStock=stockHidden();
+    const _sh=G('dashStockHead'), _bg=G('btGrid');
+    if(_sh) _sh.style.display=hideStock?'none':'';
+    if(_bg) _bg.style.display=hideStock?'none':'';
+    if(!hideStock){
     const{data:stockRows}=await db.from('blood_donations').select('component_type').eq('status','in_stock').eq('is_deleted',false);
     const compCnt={'دم كامل':0,'دم مضغوط':0,'بلازما':0,'صفائح دموية':0,'بروتين بارد':0};
     (stockRows||[]).forEach(r=>{ const ct=r.component_type||'دم كامل'; compCnt[ct]=(compCnt[ct]||0)+1; });
@@ -40,6 +47,7 @@ async function loadDash(){
         <div class="comp-stock-name">${name}</div>
         <div class="comp-stock-count">${fnum(n)}</div>
       </div>`).join('');
+    }
 
     // Infected badge
     const {count:ic}=await db.from('blood_donations').select('*',{count:'exact',head:true}).eq('serology_result','Positive').eq('is_deleted',false);

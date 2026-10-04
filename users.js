@@ -23,12 +23,24 @@ const ALL_PERMS = [
   {key:'notifications', label:'🔔 التنبيهات'},
 ];
 
+// Extra per-account options (not sections): kept out of "تحديد الكل" so ticking everything never
+// turns one of them on by accident.
+const FLAG_PERMS = [
+  {key:'hide_stock', label:'🙈 إخفاء رصيد القناني من الرئيسية (تبقى الإحصائيات فقط)'},
+];
+
 function renderPermCheckboxes(containerId, selected=[]){
   const box = G(containerId);
   if(!box) return;
   box.innerHTML = selAllRow('perm-chk','',true,containerId) + ALL_PERMS.map(p=>`
     <label style="display:flex;align-items:center;gap:6px;font-size:15px;cursor:pointer;background:#fafafa;border:1px solid #e0e0e0;border-radius:8px;padding:7px 10px">
       <input type="checkbox" class="perm-chk" value="${p.key}" ${selected.includes(p.key)?'checked':''} style="width:16px;height:16px;accent-color:#BE123C">
+      ${p.label}
+    </label>`).join('')
+  + `<div style="grid-column:1/-1;border-top:1px solid #e0e0e0;margin-top:4px;padding-top:8px;font-size:14px;color:#757575;font-weight:700">خيارات إضافية</div>`
+  + FLAG_PERMS.map(p=>`
+    <label style="grid-column:1/-1;display:flex;align-items:center;gap:6px;font-size:15px;cursor:pointer;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:7px 10px">
+      <input type="checkbox" class="perm-flag" value="${p.key}" ${selected.includes(p.key)?'checked':''} style="width:16px;height:16px;accent-color:#B45309">
       ${p.label}
     </label>`).join('');
   syncSelAll('perm-chk');
@@ -62,7 +74,7 @@ async function loadUsers(){
       <th>الاسم الكامل</th><th>الدور الوظيفي</th><th>الحالة</th><th>تاريخ الإنشاء</th><th>إجراءات</th>
     </tr></thead><tbody>${data.map(u=>`<tr>
       <td>${esc(u.full_name)}</td>
-      <td><span style='font-size:14px;color:#757575'>${u.role==='admin'?'مدير النظام ✅':((u.permissions||[]).length+' قسم')}</span></td>
+      <td><span style='font-size:14px;color:#757575'>${u.role==='admin'?'مدير النظام ✅':((u.permissions||[]).filter(k=>k!=='hide_stock').length+' قسم'+((u.permissions||[]).includes('hide_stock')?' · بدون رصيد':''))}</span></td>
       <td><span class="pill ${u.is_active?'pg':'pr'}">${u.is_active?'نشط':'معطّل'}</span></td>
       <td>${fd(u.created_at)}</td>
       <td>${u.id!==SES?.user?.id?`

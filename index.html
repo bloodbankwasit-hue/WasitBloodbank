@@ -983,7 +983,7 @@ tbody tr:hover td{background:#fafafa}
           <div class="sc-card" style="cursor:pointer" onclick="openDashDrill('تعويضيو الشهر',_dashMonthStart(),_dashToday(),{donation_type:'تعويضي'})"><div class="sc-ico">🩹</div><div class="sc-val" id="st3">—</div><div class="sc-lbl">تعويضيو الشهر</div></div>
           <div class="sc-card" style="cursor:pointer" onclick="openDashAllTimeChoice()"><div class="sc-ico">✅</div><div class="sc-val" id="st4">—</div><div class="sc-lbl">إجمالي الكل</div></div>
         </div>
-        <div class="sh" style="margin-top:4px"><div class="sh-t"><i class="ti ti-droplet-half"></i> مخزون الفصائل — اضغط فصيلة لعرض قناني المخزون</div></div>
+        <div class="sh" id="dashStockHead" style="margin-top:4px"><div class="sh-t"><i class="ti ti-droplet-half"></i> مخزون الفصائل — اضغط فصيلة لعرض قناني المخزون</div></div>
         <div class="btg" id="btGrid"></div>
       </div>
 
@@ -2718,6 +2718,12 @@ const PERM_SCREEN = {
   barcode:'barcode', infected:'infected',
   rare:'rare', stats:'stats', audit:'audit', settings:'settings', users:'users'
 };
+
+// Per-account option "hide bottle stock on the home screen" (set in إدارة الحسابات). It is a flag
+// stored in the account's permissions list. Admins and all-access accounts never have it.
+function stockHidden(){
+  return !!UPROF && UPROF.role!=='admin' && Array.isArray(UPROF.permissions) && UPROF.permissions.includes('hide_stock');
+}
 
 function hasPermission(key){
   if(!UPROF) return false;
