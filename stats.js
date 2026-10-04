@@ -1,18 +1,80 @@
 // ================================================================
 // STATISTICS
 // ================================================================
+// ── "المتبرعون الذين مرّوا على المصرف" — computed from the data (not a stored counter, so it can
+// never drift with deletions / offline entries). Unit = visit: one registered donation attempt.
+//   بالمصرف  : every reception registration (donor_id set), counted once per donor+bottle+date
+//              (separated components and trima's two outputs share that key). INCLUDES donors
+//              rejected medically after registering (exit_reason='medical_reject'); EXCLUDES
+//              donors who simply withdrew without a draw (exit_reason='withdrawn') and rows an
+//              admin deleted. A bottle that was damaged and later finalized (soft-deleted) still counts.
+//   بالحملات : campaign numbers that were drawn or damaged during the draw ('reserved' = nobody came,
+//              not counted) + old-style registrations whose bottle type starts with "حملة".
+async function _stFetchAll(build){
+  let all=[], from=0; const ps=1000;
+  for(;;){
+    const{data,error}=await build().range(from,from+ps-1);
+    if(error) throw error;
+    all=all.concat(data||[]);
+    if((data||[]).length<ps) break;
+    from+=ps;
+  }
+  return all;
+}
+function visitorsFromRows(rows){
+  const seen=new Set(), legacySeen=new Set(), persons=new Set();
+  let bank=0, med=0, legacyCamp=0;
+  rows.forEach(r=>{
+    const withdrawn=r.exit_reason==='withdrawn';
+    const counted=!withdrawn && (!r.is_deleted || r.status==='damaged' || r.exit_reason==='medical_reject');
+    if(!counted) return;
+    const key=r.donor_id+'|'+(r.bottle_number??r.id)+'|'+r.donation_date;
+    const legacy=String(r.bottle_type||'').startsWith('حملة');
+    const set=legacy?legacySeen:seen;
+    if(set.has(key)) return;
+    set.add(key);
+    if(legacy){ legacyCamp++; return; }
+    bank++; persons.add(r.donor_id);
+    if(r.exit_reason==='medical_reject') med++;
+  });
+  return {bank, persons:persons.size, med, legacyCamp};
+}
+async function computeVisitors(f,t){
+  let missingCol=false, rows;
+  const base=(cols)=>()=>db.from('blood_donations').select(cols)
+    .not('donor_id','is',null).gte('donation_date',f).lte('donation_date',t).order('id');
+  try{ rows=await _stFetchAll(base('id,donor_id,bottle_number,bottle_type,donation_date,status,is_deleted,exit_reason')); }
+  catch(e){   // exit_reason column not created yet — still produce the numbers (without medical rejects)
+    missingCol=true;
+    rows=await _stFetchAll(base('id,donor_id,bottle_number,bottle_type,donation_date,status,is_deleted'));
+  }
+  const v=visitorsFromRows(rows);
+  const camps=await _stFetchAll(()=>db.from('campaigns').select('id').gte('campaign_date',f).lte('campaign_date',t).order('id'));
+  const ids=camps.map(c=>c.id); let drawn=0, damaged=0;
+  for(let i=0;i<ids.length;i+=50){
+    const part=ids.slice(i,i+50);
+    const sl=await _stFetchAll(()=>db.from('campaign_slots').select('id,status').in('campaign_id',part).in('status',['drawn','damaged']).order('id'));
+    sl.forEach(s=>{ if(s.status==='drawn') drawn++; else damaged++; });
+  }
+  const campaigns=drawn+damaged+v.legacyCamp;
+  return {bank:v.bank, persons:v.persons, med:v.med, drawn, damaged, legacyCamp:v.legacyCamp, campaigns, total:v.bank+campaigns, missingCol};
+}
+
 async function loadStats(){
   const f=G('stFrom').value, t=G('stTo').value;
   if(!f||!t){toast('يرجى تحديد الفترة الزمنية','warning'); return;}
   load(true);
-  const {data}=await db.from('blood_donations')
+  let vis=null;
+  try{ vis=await computeVisitors(f,t); }catch(e){ console.log('visitors count failed:', e); }
+  let {data}=await db.from('blood_donations')
     .select('donation_type,bottle_type,blood_type,serology_result,component_type,status,dispatch_date,donors(gender)')
     .gte('donation_date',f).lte('donation_date',t).eq('is_deleted',false);
   const {data:outData}=await db.from('blood_donations')
     .select('component_type')
     .eq('status','dispatched').gte('dispatch_date',f).lte('dispatch_date',t).eq('is_deleted',false);
   load(false);
-  if(!data?.length){toast('لا توجد بيانات في هذه الفترة','warning'); return;}
+  if(!data?.length && !(vis&&vis.total)){toast('لا توجد بيانات في هذه الفترة','warning'); return;}
+  data=data||[];
   const byTyp={}, byBot={}, byBld={}, byGen={ذكر:0,أنثى:0};
   const byCompIn={}, byCompOut={};
   const bts=['مفلتر','رباعي','ريفيوس','ثنائي','أحادي','تريما','حملة تبرع رباعي','حملة تبرع مفلتر','رباعي SAG'];
@@ -40,7 +102,7 @@ async function loadStats(){
   });
   const allComps=[...new Set([...Object.keys(byCompIn),...Object.keys(byCompOut)])];
   const totalDonations = data.filter(r=>(r.component_type||'دم كامل')==='دم كامل').length;
-  window._STATS_BREAKDOWN={f,t,total:totalDonations,byTyp,byGen,byBot,bts,byBld,byCompIn,byCompOut,allComps};
+  window._STATS_BREAKDOWN={f,t,total:totalDonations,byTyp,byGen,byBot,bts,byBld,byCompIn,byCompOut,allComps,vis};
   G('stRpt').style.display='block';
   G('stRpt').innerHTML=`<div class="rpt">
     <div class="rpt-hd">
@@ -51,6 +113,15 @@ async function loadStats(){
       <div class="rh-en">Ministry of Health<br>Wasit Health Directorate<br>Main Blood Bank Division</div>
     </div>
     <div class="rpt-body">
+      ${vis?`<div class="rs"><div class="rs-t">المتبرعون الذين مرّوا على المصرف</div>
+        <div class="rr"><span>بالمصرف</span><span class="rv">${fnum(vis.bank)}</span></div>
+        <div class="rr"><span style="color:#757575">&nbsp;&nbsp;↳ أشخاص مختلفون</span><span class="rv">${fnum(vis.persons)}</span></div>
+        <div class="rr"><span style="color:#757575">&nbsp;&nbsp;↳ رُفضوا طبياً بعد التسجيل</span><span class="rv">${fnum(vis.med)}</span></div>
+        <div class="rr"><span>بالحملات</span><span class="rv">${fnum(vis.campaigns)}</span></div>
+        <div class="rr"><span style="color:#757575">&nbsp;&nbsp;↳ سحب ناجح / تالفة أثناء السحب</span><span class="rv">${fnum(vis.drawn+vis.legacyCamp)} / ${fnum(vis.damaged)}</span></div>
+        <div class="rr" style="border-top:2px solid #BE123C;margin-top:4px"><span style="font-weight:800">المجموع الكلي</span><span class="rv" style="font-size:17px">${fnum(vis.total)}</span></div>
+        <div style="font-size:12.5px;color:#757575;padding:4px 8px">العدّ بالزيارات (كل تسجيل مرة). الانسحاب بدون سحب دم لا يُحسب.${vis.missingCol?' <b style="color:#DC2626">تنبيه: عمود exit_reason غير موجود بعد — الرفض الطبي غير محسوب.</b>':''}</div>
+      </div>`:''}
       <div class="rs"><div class="rs-t">إحصائية حسب نوع التبرع</div>
         ${['طوعي','تعويضي'].map(t=>`<div class="rr"><span>${t}</span><span class="rv">${fnum(byTyp[t]||0)}</span></div>`).join('')}
       </div>
@@ -274,6 +345,10 @@ function exportStatsExcel(){
   let body='';
   body+=`<tr><td colspan="2" style="background:#BE123C;color:#fff;font-weight:bold;font-size:14px;padding:8px">تقرير إحصائي — مصرف الدم الرئيسي واسط (${s.f} إلى ${s.t}) — الإجمالي: ${s.total}</td></tr>`;
   body+=`<tr><td>&nbsp;</td><td></td></tr>`;
+  if(s.vis) body+=sec('المتبرعون الذين مرّوا على المصرف', [
+    ['بالمصرف', fnum(s.vis.bank)], ['— أشخاص مختلفون', fnum(s.vis.persons)], ['— رُفضوا طبياً بعد التسجيل', fnum(s.vis.med)],
+    ['بالحملات', fnum(s.vis.campaigns)], ['— سحب ناجح', fnum(s.vis.drawn+s.vis.legacyCamp)], ['— تالفة أثناء السحب', fnum(s.vis.damaged)],
+    ['المجموع الكلي', fnum(s.vis.total)]]);
   body+=sec('حسب نوع التبرع', ['طوعي','تعويضي'].map(t=>[t, fnum(s.byTyp[t]||0)]));
   body+=sec('حسب الجنس', Object.entries(s.byGen).map(([g,c])=>[g, fnum(c)]));
   body+=sec('حسب نوع القنينة', s.bts.filter(b=>s.byBot[b]).map(b=>[b, fnum(s.byBot[b])]));

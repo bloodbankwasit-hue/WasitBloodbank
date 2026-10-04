@@ -241,7 +241,7 @@ async function confirmMedicalReject(){
         bottle_type:d.bottle_type, bottle_number:d.bottle_number, created_by:SES?.user?.id
       });
     }
-    const{error}=await db.from('blood_donations').update({is_deleted:true}).eq('id',id);
+    const{error}=await markDonationExit(id,'medical_reject');
     if(error) throw error;
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'rejected_medical',reason,released_bottle:d?.bottle_number}});
     await cacheRejectedDonors();

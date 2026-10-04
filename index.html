@@ -1254,6 +1254,7 @@ tbody tr:hover td{background:#fafafa}
       <!-- STATS -->
       <div class="sc" id="s-stats">
         <div class="abar" style="margin-bottom:14px;align-items:flex-end">
+          <div class="fgrp"><label style="font-size:14px;color:#757575;font-weight:600">السنة</label><select id="stYear" onchange="stPickYear(this.value)"><option value="">—</option></select></div>
           <div class="fgrp"><label style="font-size:14px;color:#757575;font-weight:600">من تاريخ</label><input type="date" id="stFrom"></div>
           <div class="fgrp"><label style="font-size:14px;color:#757575;font-weight:600">إلى تاريخ</label><input type="date" id="stTo"></div>
           <button class="btn btn-p" onclick="loadStats()"><i class="ti ti-chart-bar"></i> توليد التقرير</button>
@@ -1822,6 +1823,20 @@ function load(v){ G('loader').classList.toggle('on',v); }
 // places: السحب itself, and سجل المتبرعين (for a donor still awaiting draw who reception staff
 // notices has left). Whichever is used first hides the record from BOTH screens at once — it's
 // the exact same row, just two different entry points to the same action.
+// Soft-deletes donation row(s) AND records why, so the statistics can tell a plain withdrawal
+// (not counted as a visitor) from a medical rejection (counted). If the exit_reason column has not
+// been created yet the update is retried without it, so the draw screen never breaks.
+async function markDonationExit(ids, reason){
+  ids=[].concat(ids);
+  let r=await db.from('blood_donations').update({is_deleted:true, exit_reason:reason}).in('id',ids);
+  if(r.error && /exit_reason/i.test(r.error.message||'')) r=await db.from('blood_donations').update({is_deleted:true}).in('id',ids);
+  return r;
+}
+// Statistics year shortcut: fills the date range for a whole calendar year.
+(function(){ const s=document.getElementById('stYear'); if(!s) return;
+  const y=new Date().getFullYear(); for(let i=y;i>=y-6;i--){ const o=document.createElement('option'); o.value=i; o.textContent=i; s.appendChild(o); } })();
+function stPickYear(y){ if(!y) return; G('stFrom').value=y+'-01-01'; G('stTo').value=y+'-12-31'; }
+
 async function withdrawDonation(id, donorName){
   if(!confirm('تأكيد: "'+donorName+'" انسحب ولم يُسحب منه دم؟ سيُحذف سجل الاستمارة ويُعاد رقم القنينة للاستخدام.')) return;
   load(true);
@@ -1832,7 +1847,7 @@ async function withdrawDonation(id, donorName){
         bottle_type:d.bottle_type, bottle_number:d.bottle_number, created_by:SES?.user?.id
       });
     }
-    const{error}=await db.from('blood_donations').update({is_deleted:true}).eq('id',id);
+    const{error}=await markDonationExit(id,'withdrawn');
     if(error) throw error;
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'withdrawn',released_bottle:d?.bottle_number}});
     toast('↩️ تم تسجيل الانسحاب — رقم القنينة '+(d?.bottle_number||'')+' أُعيد لإعادة الاستخدام','warning',5000);
