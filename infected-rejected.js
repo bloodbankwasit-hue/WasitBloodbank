@@ -39,17 +39,40 @@ async function loadInfected(type, tabEl, page=1){
     _infType = type;
   }
   _infPage=page;
+  const s=(G('infSrch')?.value||'').trim();
+  const cols='bottle_number,serology_result,serology_type,donation_date,bottle_note,id,donors(donor_number,full_name,mobile,national_id)';
   load(true);
-  let q=db.from('blood_donations')
-    .select('bottle_number,serology_result,serology_type,donation_date,bottle_note,id,donors(donor_number,full_name,mobile)',{count:'exact'})
-    .eq('serology_result','Positive').eq('is_deleted',false).order('created_at',{ascending:false});
-  if(_infType) q=q.eq('serology_type',_infType);
-  q=q.range((page-1)*PS, page*PS-1);
-  const {data,count}=await q; load(false);
+  let data, count;
+  if(!s){
+    let q=db.from('blood_donations').select(cols,{count:'exact'})
+      .eq('serology_result','Positive').eq('is_deleted',false).order('created_at',{ascending:false});
+    if(_infType) q=q.eq('serology_type',_infType);
+    q=q.range((page-1)*PS, page*PS-1);
+    ({data,count}=await q);
+  } else {
+    // Search: positives are few, so fetch them all (1000 per page) and match here. That allows
+    // Arabic-aware matching (أإآ=ا، ى=ي، ة=ه) across name, mobile, donor no., national ID,
+    // bottle number, infection type and the note — one box, no need to say which field.
+    let all=[], from=0;
+    for(;;){
+      let q=db.from('blood_donations').select(cols)
+        .eq('serology_result','Positive').eq('is_deleted',false).order('created_at',{ascending:false});
+      if(_infType) q=q.eq('serology_type',_infType);
+      const r=await q.range(from,from+999);
+      if(r.error) break;
+      all=all.concat(r.data||[]);
+      if((r.data||[]).length<1000) break;
+      from+=1000;
+    }
+    const needle=_normSearch(s);
+    const filtered=all.filter(r=>_normSearch([r.donors?.full_name,r.donors?.mobile,r.donors?.donor_number,r.donors?.national_id,r.bottle_number,r.serology_type,r.bottle_note].join(' | ')).includes(needle));
+    count=filtered.length; data=filtered.slice((page-1)*PS, page*PS);
+  }
+  load(false);
   if(data&&data.length){
     G('infTbl').innerHTML=`<div class="tw"><table><thead><tr>
       <th>رقم المتبرع</th><th>اسم المتبرع</th><th>رقم القنينة</th>
-      <th>نوع الإصابة</th><th>تاريخ الاكتشاف</th><th>رقم الموبايل</th><th>ملاحظة</th>
+      <th>نوع الإصابة</th><th>تاريخ الاكتشاف</th><th>رقم الموبايل</th><th>ملاحظة</th>${_canUnInfect()?'<th>إجراء</th>':''}
     </tr></thead><tbody>${data.map(r=>`<tr>
       <td>${N(r.donors?.donor_number)}</td>
       <td>${esc(N(r.donors?.full_name))}</td>
@@ -58,14 +81,104 @@ async function loadInfected(type, tabEl, page=1){
       <td>${fd(r.donation_date)}</td>
       <td dir="ltr">${esc(N(r.donors?.mobile))}</td>
       <td style="min-width:140px">${r.bottle_note?esc(r.bottle_note):'—'}</td>
+      ${_canUnInfect()?`<td><button class="btn" style="font-size:14px;padding:6px 10px;white-space:nowrap;color:#166534;border-color:#166534" onclick="openUnInfect('${r.id}')"><i class="ti ti-rotate-2"></i> إلغاء الإصابة</button></td>`:''}
     </tr>`).join('')}</tbody></table></div>`;
     G('infPag').innerHTML=_pagHtml(count,page,'goInfPage');
   } else {
-    G('infTbl').innerHTML='<div class="empty"><i class="ti ti-shield-check" style="color:#2e7d32"></i><p>لا توجد حالات إيجابية</p></div>';
+    G('infTbl').innerHTML = s
+      ? '<div class="empty"><i class="ti ti-search-off"></i><p>لا توجد نتائج مطابقة للبحث</p></div>'
+      : '<div class="empty"><i class="ti ti-shield-check" style="color:#2e7d32"></i><p>لا توجد حالات إيجابية</p></div>';
     G('infPag').innerHTML='';
   }
 }
 let _infPage=1, _infType='';
+
+// ── Cancel an infection result after a second, negative test ─────────────────────────────────
+// Who: anyone who can enter وحدة الفيروسات (admin or the 'virology' permission).
+// What happens (all rows of the same draw — same donor + bottle number — together):
+//   • serology → Negative, infection type cleared, a note with the reason is appended;
+//   • the bottle itself is DISCARDED by default (status 'damaged', reason recorded) because time has
+//     usually passed between the two tests; a checkbox sends it back to المخزن المؤقت instead;
+//   • the donor's automatic permanent rejection ("إصابة: …") is lifted — unless another positive
+//     bottle of the same donor is still on record, in which case it is kept;
+//   • everything is written to the audit log with the original positive result.
+function _canUnInfect(){ return UPROF?.role==='admin' || (typeof hasPermission==='function' && hasPermission('virology')); }
+
+async function openUnInfect(id){
+  if(!_canUnInfect()){ toast('⛔ هذا الإجراء لموظفي وحدة الفيروسات','error'); return; }
+  load(true);
+  const{data:r}=await db.from('blood_donations').select('id,bottle_number,serology_type,donors(full_name)').eq('id',id).single();
+  load(false);
+  if(!r){ toast('تعذّر تحميل القنينة','error'); return; }
+  G('ui-id').value=id;
+  G('ui-info').innerHTML='<b>'+esc(r.donors?.full_name||'—')+'</b><br>قنينة رقم '+esc(r.bottle_number)+' — الإصابة المسجّلة: <b style="color:#BE123C">'+esc(r.serology_type||'موجب')+'</b>';
+  G('ui-reason').value=''; G('ui-unblock').checked=true; G('ui-keep').checked=false;
+  G('unInfectModal').classList.add('on');
+}
+
+async function confirmUnInfect(){
+  if(!_canUnInfect()){ toast('⛔ هذا الإجراء لموظفي وحدة الفيروسات','error'); return; }
+  if(!IS_ONLINE){ toast('هذا الإجراء يحتاج اتصالاً بالإنترنت','warning'); return; }
+  const id=G('ui-id').value, reason=G('ui-reason').value.trim();
+  const unblock=G('ui-unblock').checked, keep=G('ui-keep').checked;
+  if(!reason){ toast('اكتب سبب الإلغاء (مثلاً: فحص ثانٍ سالب بتاريخ ...)','error'); return; }
+  load(true);
+  try{
+    const{data:main,error:me}=await db.from('blood_donations')
+      .select('id,donor_id,bottle_number,serology_type,donors(full_name)').eq('id',id).single();
+    if(me||!main) throw me||new Error('القنينة غير موجودة');
+    const oldType=main.serology_type, donorName=main.donors?.full_name||null;
+    // every row of this draw that carries the positive result (the bottle + trima outputs / components)
+    const{data:rows,error:re}=await db.from('blood_donations')
+      .select('id,status,bottle_note').eq('donor_id',main.donor_id).eq('bottle_number',main.bottle_number)
+      .eq('serology_result','Positive').eq('is_deleted',false);
+    if(re) throw re;
+    const today=new Date().toISOString().split('T')[0];
+    const stamp='أُلغيت الإصابة ('+(oldType||'موجب')+') بفحص ثانٍ سالب: '+reason;
+    const damageReason='إصابة ملغاة بعد فحص ثانٍ — القنينة غير صالحة للاستخدام';
+    for(const r of (rows||[])){
+      const upd={serology_result:'Negative', serology_type:null, bottle_note:(r.bottle_note?r.bottle_note+' | ':'')+stamp};
+      if(r.status==='rejected_positive'){
+        if(keep) upd.status='pending_release';
+        else { upd.status='damaged'; upd.damage_reason=damageReason; upd.damaged_date=today; }
+      }
+      const{error:ue}=await db.from('blood_donations').update(upd).eq('id',r.id);
+      if(ue) throw ue;
+    }
+    // Lift the donor's automatic permanent rejection — only if no OTHER positive bottle of theirs remains.
+    let unblocked=false, blockedKept=false;
+    if(unblock && donorName){
+      const{data:others}=await db.from('blood_donations').select('id')
+        .eq('donor_id',main.donor_id).eq('serology_result','Positive').eq('is_deleted',false).limit(1);
+      if(others && others.length){ blockedKept=true; }
+      else {
+        const{error:de}=await db.from('rejected_donors').update({is_deleted:true})
+          .eq('full_name',donorName).eq('rejection_type','دائم').eq('rejection_reason','إصابة: '+oldType).eq('is_deleted',false);
+        if(de) throw de;
+        unblocked=true;
+        if(typeof cacheRejectedDonors==='function') await cacheRejectedDonors();
+      }
+    }
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,
+      old_values:{serology_result:'Positive',serology_type:oldType},
+      new_values:{serology_result:'Negative',reason,bottle:keep?'returned_to_pending_release':'discarded',donor_unblocked:unblocked,rows:(rows||[]).length}});
+    G('unInfectModal').classList.remove('on');
+    toast('✅ أُلغيت الإصابة'+(unblocked?' ورُفع المنع عن المتبرع':'')+(keep?'':' — القنينة سُجّلت كتالفة'),'success',5000);
+    if(blockedKept) toast('⚠️ لم يُرفع المنع: المتبرع عنده إصابة أخرى مسجّلة','warning',6000);
+    await loadInfected(undefined,undefined,_infPage);
+    if(typeof refreshExpiryNotifications==='function') refreshExpiryNotifications();
+  }catch(e){ toast('خطأ: '+e.message,'error'); console.log('unInfect err:',e); }
+  finally{ load(false); }
+}
+let _infSearchTimer=null;
+function infSearchLive(){
+  clearTimeout(_infSearchTimer);
+  _infSearchTimer=setTimeout(()=>loadInfected(undefined,undefined,1), 350);
+}
+// Arabic-tolerant text for matching: lower-case, أإآ→ا، ى→ي، ة→ه، no diacritics/tatweel.
+function _normSearch(s){
+  return String(s??'').toLowerCase().replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[\u064B-\u065F\u0640]/g,'').trim();
+}
 function goInfPage(p){ loadInfected(undefined, undefined, p); }
 
 // Shared pagination-control renderer (same look as سجل المتبرعين's pager) — takes the total

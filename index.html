@@ -1171,6 +1171,9 @@ tbody tr:hover td{background:#fafafa}
         </div>
 
         <div id="infectedPane">
+          <div class="abar" style="margin-bottom:8px">
+            <input type="text" class="sinp" id="infSrch" placeholder="🔍 بحث: اسم المتبرع، رقم القنينة، الموبايل، نوع الإصابة، ملاحظة..." style="max-width:420px" oninput="infSearchLive()">
+          </div>
           <div class="tabs">
             <div class="tab on" onclick="loadInfected('',this)">الكل</div>
             <div class="tab" onclick="loadInfected('HIV',this)">HIV</div>
@@ -1359,7 +1362,8 @@ tbody tr:hover td{background:#fafafa}
 
       <!-- ========== RECEPTION ========== -->
       <div class="sc" id="s-separation">
-        <div class="sh"><div class="sh-t"><i class="ti ti-dna"></i> الفصل — متابعة القناني بعد السحب</div></div>
+        <div class="sh" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><div class="sh-t"><i class="ti ti-dna"></i> الفصل — متابعة القناني بعد السحب</div>
+          <button class="btn" id="sepStatsBtn" style="font-size:15px;padding:7px 12px;flex-shrink:0" onclick="sepStatsOpen()"><i class="ti ti-chart-bar"></i> إحصائيات</button></div>
         <div id="sepTypeGrid" class="comp-stock-grid" style="margin-bottom:16px"></div>
         <div id="sepBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
           <span id="sepBulkCount">0 محدد</span>
@@ -1370,6 +1374,7 @@ tbody tr:hover td{background:#fafafa}
           </div>
         </div>
         <div id="sepBoardList"></div>
+        <div id="sepStatsPane" style="display:none"></div>
       </div>
 
       <!-- ========== المخزن المؤقت (pending confirmation before التجهيز) ========== -->
@@ -5030,6 +5035,28 @@ if('serviceWorker' in navigator){
     <div class="modal-foot">
       <button class="btn" onclick="G('damagedListModal').classList.remove('on')"><i class="ti ti-x"></i> إغلاق</button>
       <button class="btn" style="background:#7F1D1D;color:#fff;border-color:#7F1D1D" onclick="finalizeDamagedSelected()"><i class="ti ti-trash"></i> تلف نهائي للمحدد</button>
+    </div>
+  </div>
+</div>
+
+<!-- CANCEL INFECTION (after a second negative test) -->
+<div class="overlay" id="unInfectModal">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-rotate-2"></i> إلغاء الإصابة بعد فحص ثانٍ</div>
+    <div class="modal-body">
+      <input type="hidden" id="ui-id">
+      <div id="ui-info" style="background:#F8FAFC;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:16px;line-height:1.7"></div>
+      <div class="fgrp"><label>سبب الإلغاء * (مثلاً: فحص ثانٍ سالب بتاريخ ...)</label>
+        <textarea id="ui-reason" rows="3" placeholder="اكتب نتيجة الفحص الثاني وتاريخه" style="width:100%;padding:10px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:16px;resize:vertical;box-sizing:border-box"></textarea></div>
+      <label style="display:flex;align-items:center;gap:8px;margin:10px 0 6px;font-size:16px;cursor:pointer">
+        <input type="checkbox" id="ui-unblock" checked style="width:18px;height:18px;accent-color:#166534"> رفع المنع عن المتبرع (يسمح له بالتبرع من جديد)</label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:16px;cursor:pointer">
+        <input type="checkbox" id="ui-keep" style="width:18px;height:18px;accent-color:#B45309"> القنينة ما زالت صالحة — أعدها للمخزن المؤقت</label>
+      <div style="font-size:13.5px;color:#757575;margin-top:6px">بدون تأشير الخيار الأخير، تُسجَّل القنينة كتالفة ولا تدخل المخزون.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="G('unInfectModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
+      <button class="btn btn-p" onclick="confirmUnInfect()"><i class="ti ti-check"></i> تأكيد الإلغاء</button>
     </div>
   </div>
 </div>

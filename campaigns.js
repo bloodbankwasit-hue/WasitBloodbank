@@ -6,10 +6,12 @@ let _sepSelectedType = null, _sepLevel = 1;
 
 function _sepShowLevel(n){
   _sepLevel = n;
-  const g1=G('sepTypeGrid'), g3=G('sepBoardList');
+  const g1=G('sepTypeGrid'), g3=G('sepBoardList'), g4=G('sepStatsPane'), gb=G('sepStatsBtn');
   if(g1) g1.style.display = n===1 ? '' : 'none';
   if(g3) g3.style.display = n===2 ? '' : 'none';
-  const g2=G('sepBulkBar'); if(g2 && n===1) g2.style.display='none'; // bulk bar only relevant inside a type's list
+  if(g4) g4.style.display = n===3 ? '' : 'none';
+  if(gb) gb.style.display = n===1 ? '' : 'none';      // the statistics button lives on the first level only
+  const g2=G('sepBulkBar'); if(g2 && n!==2) g2.style.display='none'; // bulk bar only relevant inside a type's list
 }
 
 // Level 1 — one tile per separable bottle type, with a live count
@@ -499,4 +501,211 @@ async function resolveCampSlots(slotIds, outcome){
     await refreshCampaignSlots();
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }
+}
+
+// ================================================================
+// إحصائيات الفصل — advanced search: weekly / monthly / half-yearly / yearly / custom range.
+// A separation event = the component rows created from a whole-blood bottle (parent_donation_id
+// set); their created_at is the moment of separation. The numbers come from those rows only, so
+// they never depend on what happened to a component afterwards (a component damaged later still
+// counts as produced). "Bottles separated" = distinct parent bottles.
+// ================================================================
+let _sstKind='month', _sstToken=0;
+const _SST_KINDS={week:'أسبوعي',month:'شهري',half:'نصف سنوي',year:'سنوي',custom:'فترة مخصصة'};
+
+function _ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _parseYmd(s){ const [y,m,d]=String(s).split('-').map(Number); return new Date(y,(m||1)-1,d||1); }
+
+// Pure: the date range of the period that contains the anchor date. Week = Saturday → Friday.
+function sepPeriodRange(kind, anchorStr){
+  const a=_parseYmd(anchorStr), y=a.getFullYear(), m=a.getMonth(), d=a.getDate();
+  let from, to;
+  if(kind==='week'){ const back=(a.getDay()+1)%7; from=new Date(y,m,d-back); to=new Date(y,m,d-back+6); }
+  else if(kind==='month'){ from=new Date(y,m,1); to=new Date(y,m+1,0); }
+  else if(kind==='half'){ const h=m<6?0:6; from=new Date(y,h,1); to=new Date(y,h+6,0); }
+  else { from=new Date(y,0,1); to=new Date(y,11,31); }
+  return {from,to};
+}
+// Pure: move the anchor one period back (-1) or forward (+1).
+function sepShiftAnchor(kind, anchorStr, dir){
+  const a=_parseYmd(anchorStr), y=a.getFullYear(), m=a.getMonth(), d=a.getDate();
+  if(kind==='week')  return _ymd(new Date(y,m,d+7*dir));
+  if(kind==='month') return _ymd(new Date(y,m+dir,1));
+  if(kind==='half')  return _ymd(new Date(y,m+6*dir,1));
+  return _ymd(new Date(y+dir,m,1));
+}
+// Pure: turn component rows into the report numbers.
+function sepAggregate(rows, from, to, kind){
+  const days=Math.round((to-from)/86400000)+1;
+  const mode=(kind==='half'||kind==='year'||(kind==='custom'&&days>92))?'month':'day';
+  const key=d=>mode==='month'?_ymd(d).slice(0,7):_ymd(d);
+  const buckets=new Map();
+  if(mode==='day'){ for(let d=new Date(from); d<=to; d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1)) buckets.set(key(d),{p:new Set(),c:0}); }
+  else { for(let d=new Date(from.getFullYear(),from.getMonth(),1); d<=to; d=new Date(d.getFullYear(),d.getMonth()+1,1)) buckets.set(key(d),{p:new Set(),c:0}); }
+  const parents=new Set(), byComp={}, byType={}, byBlood={};
+  rows.forEach(r=>{
+    const pid=r.parent_donation_id;
+    parents.add(pid);
+    byComp[r.component_type]=(byComp[r.component_type]||0)+1;
+    const bt=r.bottle_type||'—', bl=r.blood_type||'غير محدد';
+    (byType[bt]=byType[bt]||new Set()).add(pid);
+    (byBlood[bl]=byBlood[bl]||new Set()).add(pid);
+    const b=buckets.get(key(new Date(r.created_at)));
+    if(b){ b.p.add(pid); b.c++; }
+  });
+  const cnt=o=>Object.fromEntries(Object.entries(o).map(([k,s])=>[k,s.size]));
+  return { days, mode, bottles:parents.size, comps:rows.length, perDay:days?parents.size/days:0,
+           byComp, byType:cnt(byType), byBlood:cnt(byBlood),
+           timeline:[...buckets.entries()].map(([k,v])=>({key:k,bottles:v.p.size,comps:v.c})) };
+}
+
+function sepStatsOpen(){
+  _sepSelectedType=null;
+  const types=Object.keys(COMPONENT_RULES);
+  const comps=[...new Set(Object.values(COMPONENT_RULES).flat().map(c=>c.type))];
+  const bts=['A+','A-','B+','B-','O+','O-','AB+','AB-'];
+  const opt=a=>a.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
+  G('sepStatsPane').innerHTML=`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <button class="btn" onclick="loadSeparationBoard()"><i class="ti ti-arrow-right"></i> رجوع</button>
+      <div style="font-size:18px;font-weight:800;color:#BE123C">📊 إحصائيات الفصل</div>
+    </div>
+    <div class="tabs" id="sstKinds" style="flex-wrap:wrap">
+      ${Object.entries(_SST_KINDS).map(([k,l])=>`<div class="tab" data-k="${k}" onclick="sepStatsKind('${k}')">${l}</div>`).join('')}
+    </div>
+    <div id="sstAnchorRow" style="display:flex;gap:6px;align-items:center;margin:10px 0">
+      <button class="btn" onclick="sepStatsShift(-1)" title="الفترة السابقة"><i class="ti ti-chevron-right"></i></button>
+      <input type="date" id="sstAnchor" class="sinp" style="flex:1" onchange="sepStatsRun()">
+      <button class="btn" onclick="sepStatsShift(1)" title="الفترة التالية"><i class="ti ti-chevron-left"></i></button>
+    </div>
+    <div id="sstCustomRow" style="display:none;gap:6px;margin:10px 0">
+      <input type="date" id="sstFrom" class="sinp" style="flex:1" onchange="sepStatsRun()">
+      <input type="date" id="sstTo" class="sinp" style="flex:1" onchange="sepStatsRun()">
+    </div>
+    <div class="fgrid" style="margin-bottom:6px">
+      <div class="fgrp"><label>نوع القنينة</label><select id="sstBt" onchange="sepStatsRun()"><option value="">الكل</option>${opt(types)}</select></div>
+      <div class="fgrp"><label>المكوّن</label><select id="sstComp" onchange="sepStatsRun()"><option value="">الكل</option>${opt(comps)}</select></div>
+      <div class="fgrp"><label>فصيلة الدم</label><select id="sstBl" onchange="sepStatsRun()"><option value="">الكل</option>${opt(bts)}</select></div>
+    </div>
+    <div id="sstRange" style="font-size:15px;color:#6B7280;margin-bottom:8px"></div>
+    <div id="sstResult"></div>`;
+  const today=_ymd(new Date());
+  G('sstAnchor').value=today; G('sstFrom').value=_ymd(new Date(new Date().getFullYear(),new Date().getMonth(),1)); G('sstTo').value=today;
+  _sepShowLevel(3);
+  sepStatsKind('month');
+}
+
+function sepStatsKind(k){
+  _sstKind=k;
+  document.querySelectorAll('#sstKinds .tab').forEach(t=>t.classList.toggle('on', t.dataset.k===k));
+  G('sstAnchorRow').style.display = k==='custom' ? 'none' : 'flex';
+  G('sstCustomRow').style.display = k==='custom' ? 'flex' : 'none';
+  sepStatsRun();
+}
+function sepStatsShift(dir){
+  if(_sstKind==='custom') return;
+  G('sstAnchor').value=sepShiftAnchor(_sstKind, G('sstAnchor').value||_ymd(new Date()), dir);
+  sepStatsRun();
+}
+
+async function sepStatsRun(){
+  const my=++_sstToken, kind=_sstKind;
+  let from, to;
+  if(kind==='custom'){
+    const f=G('sstFrom').value, t=G('sstTo').value;
+    if(!f||!t){ G('sstResult').innerHTML=''; return; }
+    from=_parseYmd(f); to=_parseYmd(t);
+    if(from>to){ [from,to]=[to,from]; }
+  } else {
+    const a=G('sstAnchor').value; if(!a){ G('sstResult').innerHTML=''; return; }
+    ({from,to}=sepPeriodRange(kind,a));
+  }
+  const bt=G('sstBt').value, comp=G('sstComp').value, bl=G('sstBl').value;
+  G('sstRange').textContent='من '+fd(_ymd(from))+' إلى '+fd(_ymd(to))+(kind==='week'?'  (السبت ← الجمعة)':'');
+  G('sstResult').innerHTML='<div class="empty"><i class="ti ti-loader"></i><p>جاري التحميل...</p></div>';
+  try{
+    const fromIso=new Date(from.getFullYear(),from.getMonth(),from.getDate(),0,0,0,0).toISOString();
+    const toIso=new Date(to.getFullYear(),to.getMonth(),to.getDate(),23,59,59,999).toISOString();
+    let rows=[];
+    for(let p=0;;p+=1000){
+      let q=db.from('blood_donations').select('id,parent_donation_id,component_type,bottle_type,blood_type,created_at')
+        .not('parent_donation_id','is',null).gte('created_at',fromIso).lte('created_at',toIso)
+        .order('created_at').order('id');
+      if(bt) q=q.eq('bottle_type',bt);
+      if(comp) q=q.eq('component_type',comp);
+      if(bl) q=q.eq('blood_type',bl);
+      const{data,error}=await q.range(p,p+999);
+      if(error) throw error;
+      rows=rows.concat(data||[]);
+      if((data||[]).length<1000) break;
+    }
+    if(my!==_sstToken) return;            // a newer selection superseded this one
+    const agg=sepAggregate(rows,from,to,kind);
+    window._SST_LAST={agg,kind,from:_ymd(from),to:_ymd(to),filters:[bt&&('نوع القنينة: '+bt),comp&&('المكوّن: '+comp),bl&&('الفصيلة: '+bl)].filter(Boolean)};
+    G('sstResult').innerHTML=sepStatsHtml(window._SST_LAST);
+  }catch(e){
+    if(my===_sstToken) G('sstResult').innerHTML='<div class="empty"><i class="ti ti-alert-triangle"></i><p>تعذّر التحميل: '+esc(e.message||'')+'</p></div>';
+  }
+}
+
+function _sstLabel(agg,key){
+  if(agg.mode==='month'){ const [y,m]=key.split('-').map(Number); return new Date(y,m-1,1).toLocaleDateString('ar-IQ-u-nu-latn',{month:'long',year:'numeric'}); }
+  return fd(key);
+}
+function sepStatsHtml(S){
+  const a=S.agg;
+  if(!a.comps) return '<div class="empty"><i class="ti ti-search-off"></i><p>لا توجد عمليات فصل ضمن هذه الفترة والفلاتر</p></div>';
+  const rr=(l,v,st)=>`<div class="rr"${st?` style="${st}"`:''}><span>${esc(l)}</span><span class="rv">${v}</span></div>`;
+  const sortRows=o=>Object.entries(o).sort((x,y)=>y[1]-x[1]);
+  const max=Math.max(1,...a.timeline.map(t=>t.bottles));
+  return `
+  <div style="display:flex;gap:8px;margin-bottom:10px">
+    <button class="btn" onclick="sepStatsPrint()"><i class="ti ti-printer"></i> طباعة</button>
+    <button class="btn" onclick="sepStatsExcel()"><i class="ti ti-file-spreadsheet"></i> Excel</button>
+  </div>
+  <div class="rpt" id="sstRpt">
+    <div class="rpt-hd" style="background:#BE123C;color:#fff;padding:14px 18px">
+      <div class="rh-t" style="font-size:16px;font-weight:700">إحصائيات الفصل — ${_SST_KINDS[S.kind]}</div>
+      <div class="rh-s" style="font-size:13px;opacity:.85;margin-top:2px">${fd(S.from)} إلى ${fd(S.to)}${S.filters.length?' — '+esc(S.filters.join(' | ')):''}</div>
+    </div>
+    <div class="rpt-body">
+      <div class="rs"><div class="rs-t">الملخص</div>
+        ${rr('قناني دم كامل مفصولة',fnum(a.bottles))}
+        ${rr('مكوّنات ناتجة',fnum(a.comps))}
+        ${rr('المعدل اليومي (قنينة/يوم)',a.perDay.toLocaleString('ar-IQ',{maximumFractionDigits:1}))}
+      </div>
+      <div class="rs"><div class="rs-t">حسب المكوّن</div>${sortRows(a.byComp).map(([k,v])=>rr(k,fnum(v))).join('')}</div>
+      <div class="rs"><div class="rs-t">حسب نوع القنينة (قناني مفصولة)</div>${sortRows(a.byType).map(([k,v])=>rr(k,fnum(v))).join('')}</div>
+      <div class="rs"><div class="rs-t">حسب فصيلة الدم (قناني مفصولة)</div>${sortRows(a.byBlood).map(([k,v])=>rr(k,fnum(v))).join('')}</div>
+      <div class="rs"><div class="rs-t">التوزيع الزمني — ${a.mode==='month'?'شهرياً':'يومياً'} (قناني / مكوّنات)</div>
+        ${a.timeline.map(t=>`<div class="rr" style="align-items:center;gap:8px"><span style="min-width:110px">${esc(_sstLabel(a,t.key))}</span>
+          <span style="flex:1;height:8px;background:#f1f1f1;border-radius:4px;overflow:hidden"><span style="display:block;height:100%;width:${(t.bottles/max*100).toFixed(0)}%;background:#BE123C"></span></span>
+          <span class="rv" style="min-width:70px;text-align:left">${fnum(t.bottles)} / ${fnum(t.comps)}</span></div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+function sepStatsPrint(){
+  const el=G('sstRpt'); if(!el){ toast('لا يوجد تقرير للطباعة','warning'); return; }
+  printHtmlDocument(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>إحصائيات الفصل</title>
+  <style>body{font-family:'Segoe UI',Arial,sans-serif;direction:rtl;padding:20px;background:#fff;font-size:15px}
+  .rpt{border:1px solid #ddd;border-radius:8px;overflow:hidden}.rpt-body{padding:14px}.rs{margin-bottom:12px}
+  .rs-t{font-size:14px;font-weight:700;color:#757575;padding:4px 8px;background:#fafafa;border-radius:4px;margin-bottom:6px}
+  .rr{display:flex;justify-content:space-between;padding:4px 8px;border-bottom:1px solid #f5f5f5;font-size:14px}.rv{font-weight:700;color:#BE123C}
+  @media print{@page{margin:10mm}}</style></head><body>${el.outerHTML}</body></html>`);
+}
+function sepStatsExcel(){
+  const S=window._SST_LAST; if(!S||!S.agg.comps){ toast('لا يوجد تقرير للتصدير','warning'); return; }
+  const a=S.agg;
+  const sec=(t,rows)=>`<tr><td colspan="3" style="background:#1E293B;color:#fff;font-weight:bold;padding:6px">${esc(t)}</td></tr>`+
+    rows.map(r=>`<tr>${r.map(c=>`<td>${esc(String(c))}</td>`).join('')}</tr>`).join('')+`<tr><td>&nbsp;</td></tr>`;
+  const cnt=o=>Object.entries(o).sort((x,y)=>y[1]-x[1]);
+  const body=`<tr><td colspan="3" style="background:#BE123C;color:#fff;font-weight:bold;padding:8px">إحصائيات الفصل — ${_SST_KINDS[S.kind]} (${S.from} إلى ${S.to})${S.filters.length?' — '+esc(S.filters.join(' | ')):''}</td></tr><tr><td>&nbsp;</td></tr>`+
+    sec('الملخص',[['قناني دم كامل مفصولة',a.bottles],['مكوّنات ناتجة',a.comps],['المعدل اليومي (قنينة/يوم)',a.perDay.toFixed(1)]])+
+    sec('حسب المكوّن',cnt(a.byComp))+sec('حسب نوع القنينة (قناني مفصولة)',cnt(a.byType))+sec('حسب فصيلة الدم (قناني مفصولة)',cnt(a.byBlood))+
+    sec('التوزيع الزمني ('+(a.mode==='month'?'شهرياً':'يومياً')+')',a.timeline.map(t=>[_sstLabel(a,t.key),t.bottles,t.comps]));
+  const blob=new Blob(['\uFEFF<html dir="rtl"><head><meta charset="UTF-8"></head><body><table border="1">'+body+'</table></body></html>'],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const l=document.createElement('a'); l.href=URL.createObjectURL(blob); l.download='إحصائيات_الفصل_'+S.from+'_'+S.to+'.xls'; l.click();
+  toast('✅ تم تصدير التقرير لإكسل','success',3500);
 }
