@@ -6,6 +6,7 @@ const ALL_PERMS = [
   {key:'reception',  label:'➕ إضافة متبرع'},
   {key:'campaigns',  label:'🚐 حملات التبرع'},
   {key:'draw',       label:'💉 السحب'},
+  {key:'trima',      label:'🩸 وحدة التريما'},
   {key:'damaged_store', label:'🗑️ مخزن القناني التالفة'},
   {key:'virology',   label:'🧪 وحدة الفيروسات'},
   {key:'classification', label:'🩸 وحدة التصنيف'},

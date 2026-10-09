@@ -1196,6 +1196,12 @@ tbody tr:hover td{background:#fafafa}
         </div>
       </div>
 
+      <!-- TRIMA -->
+      <div class="sc" id="s-trima">
+        <div class="sh"><div class="sh-t">🩸 وحدة التريما — قائمة الانتظار</div></div>
+        <div id="trimaList"><div class="empty"><i class="ti ti-clock"></i><p>جاري التحميل...</p></div></div>
+      </div>
+
       <!-- DAMAGED STORE -->
       <div class="sc" id="s-damaged_store">
         <div class="tabs" id="dstTabs" style="margin-bottom:10px">
@@ -1747,7 +1753,7 @@ const PS = 20;
 const TITLES = {
   dashboard:'لوحة التحكم', add:'إضافة متبرع جديد', donors:'سجل المتبرعين',
   search:'بحث متقدم', globalsearch:'الأرشيف الشامل', campaigns:'حملات التبرع', separation:'الفصل', pending_release:'المخزن المؤقت', barcode:'الباركود والطباعة', infected:'المصابون',
-  rejected:'المرفوضون', rare:'الفصائل النادرة', damaged_store:'مخزن القناني التالفة',
+  rejected:'المرفوضون', rare:'الفصائل النادرة', damaged_store:'مخزن القناني التالفة', trima:'وحدة التريما',
   stats:'الإحصائيات', audit:'سجل التتبع', settings:'الإعدادات', dthome:'الرئيسية'
 };
 
@@ -1792,6 +1798,7 @@ const SECTION_SCRIPTS = {
   separation: 'campaigns.js',
   pending_release: 'campaigns.js',
   draw: 'draw.js',
+  trima: ['draw.js', 'trima.js'],
   virology: ['lab-shared.js', 'virology.js'],
   classification: ['lab-shared.js', 'classification.js'],
   dashboard: 'dashboard.js',
@@ -1898,7 +1905,7 @@ async function withdrawDonation(id, donorName){
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'withdrawn',released_bottle:d?.bottle_number}});
     toast('↩️ تم تسجيل الانسحاب — رقم القنينة '+(d?.bottle_number||'')+' أُعيد لإعادة الاستخدام','warning',5000);
     // Refresh whichever screen this was called from.
-    if(G('s-draw')?.classList.contains('on')){ G('drawModal')?.classList.remove('on'); await loadDraw(); }
+    if(G('s-draw')?.classList.contains('on')||G('s-trima')?.classList.contains('on')){ G('drawModal')?.classList.remove('on'); await reloadDrawView(); }
     else if(typeof loadDonors==='function') await loadDonors(DPAGE);
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }
@@ -2915,6 +2922,7 @@ async function nav(name, el){
     case 'users':      await loadUsers(); break;
     case 'reception':  setupReception(); break;
     case 'draw':       await loadDraw(); break;
+    case 'trima':      await loadTrima(); break;
     case 'virology':       await loadVirology(); break;
     case 'classification': await loadClassification(); break;
     case 'supply':     await loadSupply(); break;
@@ -2982,7 +2990,8 @@ const COMPONENT_RULES = {
   'ثنائي':     [{type:'دم مضغوط',days:35},{type:'بلازما',days:365}]
 };
 // Trima's two possible direct outputs (chosen by the draw employee — no separate step).
-const TRIMA_OUTPUTS = [{type:'دم مضغوط',days:21},{type:'صفائح دموية',days:5}];
+// Red-cell shelf life follows the separation rules for a filtered (leukoreduced) unit = 45 days.
+const TRIMA_OUTPUTS = [{type:'دم مضغوط',days:45},{type:'صفائح دموية',days:5}];
 
 function calcExpiry(){
   const draw=G('f-draw').value; if(!draw) return;
@@ -4090,6 +4099,7 @@ const WORK_CARDS = [
   {key:'reception', icon:'➕', name:'إضافة متبرع',  desc:'تسجيل متبرع جديد'},
   {key:'campaigns', icon:'🚐', name:'حملات التبرع',  desc:'تسلسلات ومتابعة الحملات'},
   {key:'draw',      icon:'💉', name:'السحب',        desc:'وحدة سحب الدم'},
+  {key:'trima',     icon:'🩸', name:'وحدة التريما',  desc:'سحب التريما: دم مضغوط أو صفائح'},
   {key:'virology',      icon:'🧪', name:'وحدة الفيروسات', desc:'فحص العينات'},
   {key:'classification',icon:'🩸', name:'وحدة التصنيف',  desc:'تحديد فصيلة القناني'},
   {key:'separation',icon:'🧬', name:'الفصل',        desc:'متابعة القناني من السحب لحد الفصل'},
@@ -4819,9 +4829,9 @@ if('serviceWorker' in navigator){
         <div class="fgrp" id="dm-exp-grp"><label>تاريخ النفاد (تلقائي)</label><input type="date" id="dm-exp" class="auto" readonly></div>
       </div>
       <div id="dm-trima-section" style="display:none;margin-top:10px;background:#F0F9FF;border:1px solid #BAE6FD;border-radius:10px;padding:12px">
-        <div style="font-size:15.5px;font-weight:700;color:#0369A1;margin-bottom:8px">جهاز التريما — حدد الناتج (أو الاثنين):</div>
+        <div style="font-size:15.5px;font-weight:700;color:#0369A1;margin-bottom:8px">جهاز التريما — حدد الناتج (دم مضغوط أو صفائح أو الاثنين):</div>
         <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1.5px solid #BAE6FD;background:#fff;border-radius:8px;margin-bottom:6px;cursor:pointer">
-          <input type="checkbox" id="dm-trima-blood" style="width:17px;height:17px"><span style="font-weight:600">دم مضغوط <span style="color:#757575;font-weight:400">(إكسباير ٢١ يوم)</span></span>
+          <input type="checkbox" id="dm-trima-blood" style="width:17px;height:17px"><span style="font-weight:600">دم مضغوط <span style="color:#757575;font-weight:400">(إكسباير ٤٥ يوم)</span></span>
         </label>
         <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1.5px solid #BAE6FD;background:#fff;border-radius:8px;cursor:pointer">
           <input type="checkbox" id="dm-trima-plt" style="width:17px;height:17px"><span style="font-weight:600">صفائح دموية <span style="color:#757575;font-weight:400">(إكسباير ٥ أيام)</span></span>

@@ -178,7 +178,7 @@ async function saveClassification(){
       // Offline: queue the field update — same reasoning as virology's offline path, the
       // completion/rejection decision needs the real server state and is only made for real
       // when syncQueue() replays this through applyLabUpdate() once back online.
-      await enqueueOp('lab', {donation_id:id, fieldUpdates:{blood_type:bt}});
+      await enqueueOp('lab', {donation_id:id, fieldUpdates:{blood_type:bt, blood_type_date:labToday()}});
       const q = await getPendingQueue();
       updateOfflineBar('offline', q.length+' عملية معلّقة');
       toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً عند عودة الإنترنت','warning',5000);

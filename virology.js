@@ -138,7 +138,7 @@ async function saveVirology(){
   try{
     const ser = diseases.length ? 'Positive' : 'Negative';
     const serType = diseases.length ? diseases.join(', ') : null;
-    const fieldUpdates = {serology_result:ser, serology_type:serType};
+    const fieldUpdates = {serology_result:ser, serology_type:serType, serology_date:labToday()};
     const note = G('vm-note').value.trim();
     if(ser==='Positive' && note) fieldUpdates.bottle_note = note;   // only sent when written
     if(!IS_ONLINE){

@@ -1,11 +1,16 @@
 // ================================================================
 // WORKFLOW — DRAW (السحب)
 // ================================================================
+// Draw and Trima share the same confirm modal; refresh whichever screen opened it.
+async function reloadDrawView(){
+  if(G('s-trima')?.classList.contains('on') && typeof loadTrima==='function') await loadTrima();
+  else await loadDraw();
+}
 async function loadDraw(){
   load(true);
   const{data}=await db.from('blood_donations')
     .select('id,donation_type,donation_date,donation_time,bottle_number,bottle_type,donors(full_name,birth_year,gender,mobile)')
-    .eq('status','pending_draw').eq('is_deleted',false)
+    .eq('status','pending_draw').eq('is_deleted',false).neq('bottle_type','تريما')
     .order('created_at',{ascending:true});
   load(false);
   if(data&&data.length){
@@ -66,7 +71,7 @@ async function confirmBulkDraw(){
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:ids[0],new_values:{status:'pending_lab',bulk_count:ids.length}});
     toast('✅ تم تأكيد السحب لـ'+ids.length+' متبرع','success',4000);
     G('bulkDrawModal').classList.remove('on');
-    await loadDraw();
+    await reloadDrawView();
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }
 }
@@ -149,7 +154,7 @@ async function confirmDrawSuccess(){
       await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'separated',components:rows.map(r=>r.component_type).join(', ')}});
       toast('✅ تم تسجيل سحب التريما — '+rows.length+' مكوّن أُرسل للمختبر','success',4500);
       G('drawModal').classList.remove('on');
-      await loadDraw();
+      await reloadDrawView();
     }catch(e){ toast('خطأ: '+e.message,'error'); }
     finally{ load(false); }
     return;
@@ -167,7 +172,7 @@ async function confirmDrawSuccess(){
       updateOfflineBar('offline', q.length+' عملية معلّقة');
       toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً عند عودة الإنترنت','warning',5000);
       G('drawModal').classList.remove('on');
-      await loadDraw();
+      await reloadDrawView();
       load(false);
       return;
     }
@@ -180,7 +185,7 @@ async function confirmDrawSuccess(){
     G('drawModal').classList.remove('on');
     const{data:don}=await db.from('blood_donations').select('*,donors(full_name,donor_number)').eq('id',id).single();
     if(don){ BCDATA=don; setTimeout(()=>printBC('full'),300); }
-    await loadDraw();
+    await reloadDrawView();
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }
 }
@@ -203,7 +208,7 @@ async function confirmDamagedBottle(){
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'damaged',bottle_note:note||null}});
     toast('⚠️ سُجّلت القنينة كتالفة — يُسمح بالتبرع مجدداً بعد أسبوعين','warning',5500);
     G('drawModal').classList.remove('on');
-    await loadDraw();
+    await reloadDrawView();
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }
 }
@@ -247,7 +252,7 @@ async function confirmMedicalReject(){
     await cacheRejectedDonors();
     toast('⛔ تم رفض المتبرع مؤقتاً — رقم القنينة '+(d?.bottle_number||'')+' أُعيد لإعادة الاستخدام','warning',5500);
     G('drawModal').classList.remove('on');
-    await loadDraw();
+    await reloadDrawView();
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }
 }

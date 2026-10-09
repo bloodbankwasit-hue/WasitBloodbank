@@ -7,7 +7,15 @@
 
 // fieldUpdates carries only the field(s) THIS unit is responsible for (blood_type, or
 // serology_result + serology_type) — never both, since each unit only ever knows its own part.
+// Local (Baghdad) calendar day the work was actually done — used by the home-screen statistics.
+function labToday(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
 async function applyLabUpdate(id, fieldUpdates){
+  // Stamp the day this unit did its part (kept if the caller already stamped it, e.g. an offline
+  // operation queued earlier and replayed now).
+  fieldUpdates={...fieldUpdates};
+  if('serology_result' in fieldUpdates && !fieldUpdates.serology_date) fieldUpdates.serology_date=labToday();
+  if('blood_type' in fieldUpdates && !fieldUpdates.blood_type_date) fieldUpdates.blood_type_date=labToday();
   const{data:cur}=await db.from('blood_donations')
     .select('blood_type,serology_result,serology_type,donor_id,bottle_number,donors(full_name)')
     .eq('id',id).single();
@@ -24,7 +32,12 @@ async function applyLabUpdate(id, fieldUpdates){
   const payload = {...fieldUpdates};
   if(complete) payload.status = newStatus;
 
-  const{error}=await db.from('blood_donations').update(payload).eq('id',id);
+  let{error}=await db.from('blood_donations').update(payload).eq('id',id);
+  if(error && /serology_date|blood_type_date/i.test(error.message||'')){
+    // The date columns haven't been added to the database yet — save the result without them.
+    delete payload.serology_date; delete payload.blood_type_date;
+    ({error}=await db.from('blood_donations').update(payload).eq('id',id));
+  }
   if(error) throw error;
 
   // One draw event can produce more than one pending-lab row sharing the same bottle number
