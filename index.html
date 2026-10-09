@@ -1196,6 +1196,18 @@ tbody tr:hover td{background:#fafafa}
         </div>
       </div>
 
+      <!-- DAMAGED STORE -->
+      <div class="sc" id="s-damaged_store">
+        <div class="tabs" id="dstTabs" style="margin-bottom:10px">
+          <div class="tab on" data-t="wait" onclick="dstTab('wait')">⏳ بانتظار الإتلاف</div>
+          <div class="tab" data-t="archive" onclick="dstTab('archive')">🗄️ الأرشيف</div>
+          <div class="tab" data-t="stats" onclick="dstTab('stats')">📊 إحصائيات</div>
+        </div>
+        <div id="dst-wait"></div>
+        <div id="dst-archive" style="display:none"></div>
+        <div id="dst-stats" style="display:none"></div>
+      </div>
+
       <!-- RARE -->
       <div class="sc" id="s-rare">
         <div class="rare-wrap">
@@ -1590,7 +1602,7 @@ tbody tr:hover td{background:#fafafa}
           <div class="sh-t"><i class="ti ti-package"></i> خزين القناني</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn" style="font-size:15px;padding:7px 12px" onclick="openSupplyExport()"><i class="ti ti-file-export"></i> تصدير متقدم</button>
-            <button id="viewDamagedBtn" class="btn" style="border-color:#7F1D1D;color:#7F1D1D;font-size:15px;padding:7px 12px" onclick="openDamagedList()">🗑️ القناني التالفة (0)</button>
+            <button id="viewDamagedBtn" class="btn" style="border-color:#7F1D1D;color:#7F1D1D;font-size:15px;padding:7px 12px" onclick="nav('damaged_store')">🗑️ القناني التالفة (0)</button>
           </div>
         </div>
         <div id="supplyTypeGrid" class="comp-stock-grid" style="margin-bottom:16px"></div>
@@ -1658,6 +1670,34 @@ tbody tr:hover td{background:#fafafa}
   </div>
 </div>
 
+<!-- DAMAGED STORE MODALS -->
+<div class="overlay" id="dstDestroyModal">
+  <div class="modal" style="width:440px;max-width:95vw">
+    <div class="modal-title">🗑️ محضر إتلاف طبي</div>
+    <div style="margin-bottom:10px;font-weight:700">عدد القناني: <span id="dsd-count">0</span></div>
+    <div class="fgrid">
+      <div class="fgrp"><label>طريقة الإتلاف</label><select id="dsd-method"></select></div>
+      <div class="fgrp"><label>تاريخ الإتلاف</label><input type="date" id="dsd-date"></div>
+      <div class="fgrp s2"><label>المسؤول</label><input type="text" id="dsd-officer"></div>
+      <div class="fgrp s2"><label>ملاحظات</label><input type="text" id="dsd-notes" placeholder="اختياري"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="G('dstDestroyModal').classList.remove('on')">إلغاء</button>
+      <button class="btn btn-p" onclick="dstConfirmDestroy()">✅ تأكيد الإتلاف</button>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="dstRepModal">
+  <div class="modal" style="width:560px;max-width:95vw">
+    <div class="modal-title">📄 محضر إتلاف</div>
+    <div id="dstRepBody" style="max-height:55vh;overflow:auto"></div>
+    <div class="modal-foot">
+      <button class="btn" onclick="G('dstRepModal').classList.remove('on')">إغلاق</button>
+      <button class="btn btn-p" id="dstRepPrint">🖨️ طباعة</button>
+    </div>
+  </div>
+</div>
+
 <!-- ADD REJECTED MODAL -->
 <div class="overlay" id="rjModal">
   <div class="modal">
@@ -1707,7 +1747,7 @@ const PS = 20;
 const TITLES = {
   dashboard:'لوحة التحكم', add:'إضافة متبرع جديد', donors:'سجل المتبرعين',
   search:'بحث متقدم', globalsearch:'الأرشيف الشامل', campaigns:'حملات التبرع', separation:'الفصل', pending_release:'المخزن المؤقت', barcode:'الباركود والطباعة', infected:'المصابون',
-  rejected:'المرفوضون', rare:'الفصائل النادرة',
+  rejected:'المرفوضون', rare:'الفصائل النادرة', damaged_store:'مخزن القناني التالفة',
   stats:'الإحصائيات', audit:'سجل التتبع', settings:'الإعدادات', dthome:'الرئيسية'
 };
 
@@ -1759,6 +1799,7 @@ const SECTION_SCRIPTS = {
   globalsearch: ['donors.js', 'search.js'],
   infected: 'infected-rejected.js',
   rare: 'rare.js',
+  damaged_store: 'damaged-store.js',
   audit: 'audit.js',
   settings: ['sequences.js', 'settings.js', 'backup.js'],
   users: 'users.js',
@@ -2867,6 +2908,7 @@ async function nav(name, el){
       await loadInfected('', document.querySelector('#infectedPane .tab'));
       break;
     case 'rare':    await loadRareGrid(); break;
+    case 'damaged_store': await loadDamagedStore(); break;
     case 'add':     await loadNextBN(); break;
     case 'audit':    await loadAudit(); break;
     case 'settings':  await loadSeqGrid(); break;
@@ -3659,8 +3701,9 @@ function openSupplyExport(){
 
 async function loadSupply(){
   await autoMarkExpiredDamaged();
-  const{count:dmgCount}=await db.from('blood_donations').select('id',{count:'exact',head:true}).eq('status','damaged').eq('is_deleted',false);
+  const{count:dmgCount}=await db.from('blood_donations').select('id',{count:'exact',head:true}).eq('status','damaged').eq('is_deleted',false).is('destruction_report_id',null);
   const dmgBtn=G('viewDamagedBtn');
+  if(dmgBtn) dmgBtn.style.display = (UPROF?.role==='admin'||hasPermission('damaged_store')) ? '' : 'none';
   if(dmgBtn) dmgBtn.textContent='🗑️ القناني التالفة ('+(dmgCount||0)+')';
   await loadSupplyComponentGrid();
   refreshExpiryNotifications();
@@ -4056,6 +4099,7 @@ const WORK_CARDS = [
   {key:'globalsearch', icon:'🔍', name:'البحث والأرشيف', desc:'بحث سريع أو متقدم بكل البيانات'},
   {key:'infected',  icon:'⚠️', name:'المصابون والمرفوضون', desc:'الحالات الإيجابية والمرفوضون مؤقتاً ودائماً'},
   {key:'rare',      icon:'💎', name:'الفصائل النادرة', desc:'O− و AB−'},
+  {key:'damaged_store', icon:'🗑️', name:'مخزن القناني التالفة', desc:'استلام التالف وإتلافه بمحضر وأرشيفه'},
   {key:'stats',     icon:'📈', name:'الإحصائيات',  desc:'تقارير وطباعة'},
 ];
 
