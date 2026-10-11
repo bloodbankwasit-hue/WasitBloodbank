@@ -1893,6 +1893,13 @@ function load(v){ G('loader').classList.toggle('on',v); }
 // been created yet the update is retried without it, so the draw screen never breaks.
 async function markDonationExit(ids, reason){
   ids=[].concat(ids);
+  // The table's read policy only shows is_deleted=false rows, so a plain UPDATE that hides a row is
+  // rejected ("new row violates row-level security policy"). The soft delete therefore goes through
+  // the soft_delete_donations() database function (security definer). If that function has not been
+  // created yet, fall back to the old direct update so nothing else changes.
+  const rp=await db.rpc('soft_delete_donations',{p_ids:ids,p_reason:reason||null});
+  if(!rp.error) return {error:null};
+  if(!(rp.error.code==='PGRST202' || /could not find the function|soft_delete_donations/i.test(rp.error.message||''))) return {error:rp.error};
   let r=await db.from('blood_donations').update({is_deleted:true, exit_reason:reason}).in('id',ids);
   if(r.error && /exit_reason/i.test(r.error.message||'')) r=await db.from('blood_donations').update({is_deleted:true}).in('id',ids);
   return r;
@@ -4037,7 +4044,7 @@ async function finalizeDamagedSelected(){
   if(!confirm('تأكيد التلف النهائي لـ'+ids.length+' قنينة؟ لا يمكن التراجع عن هذا الإجراء.')) return;
   load(true);
   try{
-    const{error}=await db.from('blood_donations').update({is_deleted:true}).in('id',ids);
+    const{error}=await markDonationExit(ids,'damaged_final');
     if(error) throw error;
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'DELETE',table_name:'blood_donations',record_id:ids[0],new_values:{finalized_damaged_count:ids.length}});
     toast('تم التلف النهائي لـ'+ids.length+' قنينة','success');

@@ -307,7 +307,7 @@ async function deleteDonorRow(id,name){
   if(!confirm(`هل تريد حذف تبرع "${name}"؟ سيتم إخفاؤه من كل القوائم والتقارير، ولا يمكن التراجع عن هذا الإجراء من الواجهة.`)) return;
   load(true);
   try{
-    const{error}=await db.from('blood_donations').update({is_deleted:true}).eq('id',id);
+    const{error}=await markDonationExit(id,'deleted');
     if(error) throw error;
     await db.from('audit_log').insert({
       user_id:SES?.user?.id, user_name:UPROF?.full_name,

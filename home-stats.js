@@ -53,6 +53,15 @@ async function _hsFetchAll(build){
 }
 async function _hsCount(q){ const{count,error}=await q; if(error) throw error; return count||0; }
 const _hsBD=()=>db.from('blood_donations');
+// Withdrawn / medically-rejected donations are soft-deleted rows, which the table's read policy hides —
+// so they are counted by a database function (donation_exit_counts). Missing function → 0.
+async function _hsExitCount(r, reason, trima){
+  try{
+    const{data,error}=await db.rpc('donation_exit_counts',{p_from:r.from,p_to:r.to});
+    if(error) throw error;
+    return (data||[]).filter(x=>x.exit_reason===reason && ((x.bottle_type==='تريما')===trima)).reduce((s,x)=>s+Number(x.n||0),0);
+  }catch(e){ console.log('exit counts unavailable:',e.message||e); return 0; }
+}
 
 // Each block: perm key, title, icon, loader → {tiles:[[label,value,tone?]], groups:[[title,pairs]], names?:[...]}
 const HS_BLOCKS=[
@@ -70,18 +79,18 @@ const HS_BLOCKS=[
    const ok=await _hsFetchAll(()=>_hsBD().select('id,bottle_type').gte('draw_date',r.from).lte('draw_date',r.to)
      .eq('component_type','دم كامل').eq('is_deleted',false).neq('bottle_type','تريما').not('status','in','(damaged,pending_draw)'));
    const dmg=await _hsFetchAll(()=>_hsBD().select('id,bottle_type').gte('draw_date',r.from).lte('draw_date',r.to).eq('status','damaged').neq('bottle_type','تريما'));
-   const med=await _hsFetchAll(()=>_hsBD().select('id,bottle_type').gte('donation_date',r.from).lte('donation_date',r.to).eq('exit_reason','medical_reject').neq('bottle_type','تريما'));
+   const med=await _hsExitCount(r,'medical_reject',false);
    const wait=await _hsCount(_hsBD().select('id',{count:'exact',head:true}).eq('status','pending_draw').eq('is_deleted',false).neq('bottle_type','تريما'));
-   return {tiles:[['قناني مسحوبة',ok.length],['تالفة',dmg.length,'bad'],['رفض طبي',med.length,'warn'],['بانتظار الآن',wait]],
+   return {tiles:[['قناني مسحوبة',ok.length],['تالفة',dmg.length,'bad'],['رفض طبي',med,'warn'],['بانتظار الآن',wait]],
      groups:[['حسب نوع القنينة',hsCount(ok,x=>x.bottle_type)]]};
  }},
  {perm:'trima', icon:'🩸', title:'التريما', load: async (r)=>{
    const comps=await _hsFetchAll(()=>_hsBD().select('id,donor_id,bottle_number,draw_date,component_type').eq('bottle_type','تريما')
      .gte('draw_date',r.from).lte('draw_date',r.to).in('component_type',['دم مضغوط','صفائح دموية']).eq('is_deleted',false));
    const dmg=await _hsFetchAll(()=>_hsBD().select('id').gte('draw_date',r.from).lte('draw_date',r.to).eq('status','damaged').eq('bottle_type','تريما'));
-   const med=await _hsFetchAll(()=>_hsBD().select('id').gte('donation_date',r.from).lte('donation_date',r.to).eq('exit_reason','medical_reject').eq('bottle_type','تريما'));
+   const med=await _hsExitCount(r,'medical_reject',true);
    const wait=await _hsCount(_hsBD().select('id',{count:'exact',head:true}).eq('status','pending_draw').eq('is_deleted',false).eq('bottle_type','تريما'));
-   return {tiles:[['سحوبات تريما',hsDistinctDraws(comps).length],['تالفة',dmg.length,'bad'],['رفض طبي',med.length,'warn'],['بانتظار الآن',wait]],
+   return {tiles:[['سحوبات تريما',hsDistinctDraws(comps).length],['تالفة',dmg.length,'bad'],['رفض طبي',med,'warn'],['بانتظار الآن',wait]],
      groups:[['الناتج',hsCount(comps,x=>x.component_type)]]};
  }},
  {perm:'virology', icon:'🧪', title:'وحدة الفيروسات', load: async (r)=>{
