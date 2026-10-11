@@ -1169,6 +1169,7 @@ tbody tr:hover td{background:#fafafa}
               <button class="bcbtn" onclick="printBC('expiry')"><i class="ti ti-qrcode"></i> باركود سحب ونفاد</button>
               <button class="bcbtn" onclick="printBC('card')"><i class="ti ti-id-badge"></i> كارت تبرع</button>
               <button class="bcbtn" onclick="printBC('simple')"><i class="ti ti-scan"></i> باركود بدون نفاد</button>
+              <button class="bcbtn" onclick="printBCLabel()"><i class="ti ti-tag"></i> ملصق القنينة</button>
             </div>
           </div>
         </div>
@@ -1668,6 +1669,19 @@ tbody tr:hover td{background:#fafafa}
 </div><!-- end app -->
 
 <!-- RECEPTION PRINT MODAL (shown centered after a successful save) -->
+<div class="overlay" id="labelModal">
+  <div class="modal" style="width:360px">
+    <div style="font-size:17px;font-weight:800;margin-bottom:12px;text-align:center">🏷️ طباعة ملصق القنينة</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <label style="flex:1;font-size:13px">عدد الملصقات<input id="lb-copies" type="text" inputmode="numeric" value="1" style="width:100%;padding:8px;margin-top:4px"></label>
+      <label style="flex:1;font-size:13px">العرض (ملم)<input id="lb-w" type="text" inputmode="decimal" value="50" style="width:100%;padding:8px;margin-top:4px"></label>
+      <label style="flex:1;font-size:13px">الارتفاع (ملم)<input id="lb-h" type="text" inputmode="decimal" value="50" style="width:100%;padding:8px;margin-top:4px"></label>
+    </div>
+    <div style="font-size:12px;color:#92400E;background:#FEF3C7;border-radius:8px;padding:8px;margin-bottom:10px">اجعل «النسخ» في حوار الطباعة = 1 والمقياس 100% دون ترويسة/تذييل. القياس يُحفظ لهذا الجهاز.</div>
+    <button class="btn btn-p" onclick="confirmLabelPrint()" style="width:100%;justify-content:center">🖨️ طباعة</button>
+    <button class="btn" onclick="G('labelModal').classList.remove('on')" style="width:100%;justify-content:center;margin-top:8px">✕ إلغاء</button>
+  </div>
+</div>
 <div class="overlay" id="rcPrintModal">
   <div class="modal" style="width:420px">
     <div style="font-size:18px;font-weight:800;color:#166534;margin-bottom:14px;text-align:center">✅ تم الحفظ بنجاح — اختر ما تريد طباعته</div>
@@ -2183,11 +2197,10 @@ function printHtmlDocument(htmlString){
   // printing is still triggered automatically without any change to those templates.
 }
 
-async function exportDonorFormPDF(){
-  let d = _lastDonation;
-  if(!d){ toast('لا توجد بيانات','error'); return; }
-  // Printed from the donors list: only a few fields are on the row — fetch the full record so the
-  // template's boxes (mother's name, vitals, patient/hospital, donor number...) fill themselves.
+function isIOSDevice(){ return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
+
+// Fill in the fields a list row doesn't carry by fetching the full record (online only).
+async function enrichDonationForPrint(d){
   if(d.id && IS_ONLINE){
     try{
       const{data:full}=await db.from('blood_donations').select('*,donors(*)').eq('id',d.id).single();
@@ -2207,6 +2220,15 @@ async function exportDonorFormPDF(){
       }
     }catch(e){ console.log('receipt enrich failed:',e); }
   }
+  return d;
+}
+
+async function exportDonorFormPDF(){
+  let d = _lastDonation;
+  if(!d){ toast('لا توجد بيانات','error'); return; }
+  // Printed from the donors list: only a few fields are on the row — fetch the full record so the
+  // template's boxes (mother's name, vitals, patient/hospital, donor number...) fill themselves.
+  d = await enrichDonationForPrint(d);
   try{ await loadOneScript('receipt-template.js'); }
   catch(e){ toast('تعذر تحميل قالب الوصل','error'); return; }
   const S=v=> (v==null||v===0) ? '' : String(v);
@@ -2229,7 +2251,7 @@ async function exportDonorFormPDF(){
   // iPhone/iPad: the system print path stamps a URL/date/page-number footer on every sheet and can split
   // the form over two pages (not removable by CSS) — so draw the same template on a canvas and share it as
   // an A4-landscape PDF instead (same way the bottle sticker already works). Everything else prints the HTML.
-  const _ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+  const _ios = isIOSDevice();
   if(_ios && window.jspdf){
     try{
       toast('⏳ جاري تجهيز الوصل...','warning',2000);
@@ -2242,46 +2264,49 @@ async function exportDonorFormPDF(){
   printHtmlDocument(buildReceiptHtml(data));
 }
 
-async function exportBottleStickerPDF(){
-  const d = _lastDonation;
-  if(!d){ toast('لا توجد بيانات','error'); return; }
-  toast('⏳ جاري تجهيز الملصق...','warning',2000);
-  try{
-    const {jsPDF} = window.jspdf;
-    const W=100,H=60,sc=4;
-    const cv=document.createElement('canvas');
-    cv.width=W*sc; cv.height=H*sc;
-    const x=cv.getContext('2d');
-    x.scale(sc,sc);
-    x.fillStyle='#fff'; x.fillRect(0,0,W,H);
-    x.strokeStyle='#000'; x.lineWidth=0.8; x.strokeRect(1,1,W-2,H-2);
-    // Name
-    x.fillStyle='#000'; x.font='bold 7px Arial'; x.textAlign='center';
-    x.fillText(d.donor_name||'—',W/2,10);
-    x.beginPath(); x.moveTo(3,13); x.lineTo(W-3,13); x.stroke();
-    // Number
-    x.font='bold 18px monospace';
-    x.fillText(String(d.bottle_number||'—'),W/2,34);
-    // Dates
-    x.strokeRect(3,38,46,18); x.strokeRect(51,38,46,18);
-    x.fillStyle='#555'; x.font='5.5px Arial';
-    x.fillText('تاريخ السحب',26,45);
-    x.fillText('تاريخ النفاد',74,45);
-    x.fillStyle='#000'; x.font='bold 6.5px Arial';
-    x.fillText(d.donation_date||'—',26,54);
-    x.fillText(d.expiry_date||'—',74,54);
-    const img=cv.toDataURL('image/jpeg',0.95);
-    const doc=new jsPDF({orientation:'landscape',unit:'mm',format:[H,W],compress:true});
-    doc.addImage(img,'JPEG',0,0,W,H);
-    const blob=doc.output('blob');
-    await shareOrDownloadFile(blob,'ملصق_'+d.bottle_number+'.pdf','application/pdf');
-    toast('✅ تم تصدير الملصق','success');
-  }catch(e){
-    console.error(e);
-    toast('خطأ: '+e.message,'error');
-  }
+// ---- Bottle label (small HPRT printer) — design/engine in label-template.js ----
+function labelExpiry(d){
+  if(d.expiry_date) return String(d.expiry_date);
+  const base=d.draw_date||d.donation_date, days=WHOLE_BLOOD_DAYS[d.bottle_type];
+  if(!base||days==null) return '';
+  const e=new Date(base); if(isNaN(e)) return '';
+  e.setDate(e.getDate()+days); return e.toISOString().split('T')[0];
 }
-
+let _labelRec=null;
+async function exportBottleStickerPDF(rec){
+  const r=(rec&&rec.bottle_number!==undefined)?rec:_lastDonation;
+  if(!r){ toast('لا توجد بيانات','error'); return; }
+  try{ await loadOneScript('label-template.js'); }catch(e){ toast('تعذر تحميل قالب الملصق','error'); return; }
+  _labelRec=r;
+  const sz=labelCfgLoad();
+  G('lb-copies').value=1; G('lb-w').value=sz.width; G('lb-h').value=sz.height;
+  G('labelModal').classList.add('on');
+}
+async function confirmLabelPrint(){
+  const copies=parseInt(normDigits(G('lb-copies').value),10);
+  const size={width:parseFloat(normDec(G('lb-w').value)),height:parseFloat(normDec(G('lb-h').value))};
+  try{ labelValidate(copies,size); }catch(e){ toast(e.message,'error'); return; }
+  let d=_labelRec; if(!d) return;
+  d=await enrichDonationForPrint(d);
+  const S=v=> (v==null||v===0) ? '' : String(v);
+  const data={ donorName:S(d.donor_name||(d.donors&&d.donors.full_name)), bagNumber:S(d.bottle_number),
+    bagType:S(d.bottle_type), collectionDate:S(d.draw_date||d.donation_date), expiryDate:labelExpiry(d) };
+  labelCfgSave(size);
+  G('labelModal').classList.remove('on');
+  if(isIOSDevice() && window.jspdf){
+    try{
+      toast('⏳ جاري تجهيز الملصق...','warning',2000);
+      const blob=await labelToPdfBlob(data,copies,size);
+      await shareOrDownloadFile(blob,'ملصق_'+(data.bagNumber||'')+'.pdf','application/pdf');
+      toast('✅ تم تجهيز الملصق','success'); return;
+    }catch(e){ console.error('label pdf failed:',e); toast(e.message||'تعذر تجهيز الملصق','error'); return; }
+  }
+  printHtmlDocument(buildLabelHtml(data,copies,size));
+}
+function printBCLabel(){
+  const r=BCDATA; if(!r){ toast('لا توجد بيانات','warning'); return; }
+  exportBottleStickerPDF({...r, donor_name:r.donors&&r.donors.full_name});
+}
 
 // Donor data store for print
 const _donorStore = new Map();
