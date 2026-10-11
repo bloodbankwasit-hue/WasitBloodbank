@@ -1581,11 +1581,11 @@ tbody tr:hover td{background:#fafafa}
           </div>
           <div style="font-size:15.5px;font-weight:700;color:#374151;margin:14px 0 8px">العلامات الحيوية (اختياري)</div>
           <div class="fgrid">
-            <div class="fgrp"><label>ضغط الدم</label><input type="text" id="rc-bp" placeholder="مثال: 120/80"></div>
-            <div class="fgrp"><label>النبض</label><input type="text" inputmode="numeric" id="rc-pulse" placeholder="نبضة/دقيقة" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
-            <div class="fgrp"><label>درجة الحرارة</label><input type="number" step="0.1" id="rc-temp" placeholder="°م"></div>
-            <div class="fgrp"><label>الوزن</label><input type="number" step="0.1" id="rc-weight" placeholder="كغم"></div>
-            <div class="fgrp"><label>الهيموغلوبين</label><input type="number" step="0.1" id="rc-hgb" placeholder="g/dL"></div>
+            <div class="fgrp"><label>ضغط الدم</label><input type="text" id="rc-bp" placeholder="مثال: 120/80" oninput="this.value=normDigits(this.value)"></div>
+            <div class="fgrp"><label>النبض</label><input type="text" inputmode="numeric" id="rc-pulse" placeholder="نبضة/دقيقة" oninput="this.value=normDigits(this.value).replace(/[^0-9]/g,'')"></div>
+            <div class="fgrp"><label>درجة الحرارة</label><input type="text" inputmode="decimal" id="rc-temp" placeholder="°م" oninput="this.value=normDec(this.value)"></div>
+            <div class="fgrp"><label>الوزن</label><input type="text" inputmode="decimal" id="rc-weight" placeholder="كغم" oninput="this.value=normDec(this.value)"></div>
+            <div class="fgrp"><label>الهيموغلوبين</label><input type="text" inputmode="decimal" id="rc-hgb" placeholder="g/dL" oninput="this.value=normDec(this.value)"></div>
           </div>
         </div>
         <button class="btn-action" id="rcSaveBtn" onclick="saveReception()">✅ تأكيد القبول وإرسال للسحب</button>
@@ -1938,6 +1938,9 @@ function fd(d){
   return `${y}/${m}/${day}`;
 }
 function ft(t){ return t ? t.substring(0,5) : '—'; }
+// Typed numbers from any keyboard: Arabic-Indic digits / Arabic decimal separators become plain ones.
+function normDigits(s){ return String(s||'').replace(/[\u0660-\u0669]/g,c=>String(c.charCodeAt(0)-0x0660)).replace(/[\u06F0-\u06F9]/g,c=>String(c.charCodeAt(0)-0x06F0)); }
+function normDec(s){ s=normDigits(s).replace(/[\u066B\u066C,\u060C]/g,'.').replace(/[^0-9.]/g,''); const i=s.indexOf('.'); return i<0?s:s.slice(0,i+1)+s.slice(i+1).replace(/\./g,''); }
 function fnum(n){ return n!=null ? Number(n).toLocaleString('ar-IQ') : '—'; }
 // HTML-escape any user-supplied text before inserting into innerHTML (prevents stored XSS
 // from donor/employee names, addresses, notes, etc. containing HTML/script characters)
@@ -2207,6 +2210,19 @@ async function exportDonorFormPDF(){
     bloodPressure: S(d.blood_pressure), pulse: S(d.pulse), temperature: S(d.temperature),
     weight: S(d.weight), hemoglobin: S(d.hemoglobin)
   };
+  // iPhone/iPad: the system print path stamps a URL/date/page-number footer on every sheet and can split
+  // the form over two pages (not removable by CSS) — so draw the same template on a canvas and share it as
+  // an A4-landscape PDF instead (same way the bottle sticker already works). Everything else prints the HTML.
+  const _ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+  if(_ios && window.jspdf){
+    try{
+      toast('⏳ جاري تجهيز الوصل...','warning',2000);
+      const blob = await receiptToPdfBlob(data);
+      await shareOrDownloadFile(blob,'استمارة_'+(d.bottle_number||d.donor_number||'')+'.pdf','application/pdf');
+      toast('✅ تم تجهيز الوصل','success');
+      return;
+    }catch(e){ console.error('receipt pdf failed, falling back to print:',e); }
+  }
   printHtmlDocument(buildReceiptHtml(data));
 }
 
