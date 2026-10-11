@@ -1679,6 +1679,9 @@ tbody tr:hover td{background:#fafafa}
         🏷️ تصدير ملصق القنينة
       </button>
     </div>
+    <button class="btn" id="rcEditBtn" onclick="G('rcPrintModal').classList.remove('on');openEditDonation(_lastDonation&&_lastDonation.id)" style="width:100%;justify-content:center;margin-top:10px;border-color:#2563EB;color:#2563EB">
+      ✏️ تعديل البيانات
+    </button>
     <button class="btn" onclick="newDonor()" style="width:100%;justify-content:center;margin-top:10px">
       ➕ متبرع جديد
     </button>
@@ -1891,6 +1894,12 @@ function load(v){ G('loader').classList.toggle('on',v); }
 // Soft-deletes donation row(s) AND records why, so the statistics can tell a plain withdrawal
 // (not counted as a visitor) from a medical rejection (counted). If the exit_reason column has not
 // been created yet the update is retried without it, so the draw screen never breaks.
+// Opens the donation editor from any screen (donors.js is loaded on demand).
+async function openEditDonation(id){
+  if(!id){ toast('لا يمكن التعديل: السجل غير محفوظ بعد (بدون اتصال)','error'); return; }
+  try{ await loadOneScript('donors.js'); }catch(e){ toast('تعذر تحميل شاشة التعديل','error'); return; }
+  await editDonorRow(id);
+}
 async function markDonationExit(ids, reason){
   ids=[].concat(ids);
   // The table's read policy only shows is_deleted=false rows, so a plain UPDATE that hides a row is
@@ -4737,7 +4746,7 @@ if('serviceWorker' in navigator){
         <div class="fgrid">
           <div class="fgrp"><label>نوع التبرع *</label><select id="ed-dtyp"><option value="تعويضي">تعويضي</option><option value="طوعي">طوعي</option></select></div>
           <div class="fgrp"><label>نوع القنينة *</label><select id="ed-btyp"><option>مفلتر</option><option>رباعي</option><option>ريفيوس</option><option>ثنائي</option><option>أحادي</option><option>تريما</option><option>حملة تبرع رباعي</option><option>حملة تبرع مفلتر</option><option>رباعي SAG</option></select></div>
-          <div class="fgrp"><label>رقم القنينة</label><input type="text" id="ed-bnum" class="ro" readonly></div>
+          <div class="fgrp"><label>رقم القنينة (لا يُعدَّل — للتصحيح: انسحب ثم سجّل من جديد)</label><input type="text" id="ed-bnum" class="ro" readonly></div>
           <div class="fgrp"><label>اسم المريض</label><input type="text" id="ed-pat" placeholder="(للتبرع التعويضي فقط)"></div>
           <div class="fgrp"><label>اسم المستشفى</label><input type="text" id="ed-hosp" placeholder="مستشفى..."></div>
           <div class="fgrp"><label>تاريخ التبرع *</label><input type="date" id="ed-ddate"></div>
@@ -4750,17 +4759,19 @@ if('serviceWorker' in navigator){
         <div class="fst"><i class="ti ti-stethoscope"></i> الفحوصات السريرية والمختبرية</div>
         <div class="fgrid">
           <div class="fgrp"><label>فصيلة الدم</label><select id="ed-bt"><option value="">غير محدد</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select></div>
-          <div class="fgrp"><label>ضغط الدم (mmHg)</label><input type="text" id="ed-bp" placeholder="120/80"></div>
-          <div class="fgrp"><label>الوزن (كغ)</label><input type="text" inputmode="numeric" id="ed-wt" placeholder="70" step="0.5" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
-          <div class="fgrp"><label>النبض (ن/دقيقة)</label><input type="text" inputmode="numeric" id="ed-pulse" placeholder="72" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
-          <div class="fgrp"><label>الهيموكلوبين (g/dL)</label><input type="text" inputmode="numeric" id="ed-hgb" placeholder="15.3" step="0.1" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
-          <div class="fgrp"><label>نتيجة الفحوصات *</label><select id="ed-ser" onchange="toggleEdSer()"><option value="Negative">Negative — سالب</option><option value="Positive">Positive — موجب</option></select></div>
+          <div class="fgrp"><label>ضغط الدم (mmHg)</label><input type="text" id="ed-bp" placeholder="120/80" oninput="this.value=normDigits(this.value)"></div>
+          <div class="fgrp"><label>الوزن (كغ)</label><input type="text" inputmode="decimal" id="ed-wt" placeholder="70" oninput="this.value=normDec(this.value)"></div>
+          <div class="fgrp"><label>النبض (ن/دقيقة)</label><input type="text" inputmode="numeric" id="ed-pulse" placeholder="72" oninput="this.value=normDigits(this.value).replace(/[^0-9]/g,'')"></div>
+          <div class="fgrp"><label>الهيموكلوبين (g/dL)</label><input type="text" inputmode="decimal" id="ed-hgb" placeholder="15.3" oninput="this.value=normDec(this.value)"></div>
+          <div class="fgrp"><label>درجة الحرارة (°م)</label><input type="text" inputmode="decimal" id="ed-temp" placeholder="36.8" oninput="this.value=normDec(this.value)"></div>
+          <div class="fgrp"><label>نتيجة الفحوصات *</label><select id="ed-ser" onchange="toggleEdSer()"><option value="">لم يُفحص بعد</option><option value="Negative">Negative — سالب</option><option value="Positive">Positive — موجب</option></select></div>
           <div class="fgrp" id="edSerTypGrp" style="display:none"><label>نوع الإصابة</label><select id="ed-sert"><option value="HIV">HIV</option><option value="HCV">HCV</option><option value="HBsAg">HBsAg</option><option value="سفلس VDRL">سفلس (VDRL)</option></select></div>
         </div>
       </div>
     </div>
     <div class="modal-foot">
       <button class="btn" onclick="G('editDonorModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
+      <button class="btn" style="border-color:#BE123C;color:#BE123C" onclick="saveDonorEdit(true)"><i class="ti ti-printer"></i> حفظ وطباعة</button>
       <button class="btn btn-p" onclick="saveDonorEdit()"><i class="ti ti-device-floppy"></i> حفظ التعديلات</button>
     </div>
   </div>

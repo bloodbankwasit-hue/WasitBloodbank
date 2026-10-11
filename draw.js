@@ -31,6 +31,7 @@ async function loadDraw(){
         <div class="fc-sub">قنينة: ${r.bottle_number||'—'} (${r.bottle_type||'—'}) | ${r.donation_type}</div>
       </div>
       <div class="fc-act">
+        <button class="btn" onclick="openEditDonation('${r.id}')" title="تعديل البيانات"><i class="ti ti-edit"></i></button>
         <button class="btn btn-p" onclick="openDrawModal('${r.id}','${sq(r.donors?.full_name)}','${r.donation_type}','${r.bottle_number||''}','${r.bottle_type||''}')">
           <i class="ti ti-droplet"></i> سحب
         </button>

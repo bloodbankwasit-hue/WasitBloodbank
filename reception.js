@@ -383,6 +383,7 @@ async function saveReception(){
       }
       // Store for printing
       _lastDonation = {
+        id:don.id,
         donor_name:nm, bottle_number:bnum,
         bottle_type:btype,
         donor_number:donorNumber,
@@ -407,6 +408,7 @@ async function saveReception(){
       };
       // Show print options as a centered popup instead of resetting the form
       G('rcPrintModal').classList.add('on');
+      { const eb=G('rcEditBtn'); if(eb) eb.style.display=_lastDonation?.id?'':'none'; }
       G('rcSaveBtn').style.display='none';
       toast('✅ تم الحفظ — رقم القنينة: '+bnum,'success',4000);
     }

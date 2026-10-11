@@ -24,6 +24,7 @@ async function loadTrima(){
       <div class="fc-sub">قنينة: ${esc(r.bottle_number||'—')} | ${esc(r.donation_type||'')} | ${fd(r.donation_date)}</div>
     </div>
     <div class="fc-act">
+      <button class="btn" onclick="openEditDonation('${r.id}')" title="تعديل البيانات"><i class="ti ti-edit"></i></button>
       <button class="btn btn-p" onclick="openDrawModal('${r.id}','${sq(r.donors?.full_name)}','${sq(r.donation_type||'')}','${r.bottle_number||''}','تريما')">
         <i class="ti ti-droplet"></i> سحب تريما
       </button>

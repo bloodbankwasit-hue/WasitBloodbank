@@ -244,7 +244,8 @@ async function editDonorRow(id){
     G('ed-wt').value=r.weight||'';
     G('ed-pulse').value=r.pulse||'';
     G('ed-hgb').value=r.hemoglobin||'';
-    G('ed-ser').value=r.serology_result||'Negative';
+    if(G('ed-temp')) G('ed-temp').value=r.temperature||'';
+    G('ed-ser').value=r.serology_result||'';   // '' = not tested yet (never default to Negative)
     G('ed-sert').value=r.serology_type||'HIV';
     toggleEdSer();
     G('editDonorModal').classList.add('on');
@@ -254,7 +255,7 @@ async function editDonorRow(id){
 
 function toggleEdSer(){ G('edSerTypGrp').style.display=G('ed-ser').value==='Positive'?'flex':'none'; }
 
-async function saveDonorEdit(){
+async function saveDonorEdit(printAfter){
   const donId=G('ed-donid').value, donorId=G('ed-donorid').value;
   const dd=G('ed-ddate').value;
   // Campaign-drawn bottles have no linked donor — skip the identity requirement/update for them.
@@ -277,7 +278,7 @@ async function saveDonorEdit(){
       if(de) throw de;
     }
 
-    const ser=G('ed-ser').value;
+    const ser=G('ed-ser').value||null;   // untested stays untested (null)
     const{error:doe}=await db.from('blood_donations').update({
       bottle_type:G('ed-btyp').value, donation_type:G('ed-dtyp').value,
       patient_name:G('ed-pat').value.trim()||null, hospital_name:G('ed-hosp').value.trim()||null,
@@ -286,6 +287,7 @@ async function saveDonorEdit(){
       blood_type:G('ed-bt').value||null, blood_pressure:G('ed-bp').value.trim()||null,
       weight:parseFloat(G('ed-wt').value)||null, pulse:parseInt(G('ed-pulse').value)||null,
       hemoglobin:parseFloat(G('ed-hgb').value)||null,
+      temperature:parseFloat(G('ed-temp')?.value)||null,
       serology_result:ser, serology_type:ser==='Positive'?G('ed-sert').value:null
     }).eq('id',donId);
     if(doe) throw doe;
@@ -298,15 +300,33 @@ async function saveDonorEdit(){
 
     toast('✅ تم حفظ التعديلات','success');
     G('editDonorModal').classList.remove('on');
-    await loadDonors(DPAGE);
+    // Refresh whichever screen the editor was opened from.
+    if(G('s-donors')?.classList.contains('on')) await loadDonors(DPAGE);
+    else if((G('s-draw')?.classList.contains('on')||G('s-trima')?.classList.contains('on')) && typeof reloadDrawView==='function') await reloadDrawView();
+    if(printAfter===true){
+      // The print routine re-reads the saved record from the database (by id), so the new data is what prints.
+      _lastDonation={id:donId, donor_name:G('ed-name').value.trim(), bottle_number:G('ed-bnum').value, bottle_type:G('ed-btyp').value,
+        donation_type:G('ed-dtyp').value, donation_date:dd, donation_time:G('ed-dtime').value||'',
+        birth_year:parseInt(G('ed-by').value)||0, gender:G('ed-gen').value, mother_name:G('ed-mom').value.trim(),
+        national_id:G('ed-nid').value.trim(), mobile:G('ed-mob').value.trim(), address:G('ed-addr').value.trim(),
+        occupation:G('ed-job').value, patient_name:G('ed-pat').value.trim(), hospital_name:G('ed-hosp').value.trim(),
+        blood_pressure:G('ed-bp').value.trim(), pulse:G('ed-pulse').value, temperature:G('ed-temp')?.value||'',
+        weight:G('ed-wt').value, hemoglobin:G('ed-hgb').value};
+      await exportDonorFormPDF();
+    }
   }catch(e){ toast('خطأ في الحفظ: '+e.message,'error'); }
   finally{ load(false); }
 }
 
 async function deleteDonorRow(id,name){
-  if(!confirm(`هل تريد حذف تبرع "${name}"؟ سيتم إخفاؤه من كل القوائم والتقارير، ولا يمكن التراجع عن هذا الإجراء من الواجهة.`)) return;
+  if(!confirm(`هل تريد حذف تبرع "${name}"؟ سيتم إخفاؤه من كل القوائم والتقارير، ولا يمكن التراجع عن هذا الإجراء من الواجهة. (إذا كان بانتظار السحب يرجع رقم القنينة للاستخدام)`)) return;
   load(true);
   try{
+    // Still waiting for the draw → no blood was taken, so release the bottle number for reuse (same as «انسحب»).
+    const{data:cur}=await db.from('blood_donations').select('status,bottle_number,bottle_type').eq('id',id).single();
+    if(cur?.status==='pending_draw' && cur.bottle_number && cur.bottle_type){
+      await db.from('bottle_number_pool').insert({bottle_type:cur.bottle_type, bottle_number:cur.bottle_number, created_by:SES?.user?.id});
+    }
     const{error}=await markDonationExit(id,'deleted');
     if(error) throw error;
     await db.from('audit_log').insert({
