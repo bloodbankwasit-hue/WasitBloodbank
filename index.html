@@ -810,6 +810,17 @@ tbody tr:hover td{background:#fafafa}
   .page{padding:0}
   body{overflow:visible;height:auto}
 }
+.hs-bar{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.hs-nav{display:flex;align-items:center;justify-content:center;gap:10px}
+.hs-range{font-weight:700;font-size:16px;min-width:150px;text-align:center}
+.hs-card{background:#fff;border:1px solid #EEF2F6;border-radius:14px;padding:12px;margin-bottom:10px}
+.hs-h{font-weight:800;font-size:18px;margin-bottom:8px}
+.hs-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:6px}
+.hs-tile{background:#FAFAFA;border-radius:10px;padding:8px;text-align:center}
+.hs-v{font-size:26px;font-weight:800;line-height:1.2}
+.hs-l{font-size:13.5px;color:#757575}
+.hs-g{margin-top:4px;font-size:14.5px}.hs-gt{color:#757575;font-weight:700}
+.hs-names{margin-top:6px;font-size:14px}.hs-names summary{cursor:pointer;font-weight:700;color:#BE123C}
 </style>
 </head>
 <body>
@@ -976,7 +987,8 @@ tbody tr:hover td{background:#fafafa}
 
       <!-- DASHBOARD -->
       <div class="sc on" id="s-dashboard">
-        <div class="sg">
+        <div id="roleHome"></div>
+        <div class="sg" id="dashCards">
           <div class="sc-card" style="cursor:pointer" onclick="openDashDrill('متبرعو اليوم — '+fd(new Date().toISOString().split('T')[0]),new Date().toISOString().split('T')[0],new Date().toISOString().split('T')[0])"><div class="sc-ico">🩸</div><div class="sc-val" id="st0">—</div><div class="sc-lbl">متبرعو اليوم</div></div>
           <div class="sc-card" style="cursor:pointer" onclick="openDashDrill('إجمالي الشهر',_dashMonthStart(),_dashToday())"><div class="sc-ico">📅</div><div class="sc-val" id="st1">—</div><div class="sc-lbl">إجمالي الشهر</div></div>
           <div class="sc-card" style="cursor:pointer" onclick="openDashDrill('طوعيون الشهر',_dashMonthStart(),_dashToday(),{donation_type:'طوعي'})"><div class="sc-ico">🤲</div><div class="sc-val" id="st2">—</div><div class="sc-lbl">طوعيون الشهر</div></div>
@@ -1801,7 +1813,7 @@ const SECTION_SCRIPTS = {
   trima: ['draw.js', 'trima.js'],
   virology: ['lab-shared.js', 'virology.js'],
   classification: ['lab-shared.js', 'classification.js'],
-  dashboard: 'dashboard.js',
+  dashboard: ['dashboard.js', 'home-stats.js'],
   donors: 'donors.js',
   globalsearch: ['donors.js', 'search.js'],
   infected: 'infected-rejected.js',
@@ -2153,89 +2165,49 @@ function printHtmlDocument(htmlString){
 }
 
 async function exportDonorFormPDF(){
-  const d = _lastDonation;
+  let d = _lastDonation;
   if(!d){ toast('لا توجد بيانات','error'); return; }
-  const age = d.birth_year ? (new Date().getFullYear()-d.birth_year) : '';
-  const donorNum = d.donor_number!=null ? String(d.donor_number) : '';
-  const N=v=>v?esc(String(v)):'';
-
-  printHtmlDocument(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>استمارة التبرع</title>
-  <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Amiri',serif;direction:rtl;padding:22px;color:#000}
-    .frame{border:2px solid #000;padding:14px 16px}
-    .hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #BE123C;padding-bottom:10px;margin-bottom:12px}
-    .hdr .dept{text-align:left;font-size:16px;font-weight:700;line-height:1.6}
-    .hdr .titles{text-align:center;flex:1}
-    .hdr .titles h1{font-size:22px;font-weight:700}
-    .hdr .titles h2{font-size:16px;font-weight:400;margin-top:2px}
-    .barcoderow{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-bottom:12px}
-    .barcoderow .num{font-size:18px;font-weight:700;font-family:monospace}
-    table.f{width:100%;border-collapse:collapse;margin-bottom:2px}
-    table.f td{border:1px solid #000;padding:7px 10px;font-size:17px;vertical-align:middle}
-    table.f td.lbl{background:#EDEDED;font-weight:700;width:26%;text-align:center}
-    table.f td.val{width:24%}
-    .section-hdr{background:#EDEDED;text-align:center;font-weight:700;font-size:16.5px;padding:6px;border:1px solid #000;border-top:none}
-    .vitals td.lbl{width:20%}
-    .vitals td.val{width:20%;text-align:center}
-    @media print{@page{margin:10mm}}
-  </style></head>
-  <body>
-    <div class="frame">
-      <div class="hdr">
-        <div class="dept">دائرة صحة واسط<br>مصرف الدم الرئيسي في واسط</div>
-        <div class="titles">
-          <h1>استمارة التبرع بالدم ومشتقاته</h1>
-          <h2>Blood Donor Questionnaire</h2>
-        </div>
-        <div style="width:90px"></div>
-      </div>
-
-      <div class="barcoderow">
-        <div style="text-align:center">
-          <svg id="bc"></svg>
-          <div class="num">رقم الاستمارة: ${N(donorNum)}</div>
-        </div>
-      </div>
-
-      <table class="f">
-        <tr><td class="lbl">نوع القنينة</td><td class="val">${N(d.bottle_type)}</td><td class="lbl">الاسم الرباعي</td><td class="val">${N(d.donor_name)}</td></tr>
-        <tr><td class="lbl">رقم القنينة</td><td class="val">${N(d.bottle_number)}</td><td class="lbl">اسم الأم</td><td class="val">${N(d.mother_name)}</td></tr>
-        <tr><td class="lbl">المهنة</td><td class="val">${N(d.occupation)}</td><td class="lbl">رقم هوية الأحوال الشخصية</td><td class="val">${N(d.national_id)}</td></tr>
-        <tr><td class="lbl">الجنس</td><td class="val">${N(d.gender)}</td><td class="lbl">العمر / سنة الولادة</td><td class="val">${N(age)} / ${N(d.birth_year)}</td></tr>
-        <tr><td class="lbl">رقم الموبايل</td><td class="val" colspan="3">${N(d.mobile)}</td></tr>
-        <tr><td class="lbl">عنوان السكن</td><td class="val" colspan="3">${N(d.address)}</td></tr>
-        <tr><td class="lbl">نوع التبرع</td><td class="val">${N(d.donation_type)}</td><td class="lbl">تاريخ التبرع</td><td class="val">${N(d.donation_date)} ${N(d.donation_time)}</td></tr>
-        <tr><td class="lbl">اسم المريض</td><td class="val">${N(d.patient_name)}</td><td class="lbl">اسم المستشفى</td><td class="val">${N(d.hospital_name)}</td></tr>
-      </table>
-      <div class="section-hdr">صنف الدم والعامل الرئيسي</div>
-      <table class="f"><tr><td class="val" style="width:100%;height:26px"></td></tr></table>
-
-      <div class="section-hdr" style="margin-top:2px">العلامات الحيوية</div>
-      <table class="f vitals">
-        <tr>
-          <td class="lbl">ضغط الدم</td><td class="val">${N(d.blood_pressure)}</td>
-          <td class="lbl">النبض</td><td class="val">${N(d.pulse)}</td>
-          <td class="lbl">الهيموغلوبين</td>
-        </tr>
-        <tr>
-          <td class="lbl">درجة الحرارة</td><td class="val">${N(d.temperature)}</td>
-          <td class="lbl">الوزن</td><td class="val">${N(d.weight)}</td>
-          <td class="val">${N(d.hemoglobin)}</td>
-        </tr>
-      </table>
-    </div>
-    <script>
-      window.onload = function(){
-        try{
-          JsBarcode("#bc", ${JSON.stringify(donorNum||'0')}, {format:"CODE128", displayValue:false, height:40, width:1.6, margin:0});
-        }catch(e){}
-        setTimeout(function(){ window.print(); }, 350);
-      };
-    <\/script>
-  </body></html>`);
+  // Printed from the donors list: only a few fields are on the row — fetch the full record so the
+  // template's boxes (mother's name, vitals, patient/hospital, donor number...) fill themselves.
+  if(d.id && IS_ONLINE){
+    try{
+      const{data:full}=await db.from('blood_donations').select('*,donors(*)').eq('id',d.id).single();
+      if(full){
+        const dn=full.donors||{}, pick=(a,b)=> (a!=null&&a!=='') ? a : b;
+        d={...d,
+          donor_name:pick(dn.full_name,d.donor_name), donor_number:pick(dn.donor_number,d.donor_number),
+          mother_name:pick(dn.mother_name,d.mother_name), national_id:pick(dn.national_id,d.national_id),
+          occupation:pick(dn.occupation,d.occupation), gender:pick(dn.gender,d.gender),
+          birth_year:pick(dn.birth_year,d.birth_year), mobile:pick(dn.mobile,d.mobile), address:pick(dn.address,d.address),
+          bottle_type:pick(full.bottle_type,d.bottle_type), bottle_number:pick(full.bottle_number,d.bottle_number),
+          donation_type:pick(full.donation_type,d.donation_type), donation_date:pick(full.donation_date,d.donation_date),
+          donation_time:pick(full.donation_time,d.donation_time), patient_name:pick(full.patient_name,d.patient_name),
+          hospital_name:pick(full.hospital_name,d.hospital_name), blood_pressure:pick(full.blood_pressure,d.blood_pressure),
+          pulse:pick(full.pulse,d.pulse), temperature:pick(full.temperature,d.temperature),
+          weight:pick(full.weight,d.weight), hemoglobin:pick(full.hemoglobin,d.hemoglobin)};
+      }
+    }catch(e){ console.log('receipt enrich failed:',e); }
+  }
+  try{ await loadOneScript('receipt-template.js'); }
+  catch(e){ toast('تعذر تحميل قالب الوصل','error'); return; }
+  const S=v=> (v==null||v===0) ? '' : String(v);
+  const by = Number(d.birth_year)||0;
+  const age = by ? (new Date().getFullYear()-by) : '';
+  // The template's fields. Anything missing stays empty. barcodeValue = the donor number, exactly
+  // what the app's barcode has always encoded; the bottle number is kept separate (bagNumber).
+  const data = {
+    barcodeValue: d.donor_number!=null ? S(d.donor_number) : '',
+    donationProduct: S(d.bottle_type), bagNumber: S(d.bottle_number),
+    donorName: S(d.donor_name), motherName: S(d.mother_name), identityNumber: S(d.national_id),
+    occupation: S(d.occupation), birthYear: by ? String(by) : '', age: age!=='' ? String(age) : '',
+    gender: S(d.gender), phone: S(d.mobile), address: S(d.address),
+    donationType: S(d.donation_type), donationDate: S(d.donation_date),
+    donationTime: d.donation_time ? String(d.donation_time).substring(0,5) : '',
+    patientName: S(d.patient_name), hospitalName: S(d.hospital_name),
+    bloodPressure: S(d.blood_pressure), pulse: S(d.pulse), temperature: S(d.temperature),
+    weight: S(d.weight), hemoglobin: S(d.hemoglobin)
+  };
+  printHtmlDocument(buildReceiptHtml(data));
 }
 
 async function exportBottleStickerPDF(){
@@ -2774,9 +2746,7 @@ const PERM_SCREEN = {
 
 // Per-account option "hide bottle stock on the home screen" (set in إدارة الحسابات). It is a flag
 // stored in the account's permissions list. Admins and all-access accounts never have it.
-function stockHidden(){
-  return !!UPROF && UPROF.role!=='admin' && Array.isArray(UPROF.permissions) && UPROF.permissions.includes('hide_stock');
-}
+function stockHidden(){ return false; } // obsolete: the home screen now follows each account's sections (see home-stats.js)
 
 function hasPermission(key){
   if(!UPROF) return false;
