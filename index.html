@@ -104,6 +104,8 @@ html{-webkit-text-size-adjust:100%}
 .ni.on{background:#FFF1F2;color:#BE123C;border-right-color:#BE123C;font-weight:700}
 .ni.on i{color:#BE123C}
 .nbadge{margin-right:auto;background:#BE123C;color:#fff;font-size:12px;padding:2px 6px;border-radius:10px}
+.dt-logout{display:none;align-items:center;gap:6px;margin-right:10px;padding:5px 12px;border:1px solid #FECACA;background:#FFF1F2;color:#BE123C;border-radius:8px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+@media(min-width:769px){.dt-logout{display:inline-flex}}
 .sb-foot{padding:12px 14px 16px;border-top:1px solid #f0f0f0;background:#fafafa}
 .sf-user{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .sf-av{width:36px;height:36px;background:linear-gradient(135deg,#BE123C,#881337);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px;font-weight:700;flex-shrink:0;box-shadow:0 2px 8px rgba(198,40,40,.3)}
@@ -982,6 +984,7 @@ tbody tr:hover td{background:#fafafa}
       </button>
       <div class="ptb-title" id="pgTitle">لوحة التحكم</div>
       <span class="tb-date" id="tbDate"></span>
+      <button class="dt-logout" onclick="if(confirm('تسجيل الخروج؟'))doLogout()" title="تسجيل الخروج"><i class="ti ti-logout"></i> <span id="dtUserName"></span> · خروج</button>
     </div>
     <div class="page">
 
@@ -1932,15 +1935,22 @@ async function markDonationExit(ids, reason){
   const y=new Date().getFullYear(); for(let i=y;i>=y-6;i--){ const o=document.createElement('option'); o.value=i; o.textContent=i; s.appendChild(o); } })();
 function stPickYear(y){ if(!y) return; G('stFrom').value=y+'-01-01'; G('stTo').value=y+'-12-31'; }
 
+// Return a bottle number to the reuse pool — never twice (a double click / retry used to add the same
+// number again, and the pool then offered it to two donors).
+async function releaseBottleNumber(type,num){
+  if(!type||num==null) return;
+  const{data:ex}=await db.from('bottle_number_pool').select('id').eq('bottle_type',type).eq('bottle_number',num).limit(1);
+  if(ex&&ex.length) return;
+  await db.from('bottle_number_pool').insert({bottle_type:type,bottle_number:num,created_by:SES?.user?.id});
+}
+
 async function withdrawDonation(id, donorName){
   if(!confirm('تأكيد: "'+donorName+'" انسحب ولم يُسحب منه دم؟ سيُحذف سجل الاستمارة ويُعاد رقم القنينة للاستخدام.')) return;
   load(true);
   try{
     const{data:d}=await db.from('blood_donations').select('bottle_number,bottle_type').eq('id',id).single();
     if(d?.bottle_number && d?.bottle_type){
-      await db.from('bottle_number_pool').insert({
-        bottle_type:d.bottle_type, bottle_number:d.bottle_number, created_by:SES?.user?.id
-      });
+      await releaseBottleNumber(d.bottle_type,d.bottle_number);
     }
     const{error}=await markDonationExit(id,'withdrawn');
     if(error) throw error;
@@ -2764,6 +2774,7 @@ async function loadProf(){
   const _dept = {admin:'الإدارة',reception:'الاستقبال',tech:'السحب',lab:'المختبر',supply:'التجهيز',viewer:'عرض'}[data.role]||'—';
   // Sidebar
   G('sfName').textContent = _nm;
+  if(G('dtUserName')) G('dtUserName').textContent = _nm;
   G('sfAv').textContent   = _av;
   G('sfRole').textContent = _nm;
   G('navUsers').style.display = data.role==='admin'?'flex':'none';

@@ -243,9 +243,7 @@ async function confirmMedicalReject(){
     }
     // Release the already-reserved bottle number back into the reuse pool
     if(d?.bottle_number && d?.bottle_type){
-      await db.from('bottle_number_pool').insert({
-        bottle_type:d.bottle_type, bottle_number:d.bottle_number, created_by:SES?.user?.id
-      });
+      await releaseBottleNumber(d.bottle_type,d.bottle_number);
     }
     const{error}=await markDonationExit(id,'medical_reject');
     if(error) throw error;
