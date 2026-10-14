@@ -411,6 +411,7 @@ async function saveReception(){
       { const eb=G('rcEditBtn'); if(eb) eb.style.display=_lastDonation?.id?'':'none'; }
       G('rcSaveBtn').style.display='none';
       toast('✅ تم الحفظ — رقم القنينة: '+bnum,'success',4000);
+      if(typeof colCheckAutoPopup==='function') colCheckAutoPopup();
     }
   }catch(e){toast('خطأ: '+e.message,'error');}
   finally{load(false);}
