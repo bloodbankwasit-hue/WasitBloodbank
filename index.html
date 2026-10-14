@@ -700,6 +700,33 @@ tbody tr:hover td{background:#fafafa}
   .modal .btn-p:hover{filter:brightness(1.06)}
   .modal .btn:hover{background:#F8FAFC}
 }
+
+/* ═══════ RECEPTION — ONE SCREEN (desktop): everything visible without scrolling ═══════ */
+@media(min-width:769px){
+  #sectionPopup:has(#s-reception) .sec-popup-box{width:min(1280px,97vw);max-height:97vh}
+  #sectionPopup:has(#s-reception) .sec-popup-head{padding:8px 20px}
+  #sectionPopup:has(#s-reception) .sec-popup-body{padding:8px 16px 10px}
+  #s-reception{max-width:none}
+  #s-reception .fsec{padding:10px 18px 12px;border-radius:14px;margin-bottom:6px}
+  #s-reception .fst{font-size:17px;padding-bottom:6px;margin-bottom:8px}
+  #s-reception .fst i{font-size:19px}
+  #s-reception .fgrid:not(.rc-vitals){grid-template-columns:repeat(6,minmax(0,1fr));gap:7px 12px}
+  #s-reception .rc-row3{display:contents}
+  #s-reception .rc-row3 .fgrp label{font-size:13.5px;white-space:nowrap}
+  #s-reception .fgrp{gap:2px}
+  #s-reception .fgrp label{font-size:13.5px;margin-bottom:0}
+  #s-reception .fgrp input,#s-reception .fgrp select{padding:8px 10px;font-size:16.5px;border-radius:9px;width:100%;min-width:0}
+  #s-reception .rc-row3 .fgrp input{padding:8px 6px;font-size:15.5px}
+  #s-reception input#rc-bnum{font-size:16px !important}
+  #s-reception .fgrp:has(#rc-name),#s-reception .fgrp:has(#rc-mom),#s-reception #rc-pat-grp,#s-reception #rc-hosp-grp{grid-column:span 3}
+  #s-reception .fgrp:has(#rc-btype){grid-column:span 2}
+  #s-reception .rc-vlabel{font-size:13.5px;margin:8px 0 4px !important}
+  #s-reception .rc-vitals{grid-template-columns:repeat(5,minmax(0,1fr));gap:7px 12px}
+  #s-reception #rc-hosp-other{margin-top:4px !important}
+  #s-reception .rc-actions{display:flex;gap:10px;align-items:stretch}
+  #s-reception .rc-actions .btn-action{flex:3;max-width:none;margin:0;padding:11px;font-size:17px;border-radius:12px}
+  #s-reception .rc-actions .btn{flex:1;margin:0 !important;width:auto !important}
+}
 @media(max-width:768px){
   #s-dthome{display:none !important}
 }
@@ -1584,8 +1611,8 @@ tbody tr:hover td{background:#fafafa}
               <input type="text" id="rc-hosp-other" placeholder="اكتب اسم المستشفى" style="display:none;margin-top:6px">
             </div>
           </div>
-          <div style="font-size:15.5px;font-weight:700;color:#374151;margin:14px 0 8px">العلامات الحيوية (اختياري)</div>
-          <div class="fgrid">
+          <div class="rc-vlabel" style="font-size:15.5px;font-weight:700;color:#374151;margin:14px 0 8px">العلامات الحيوية (اختياري)</div>
+          <div class="fgrid rc-vitals">
             <div class="fgrp"><label>ضغط الدم</label><input type="text" id="rc-bp" placeholder="مثال: 120/80" oninput="this.value=normDigits(this.value)"></div>
             <div class="fgrp"><label>النبض</label><input type="text" inputmode="numeric" id="rc-pulse" placeholder="نبضة/دقيقة" oninput="this.value=normDigits(this.value).replace(/[^0-9]/g,'')"></div>
             <div class="fgrp"><label>درجة الحرارة</label><input type="text" inputmode="decimal" id="rc-temp" placeholder="°م" oninput="this.value=normDec(this.value)"></div>
@@ -1593,8 +1620,10 @@ tbody tr:hover td{background:#fafafa}
             <div class="fgrp"><label>الهيموغلوبين</label><input type="text" inputmode="decimal" id="rc-hgb" placeholder="g/dL" oninput="this.value=normDec(this.value)"></div>
           </div>
         </div>
+        <div class="rc-actions">
         <button class="btn-action" id="rcSaveBtn" onclick="saveReception()">✅ تأكيد القبول وإرسال للسحب</button>
         <button class="btn" onclick="resetReception()" style="width:100%;justify-content:center;margin-top:8px"><i class="ti ti-refresh"></i> مسح النموذج</button>
+        </div>
         <div style="height:40px"></div>
       </div>
 
