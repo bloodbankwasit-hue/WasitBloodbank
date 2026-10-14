@@ -1486,7 +1486,6 @@ tbody tr:hover td{background:#fafafa}
           <div style="font-size:31px">⏳</div>
           <div><div class="rej-warn-t" id="intervalWarnTitle" style="color:#B45309"></div><div class="rej-warn-r" id="intervalWarnReason"></div></div>
         </div>
-        <div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn" onclick="openCollectionModal('cur')"><i class="ti ti-printer"></i> استمارة سحب الدم</button></div>
         <div class="fsec">
           <div class="fst"><i class="ti ti-user"></i> بيانات الاستقبال</div>
           <div class="fgrid">
@@ -2970,6 +2969,7 @@ function setupNotifTabVisibility(){
 let _scrollMemory = {};
 
 async function nav(name, el){
+  if(name==='collection'){ await openCollectionFromNav(); return; }
   // Permission gate — defense in depth. Without this, nav() would happily load ANY section's
   // data and UI for ANY logged-in user who calls it directly (e.g. from the browser console),
   // even though the tile to reach it is hidden from them — hiding the tile alone was never
@@ -4202,6 +4202,7 @@ async function saveDispatch(){
 // ================================================================
 const WORK_CARDS = [
   {key:'reception', icon:'➕', name:'إضافة متبرع',  desc:'تسجيل متبرع جديد'},
+  {key:'collection', icon:'📋', name:'استمارة التبرع بالدم', desc:'طباعة استمارة السحب A4 وأرشيفها'},
   {key:'campaigns', icon:'🚐', name:'حملات التبرع',  desc:'تسلسلات ومتابعة الحملات'},
   {key:'draw',      icon:'💉', name:'السحب',        desc:'وحدة سحب الدم'},
   {key:'trima',     icon:'🩸', name:'وحدة التريما',  desc:'سحب التريما: دم مضغوط أو صفائح'},
@@ -4228,7 +4229,14 @@ const ADMIN_ONLY_CARDS = [
 // already control which tiles show, so the two can never drift apart.
 const SECTION_PERM = {};
 [...WORK_CARDS, ...ADMIN_ONLY_CARDS].forEach(c=>{ SECTION_PERM[c.key]=c.key; });
-SECTION_PERM.add = 'reception'; // the donor-add flow is part of reception
+SECTION_PERM.add = 'reception';
+SECTION_PERM.collection = 'reception'; // the A4 draw form is a reception task
+function cardVisible(c,isAdmin,perms){ return isAdmin || perms.includes(c.key) || (c.key==='collection' && perms.includes('reception')); }
+async function openCollectionFromNav(){
+  if(UPROF?.role!=='admin' && !hasPermission('reception')){ toast('⛔ ما عندك صلاحية الوصول لهذا القسم','error'); return; }
+  try{ await loadSectionScript('reception'); }catch(e){ toast('تعذر تحميل هذا القسم — تحقق من الاتصال بالإنترنت','error',4000); return; }
+  openCollectionModal('cur');
+} // the donor-add flow is part of reception
 
 let CURRENT_MAIN_TAB = 'home';
 
@@ -4256,7 +4264,7 @@ function buildDtHomeGrid(){
   const grid    = G('dtHomeGrid');
   if(!grid) return;
   const dashCard = {key:'dashboard', icon:'🏠', name:'لوحة التحكم', desc:'نظرة عامة وإحصائيات'};
-  let cards = [dashCard, ...WORK_CARDS.filter(c => isAdmin || perms.includes(c.key))];
+  let cards = [dashCard, ...WORK_CARDS.filter(c => cardVisible(c,isAdmin,perms))];
   if(isAdmin) cards = [...cards, ...ADMIN_ONLY_CARDS];
   grid.innerHTML = cards.map(c=>`
     <div class="dth-card" onclick="openSectionPopup('${c.key}','${c.name}')">
@@ -4269,6 +4277,7 @@ function buildDtHomeGrid(){
 let _popupSectionId=null, _popupHostParent=null, _popupHostNext=null;
 
 async function openSectionPopup(key, title){
+  if(key==='collection'){ await openCollectionFromNav(); return; }
   const sec=G('s-'+key);
   if(!sec) return;
   _popupSectionId='s-'+key;
@@ -4299,7 +4308,7 @@ function buildWorkGrid(){
   const grid    = G('workGrid');
   if(!grid) return;
 
-  let cards = WORK_CARDS.filter(c => isAdmin || perms.includes(c.key));
+  let cards = WORK_CARDS.filter(c => cardVisible(c,isAdmin,perms));
   if(isAdmin) cards = [...cards, ...ADMIN_ONLY_CARDS];
 
   grid.innerHTML = cards.map((c,i) =>
