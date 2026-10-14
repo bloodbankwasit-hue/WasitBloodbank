@@ -1678,6 +1678,7 @@ tbody tr:hover td{background:#fafafa}
     <div style="font-size:17px;font-weight:800;margin-bottom:12px;text-align:center">🖨️ إعدادات الطابعات</div>
     <label style="font-size:13px;display:block;margin-bottom:10px">طابعة الوصل (الكبيرة)<select id="pr-receipt" style="width:100%;padding:8px;margin-top:4px"></select></label>
     <label style="font-size:13px;display:block;margin-bottom:12px">طابعة الملصقات (الصغيرة)<select id="pr-label" style="width:100%;padding:8px;margin-top:4px"></select></label>
+    <div style="display:flex;gap:8px;margin-bottom:10px"><button class="btn" onclick="savePrinterSettings().then(()=>printTestSheet('receipt'))" style="flex:1;justify-content:center;font-size:12px">ورقة تجربة الوصل</button><button class="btn" onclick="savePrinterSettings().then(()=>printTestSheet('label'))" style="flex:1;justify-content:center;font-size:12px">ورقة تجربة الملصق</button></div>
     <button class="btn btn-p" onclick="savePrinterSettings()" style="width:100%;justify-content:center">حفظ</button>
     <button class="btn" onclick="G('printerModal').classList.remove('on')" style="width:100%;justify-content:center;margin-top:8px">إلغاء</button>
   </div>
@@ -1687,10 +1688,8 @@ tbody tr:hover td{background:#fafafa}
     <div style="font-size:17px;font-weight:800;margin-bottom:12px;text-align:center">🏷️ طباعة ملصق القنينة</div>
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <label style="flex:1;font-size:13px">عدد الملصقات<input id="lb-copies" type="text" inputmode="numeric" value="1" style="width:100%;padding:8px;margin-top:4px"></label>
-      <label style="flex:1;font-size:13px">العرض (ملم)<input id="lb-w" type="text" inputmode="decimal" value="50" style="width:100%;padding:8px;margin-top:4px"></label>
-      <label style="flex:1;font-size:13px">الارتفاع (ملم)<input id="lb-h" type="text" inputmode="decimal" value="50" style="width:100%;padding:8px;margin-top:4px"></label>
     </div>
-    <div id="lb-note" style="font-size:12px;color:#92400E;background:#FEF3C7;border-radius:8px;padding:8px;margin-bottom:10px">اجعل «النسخ» في حوار الطباعة = 1 والمقياس 100% دون ترويسة/تذييل. القياس يُحفظ لهذا الجهاز.</div>
+    <div id="lb-note" style="font-size:12px;color:#92400E;background:#FEF3C7;border-radius:8px;padding:8px;margin-bottom:10px">اجعل «النسخ» في حوار الطباعة = 1 والمقياس 100% دون ترويسة/تذييل. مقاس الملصق ثابت 59×40 ملم.</div>
     <button class="btn btn-p" onclick="confirmLabelPrint()" style="width:100%;justify-content:center">🖨️ طباعة</button>
     <button class="btn" onclick="G('labelModal').classList.remove('on')" style="width:100%;justify-content:center;margin-top:8px">✕ إلغاء</button>
   </div>
@@ -2264,6 +2263,18 @@ async function openPrinterSettings(){
     G('printerModal').classList.add('on');
   }catch(e){ toast('تعذر قراءة الطابعات: '+e.message,'error'); }
 }
+// Calibration sheet: border at the page edge + mm rulers, to see exactly what the printer cuts off.
+function buildPrintTestHtml(w,h,title){
+  let t='',n=0; for(let x=10;x<w;x+=10){ t+=`<i style="left:${x}mm;top:0;height:${x%50?3:6}mm;width:0;border-left:.2mm solid #000"></i><b style="left:${x-2}mm;top:6.5mm">${x}</b>`; }
+  for(let y=10;y<h;y+=10){ t+=`<i style="top:${y}mm;left:0;width:${y%50?3:6}mm;height:0;border-top:.2mm solid #000"></i><b style="top:${y-2}mm;left:7mm">${y}</b>`; }
+  return `<!doctype html><html dir="ltr"><head><meta charset="utf-8"><title>test</title><style>@page{size:${w}mm ${h}mm;margin:0}*{box-sizing:border-box}html,body{margin:0;width:${w}mm;height:${h}mm;overflow:hidden;font-family:Arial}.p{position:relative;width:${w}mm;height:${h}mm;border:.6mm solid #000}i,b{position:absolute;display:block}b{font-size:2.6mm;font-weight:400}.c{position:absolute;left:0;right:0;top:${h/2-8}mm;text-align:center;font-size:4.5mm;font-weight:700;line-height:1.5}</style></head><body><div class="p">${t}<div class="c">${title}<br>${w} × ${h} mm &nbsp; ← LEFT / TOP ↑</div></div><script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>`;
+}
+async function printTestSheet(kind){
+  if(!window.nativePrint) return;
+  try{ await loadOneScript('label-template.js'); }catch(e){ toast('تعذر تحميل القالب','error'); return; }
+  const d = kind==='label' ? {w:LABEL_SIZE.width,h:LABEL_SIZE.height,t:'LABEL TEST'} : {w:210,h:148,t:'RECEIPT TEST (A5 landscape)'};
+  nativePrintHtml(buildPrintTestHtml(d.w,d.h,d.t),{kind:kind==='label'?'label':'receipt',width:d.w,height:d.h});
+}
 async function savePrinterSettings(){
   await window.nativePrint.setConfig({receiptPrinter:G('pr-receipt').value,labelPrinter:G('pr-label').value});
   G('printerModal').classList.remove('on'); toast('تم حفظ الطابعات','success');
@@ -2323,21 +2334,19 @@ async function exportBottleStickerPDF(rec){
   if(!r){ toast('لا توجد بيانات','error'); return; }
   try{ await loadOneScript('label-template.js'); }catch(e){ toast('تعذر تحميل قالب الملصق','error'); return; }
   _labelRec=r;
-  const sz=labelCfgLoad();
-  G('lb-copies').value=1; G('lb-w').value=sz.width; G('lb-h').value=sz.height;
+  G('lb-copies').value=1;
   if(G('lb-note')) G('lb-note').style.display=window.nativePrint?'none':'';
   G('labelModal').classList.add('on');
 }
 async function confirmLabelPrint(){
   const copies=parseInt(normDigits(G('lb-copies').value),10);
-  const size={width:parseFloat(normDec(G('lb-w').value)),height:parseFloat(normDec(G('lb-h').value))};
+  const size={width:LABEL_SIZE.width,height:LABEL_SIZE.height}; // fixed stock size 59x40 mm
   try{ labelValidate(copies,size); }catch(e){ toast(e.message,'error'); return; }
   let d=_labelRec; if(!d) return;
   d=await enrichDonationForPrint(d);
   const S=v=> (v==null||v===0) ? '' : String(v);
   const data={ donorName:S(d.donor_name||(d.donors&&d.donors.full_name)), bagNumber:S(d.bottle_number),
     bagType:S(d.bottle_type), collectionDate:S(d.draw_date||d.donation_date), expiryDate:labelExpiry(d) };
-  labelCfgSave(size);
   G('labelModal').classList.remove('on');
   if(isIOSDevice() && window.jspdf){
     try{

@@ -4,7 +4,9 @@
 // يُطبع داخل iframe مخفي (CSS معزول). على iPhone/iPad يُرسم نفس التصميم على canvas ويُحفظ PDF بمقاس
 // الملصق (صفحة لكل ملصق) لأن طباعة iOS تضيف ترويسة/تذييل لا تُلغى بـ CSS.
 // ================================================================
-const LABEL_CSS = `*{box-sizing:border-box}body{margin:0;font-family:Arial,Tahoma,sans-serif;color:#000;background:#eee}.label{width:var(--label-width,50mm);height:var(--label-height,50mm);padding:1.5mm 2mm;display:flex;flex-direction:column;justify-content:space-between;background:white;margin:12px auto;overflow:hidden;break-after:page;page-break-after:always;direction:rtl}.label:last-child{break-after:auto;page-break-after:auto}.name{font-size:calc(var(--u,50mm)*.14);font-weight:700;text-align:center;line-height:1.25;white-space:nowrap;overflow:hidden}.bag-row{display:flex;direction:ltr;height:calc(var(--u,50mm)*.24)}.type{flex:0 0 28%;display:flex;align-items:center;justify-content:center;text-align:center;direction:rtl;font-size:calc(var(--u,50mm)*.075);font-weight:700;line-height:1.15;border-right:.4mm solid #000;padding:0 1mm;overflow-wrap:anywhere;overflow:hidden}.number{flex:1;min-width:0;text-align:center;direction:ltr;font-size:calc(var(--u,50mm)*.2);font-weight:700;line-height:calc(var(--u,50mm)*.24);white-space:nowrap;overflow:hidden}.dates{font-size:calc(var(--u,50mm)*.105);font-weight:700}.date-row{display:flex;justify-content:space-between;align-items:center;gap:1mm;line-height:1.5}.date-row span{white-space:nowrap}.date-value{direction:ltr;white-space:nowrap}@media print{body{background:white}.label{margin:0}html,body{width:var(--label-width,50mm)}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
+const LABEL_CSS = `*{box-sizing:border-box}body{margin:0;font-family:Arial,Tahoma,sans-serif;color:#000;background:#eee}.label{width:var(--label-width,50mm);height:var(--label-height,50mm);padding:1.5mm 2mm;display:flex;flex-direction:column;justify-content:space-between;background:white;margin:12px auto;overflow:hidden;break-after:page;page-break-after:always;direction:rtl}.label:last-child{break-after:auto;page-break-after:auto}.name{font-size:calc(var(--u,50mm)*.16);font-weight:700;text-align:center;line-height:1.25;white-space:nowrap;overflow:hidden}.bag-row{display:flex;direction:ltr;height:calc(var(--u,50mm)*.26)}.type{flex:0 0 28%;display:flex;align-items:center;justify-content:center;text-align:center;direction:rtl;font-size:calc(var(--u,50mm)*.09);font-weight:700;line-height:1.15;border-right:.4mm solid #000;padding:0 1mm;overflow-wrap:anywhere;overflow:hidden}.number{flex:1;min-width:0;text-align:center;direction:ltr;font-size:calc(var(--u,50mm)*.22);font-weight:700;line-height:calc(var(--u,50mm)*.26);white-space:nowrap;overflow:hidden}.dates{font-size:calc(var(--u,50mm)*.115);font-weight:700}.date-row{display:flex;justify-content:space-between;align-items:center;gap:1mm;line-height:1.5}.date-row span{white-space:nowrap}.date-value{direction:ltr;white-space:nowrap}@media print{body{background:white}.label{margin:0}html,body{width:var(--label-width,50mm)}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
+// Fixed stock size (measured on the real label: 5.9 cm x 4 cm, edge to edge) — not user-adjustable.
+const LABEL_SIZE = {width:59, height:40};
 const LABEL_LIMITS = {minW:25, maxW:100, minH:25, maxH:150, maxCopies:100};
 
 // Size is remembered per device (the real label stock / printer driver decides it, not the template's 50x50).
@@ -46,7 +48,7 @@ const LABEL_SCRIPT = [
 "}",
 "function fitText(){",
 " var H=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--u'))||50, px=96/25.4;",
-" var floors={name:H*.07*px,number:H*.1*px,type:H*.04*px};",
+" var floors={name:H*.08*px,number:H*.11*px,type:H*.045*px};",
 " document.querySelectorAll('.name').forEach(function(el){el.style.whiteSpace='';el.style.maxHeight='';});",
 " document.querySelectorAll('.name,.number,.type').forEach(function(el){",
 "  el.style.fontSize='';",
@@ -54,8 +56,8 @@ const LABEL_SCRIPT = [
 "  var size=parseFloat(getComputedStyle(el).fontSize);",
 "  while((el.scrollWidth>el.clientWidth+1||el.scrollHeight>el.clientHeight+1)&&size>floors[key]){size-=.5;el.style.fontSize=size+'px';}",
 "  if(key==='name'&&el.scrollWidth>el.clientWidth+1){",
-"   el.style.whiteSpace='normal';el.style.maxHeight=(H*.2)+'mm';size=H*.09*px;el.style.fontSize=size+'px';",
-"   while(el.scrollHeight>el.clientHeight+1&&size>H*.05*px){size-=.5;el.style.fontSize=size+'px';}",
+"   el.style.whiteSpace='normal';el.style.maxHeight=(H*.22)+'mm';size=H*.1*px;el.style.fontSize=size+'px';",
+"   while(el.scrollHeight>el.clientHeight+1&&size>H*.055*px){size-=.5;el.style.fontSize=size+'px';}",
 "  }",
 " });",
 "}",
@@ -97,21 +99,21 @@ async function renderLabelCanvas(data,size,ppm){
   var S=function(k){ var v=data[k]; return (v===undefined||v===null)?'':String(v); };
   function fitW(text,start,floor,maxW){ var f=start; font(f); while(ctx.measureText(text).width/ppm>maxW+0.01 && f>floor){ f-=0.5*25.4/96; font(f);} if(ctx.measureText(text).width/ppm>maxW+0.01) overflow=true; return f; }
   // name: one line, big, shrinks only as much as needed to fit the width
-  var nameLines=[S('donorName')], nameFont=U*.14, nameH;
-  nameFont=fitW(S('donorName'),U*.14,U*.07,cw); overflow=false;
+  var nameLines=[S('donorName')], nameFont=U*.16, nameH;
+  nameFont=fitW(S('donorName'),U*.16,U*.08,cw); overflow=false;
   font(nameFont);
   if(ctx.measureText(S('donorName')).width/ppm>cw+0.01){ // too long for one line even at the floor: two lines within 20% of the height
-    nameFont=U*.09; for(;;){ font(nameFont); nameLines=_lbWrap(ctx,S('donorName'),cw*ppm); if(nameLines.length*1.25*nameFont<=U*.2+0.01||nameFont<=U*.05) break; nameFont-=0.5*25.4/96; }
-    if(nameLines.length*1.25*nameFont>U*.2+0.01) overflow=true;
+    nameFont=U*.1; for(;;){ font(nameFont); nameLines=_lbWrap(ctx,S('donorName'),cw*ppm); if(nameLines.length*1.25*nameFont<=U*.22+0.01||nameFont<=U*.055) break; nameFont-=0.5*25.4/96; }
+    if(nameLines.length*1.25*nameFont>U*.22+0.01) overflow=true;
   }
   nameH=nameLines.length*1.25*nameFont;
   // row: [type | number] — type on the left with a vertical divider, number centred in the rest
-  var rowH=U*.24, typeW=cw*.28, numW=cw-typeW;
-  var numFont=fitW(S('bagNumber'),U*.2,U*.1,numW-0.4);
-  var typeFont=U*.075, typeLines;
-  for(;;){ font(typeFont); typeLines=_lbWrap(ctx,S('bagType'),(typeW-2-0.4)*ppm); if(typeLines.length*1.15*typeFont<=rowH+0.01||typeFont<=U*.04) break; typeFont-=0.5*25.4/96; }
+  var rowH=U*.26, typeW=cw*.28, numW=cw-typeW;
+  var numFont=fitW(S('bagNumber'),U*.22,U*.11,numW-0.4);
+  var typeFont=U*.09, typeLines;
+  for(;;){ font(typeFont); typeLines=_lbWrap(ctx,S('bagType'),(typeW-2-0.4)*ppm); if(typeLines.length*1.15*typeFont<=rowH+0.01||typeFont<=U*.045) break; typeFont-=0.5*25.4/96; }
   if(typeLines.length*1.15*typeFont>rowH+0.01) overflow=true;
-  var dFont=U*.105, dLine=1.5*dFont, datesH=2*dLine;
+  var dFont=U*.115, dLine=1.5*dFont, datesH=2*dLine;
   font(dFont); ['تاريخ السحب:','تاريخ النفاذ:'].forEach(function(t,i){ var v=S(i?'expiryDate':'collectionDate'); if((ctx.measureText(t).width+ctx.measureText(v).width)/ppm+1>cw) overflow=true; });
   var free=ch-nameH-rowH-datesH; if(free<-0.01) overflow=true;
   var g=Math.max(0,free)/2;
