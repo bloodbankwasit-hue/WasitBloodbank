@@ -3,12 +3,12 @@
 // والإطار والشعار المدمج). يُطبع داخل iframe مخفي فيبقى CSS القالب معزولاً تماماً عن التطبيق.
 // الباركود: نفس باركود التطبيق (CODE128 عبر JsBarcode، وقيمته رقم المتبرع) وليس مولّد القالب.
 // ================================================================
-const RECEIPT_CSS = `*{box-sizing:border-box}body{margin:0;background:#ddd;font-family:Arial,Tahoma,sans-serif;color:#111;font-weight:700} @page{size:A5 landscape;margin:0}
+const RECEIPT_CSS = `*{box-sizing:border-box}body{margin:0;background:#ddd;font-family:Tahoma,Arial,sans-serif;color:#111;font-weight:700} @page{size:A5 landscape;margin:0}
 .sheet{width:297mm;height:210mm;padding:9mm 12mm;background:white;margin:10mm auto}.frame{height:192mm;border:1mm solid #151515;padding:7mm 9mm 3mm;position:relative}
 .header{height:53mm;position:relative;text-align:center}.authority{position:absolute;right:0;top:6mm;width:76mm;white-space:nowrap;font-size:16pt;line-height:1.4}.heading{position:absolute;top:8mm;left:72mm;right:65mm;font-size:20pt;line-height:1.5;white-space:nowrap}.heading span{display:block;direction:ltr;font-size:18pt}.logo{position:absolute;left:0;top:0;width:38mm;height:32mm;object-fit:contain}.missing-logo{position:absolute;left:0;top:0;width:38mm;height:32mm;border:1px dashed #bbb;display:grid;place-content:center;color:#999;font-size:9pt}
 .barcode{position:absolute;top:30mm;left:69mm;width:128mm;height:16mm;text-align:center}.barcode svg{width:124mm;height:10mm;display:block;margin:0 auto}.barcode small{font-size:11.5pt;display:block;line-height:1.2;margin-top:.5mm}
 .bag{position:absolute;left:0;top:48mm;width:42mm;height:27mm;border:1mm solid #222;text-align:center;background:white;font-size:23pt;z-index:1}.bag div{height:13mm;display:grid;place-content:center}.bag div+div{border-top:.8mm solid #222;font-size:22pt;direction:ltr}
-.data{width:100%;border-collapse:collapse;table-layout:fixed;font-size:18pt}.data td{height:11mm;border:.25mm solid #ddd;padding:0 2mm;text-align:center;vertical-align:middle}.data .label{background:#d5d5d5;font-size:15pt;white-space:nowrap}.data .main-label{width:47mm}.ltr{direction:ltr;unicode-bidi:isolate}.data .empty{border:0}.data .section{height:10mm;font-size:17pt}.exam{width:100%;border-collapse:collapse;table-layout:fixed;font-size:15.5pt}.exam th{height:10mm;background:#d5d5d5;border:.25mm solid #ddd}.exam td{height:14mm;text-align:center;border:.25mm solid #e5e5e5;font-size:18pt}.toolbar{text-align:center;margin:5mm;font-weight:400}.toolbar button{padding:10px 30px;font-size:16px}
+.data{width:100%;border-collapse:collapse;table-layout:fixed;font-size:18pt}.data td{height:11mm;border:.25mm solid #ddd;padding:0 2mm;text-align:center;vertical-align:middle}.data .label{background:#d5d5d5;font-size:14.5pt;white-space:nowrap}.data .main-label{width:47mm}.ltr{direction:ltr;unicode-bidi:isolate}.data .empty{border:0}.data .section{height:10mm;font-size:17pt}.exam{width:100%;border-collapse:collapse;table-layout:fixed;font-size:15.5pt}.exam th{height:10mm;background:#d5d5d5;border:.25mm solid #ddd}.exam td{height:14mm;text-align:center;border:.25mm solid #e5e5e5;font-size:18pt}.toolbar{text-align:center;margin:5mm;font-weight:400}.toolbar button{padding:10px 30px;font-size:16px}
 @media print{body{background:white}.sheet{margin:0}.toolbar{display:none}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 @media print{html,body{width:210mm;height:148mm;overflow:hidden}.sheet{break-inside:avoid;page-break-after:avoid;zoom:.7;margin:.5mm auto 0}}`;
 const RECEIPT_MAIN = `<main class="sheet"><div class="frame"><header class="header">
@@ -77,7 +77,7 @@ function _rcLoadLogo(){
 }
 // Draw `text` centered at (cx, top-of-line-box centre cy); shrinks / wraps to fit maxW (mm).
 function _rcFit(ctx,text,font,maxW,ppm,ltr){
-  var fam='Arial, Tahoma, sans-serif', size=font.size*ppm, wt=font.weight>=600?'bold':'normal';
+  var fam='Tahoma, Arial, sans-serif', size=font.size*ppm, wt=font.weight>=600?'bold':'normal';
   function setF(s){ ctx.font=wt+' '+s+'px '+fam; }
   setF(size);
   var avail=maxW*ppm, w=ctx.measureText(text).width;
@@ -93,7 +93,7 @@ function _rcFit(ctx,text,font,maxW,ppm,ltr){
   return {lines:l2?[l1,l2]:[l1],size:s2};
 }
 function _rcDrawText(ctx,text,cx,cy,font,maxW,ppm,ltr,color){
-  var fit=_rcFit(ctx,text,font,maxW,ppm,ltr), fam='Arial, Tahoma, sans-serif', wt=font.weight>=600?'bold':'normal';
+  var fit=_rcFit(ctx,text,font,maxW,ppm,ltr), fam='Tahoma, Arial, sans-serif', wt=font.weight>=600?'bold':'normal';
   ctx.font=wt+' '+fit.size+'px '+fam; ctx.fillStyle=color||'#111'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
   try{ ctx.direction=ltr?'ltr':'rtl'; }catch(e){}
   var lh=fit.size*(fit.lines.length>1?1.15:1.0);
