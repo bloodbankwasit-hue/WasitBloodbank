@@ -41,7 +41,8 @@ const LABEL_SCRIPT = [
 " var host=document.getElementById('labels');host.innerHTML='';",
 " for(var i=0;i<copies;i++){",
 "  var el=document.createElement('section');el.className='label';",
-"  el.innerHTML='<div class=\"name\" data-field=\"donorName\"></div><div class=\"bag-row\"><div class=\"type\" data-field=\"bagType\"></div><div class=\"number\" data-field=\"bagNumber\"></div></div><div class=\"dates\"><div class=\"date-row\"><span>تاريخ السحب:</span><span class=\"date-value\" data-field=\"collectionDate\"></span></div><div class=\"date-row\"><span>تاريخ النفاذ:</span><span class=\"date-value\" data-field=\"expiryDate\"></span></div></div>';",
+"  var exp=(i===0)?'<div class=\"date-row\"><span>تاريخ النفاذ:</span><span class=\"date-value\" data-field=\"expiryDate\"></span></div>':'';",
+"  el.innerHTML='<div class=\"name\" data-field=\"donorName\"></div><div class=\"bag-row\"><div class=\"type\" data-field=\"bagType\"></div><div class=\"number\" data-field=\"bagNumber\"></div></div><div class=\"dates\"><div class=\"date-row\"><span>تاريخ السحب:</span><span class=\"date-value\" data-field=\"collectionDate\"></span></div>'+exp+'</div>';",
 "  el.querySelectorAll('[data-field]').forEach(function(n){var v=data[n.dataset.field];n.textContent=(v===undefined||v===null)?'':v;});host.appendChild(el);",
 " }",
 " fitText();",
@@ -113,8 +114,8 @@ async function renderLabelCanvas(data,size,ppm){
   var typeFont=U*.09, typeLines;
   for(;;){ font(typeFont); typeLines=_lbWrap(ctx,S('bagType'),(typeW-2-0.4)*ppm); if(typeLines.length*1.15*typeFont<=rowH+0.01||typeFont<=U*.045) break; typeFont-=0.5*25.4/96; }
   if(typeLines.length*1.15*typeFont>rowH+0.01) overflow=true;
-  var dFont=U*.115, dLine=1.5*dFont, datesH=2*dLine;
-  font(dFont); ['تاريخ السحب:','تاريخ النفاذ:'].forEach(function(t,i){ var v=S(i?'expiryDate':'collectionDate'); if((ctx.measureText(t).width+ctx.measureText(v).width)/ppm+1>cw) overflow=true; });
+  var simple=!!data._simple, dFont=U*.115, dLine=1.5*dFont, datesH=(simple?1:2)*dLine;
+  font(dFont); (simple?['تاريخ السحب:']:['تاريخ السحب:','تاريخ النفاذ:']).forEach(function(t,i){ var v=S(i?'expiryDate':'collectionDate'); if((ctx.measureText(t).width+ctx.measureText(v).width)/ppm+1>cw) overflow=true; });
   var free=ch-nameH-rowH-datesH; if(free<-0.01) overflow=true;
   var g=Math.max(0,free)/2;
   function drawLine(text,align,x,top,lineH,fontMm,dir){
@@ -131,7 +132,7 @@ async function renderLabelCanvas(data,size,ppm){
   typeLines.forEach(function(l,i){ drawLine(l,'center',left+(typeW-0.4)/2,rowTop+(rowH-typeLines.length*1.15*typeFont)/2+i*1.15*typeFont,1.15*typeFont,typeFont,'rtl'); });
   drawLine(S('bagNumber'),'center',left+typeW+numW/2,rowTop,rowH,numFont,'ltr');
   y+=rowH+g;
-  [['تاريخ السحب:','collectionDate'],['تاريخ النفاذ:','expiryDate']].forEach(function(r,i){
+  (simple?[['تاريخ السحب:','collectionDate']]:[['تاريخ السحب:','collectionDate'],['تاريخ النفاذ:','expiryDate']]).forEach(function(r,i){
     var top=y+i*dLine;
     drawLine(r[0],'right',W-padX,top,dLine,dFont,'rtl');
     drawLine(S(r[1]),'left',padX,top,dLine,dFont,'ltr');
@@ -142,9 +143,11 @@ async function labelToPdfBlob(data,copies,size){
   labelValidate(copies,size);
   var r=await renderLabelCanvas(data,size,12);
   if(r.overflow) throw new Error('البيانات تتجاوز مساحة الملصق — كبّر القياس أو قصّر الاسم');
+  var r2=copies>1?await renderLabelCanvas(Object.assign({},data,{_simple:true}),size,12):null;
   var jsPDF=window.jspdf.jsPDF, W=Number(size.width), H=Number(size.height), o=W>H?'landscape':'portrait';
   var doc=new jsPDF({orientation:o,unit:'mm',format:[W,H],compress:true});
-  var img=r.canvas.toDataURL('image/png');
-  for(var i=0;i<copies;i++){ if(i) doc.addPage([W,H],o); doc.addImage(img,'PNG',0,0,W,H,'lbl','FAST'); }
+  var img=r.canvas.toDataURL('image/png'), img2=r2?r2.canvas.toDataURL('image/png'):null;
+  // الأول بالتصميم الكامل (مع تاريخ النفاذ)، والبقية بدون تاريخ النفاذ
+  for(var i=0;i<copies;i++){ if(i) doc.addPage([W,H],o); doc.addImage(i?img2:img,'PNG',0,0,W,H,i?'lbl2':'lbl','FAST'); }
   return doc.output('blob');
 }

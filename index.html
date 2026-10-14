@@ -1719,7 +1719,7 @@ tbody tr:hover td{background:#fafafa}
   <div class="modal" style="width:360px">
     <div style="font-size:17px;font-weight:800;margin-bottom:12px;text-align:center">🏷️ طباعة ملصق القنينة</div>
     <div style="display:flex;gap:8px;margin-bottom:10px">
-      <label style="flex:1;font-size:13px">عدد الملصقات<input id="lb-copies" type="text" inputmode="numeric" value="1" style="width:100%;padding:8px;margin-top:4px"></label>
+      <label style="flex:1;font-size:13px">عدد الملصقات (الأول كامل، والبقية بدون تاريخ النفاذ)<input id="lb-copies" type="text" inputmode="numeric" value="6" style="width:100%;padding:8px;margin-top:4px"></label>
     </div>
     <div id="lb-note" style="font-size:12px;color:#92400E;background:#FEF3C7;border-radius:8px;padding:8px;margin-bottom:10px">اجعل «النسخ» في حوار الطباعة = 1 والمقياس 100% دون ترويسة/تذييل. مقاس الملصق ثابت 59×40 ملم.</div>
     <button class="btn btn-p" onclick="confirmLabelPrint()" style="width:100%;justify-content:center">🖨️ طباعة</button>
@@ -2383,7 +2383,7 @@ async function exportBottleStickerPDF(rec){
   if(!r){ toast('لا توجد بيانات','error'); return; }
   try{ await loadOneScript('label-template.js'); }catch(e){ toast('تعذر تحميل قالب الملصق','error'); return; }
   _labelRec=r;
-  G('lb-copies').value=1;
+  G('lb-copies').value=6;
   if(G('lb-note')) G('lb-note').style.display=window.nativePrint?'none':'';
   G('labelModal').classList.add('on');
 }
