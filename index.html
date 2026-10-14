@@ -1678,6 +1678,8 @@ tbody tr:hover td{background:#fafafa}
     <div style="font-size:17px;font-weight:800;margin-bottom:12px;text-align:center">🖨️ إعدادات الطابعات</div>
     <label style="font-size:13px;display:block;margin-bottom:10px">طابعة الوصل (الكبيرة)<select id="pr-receipt" style="width:100%;padding:8px;margin-top:4px"></select></label>
     <label style="font-size:13px;display:block;margin-bottom:12px">طابعة الملصقات (الصغيرة)<select id="pr-label" style="width:100%;padding:8px;margin-top:4px"></select></label>
+    <label style="font-size:13px;display:block;margin-bottom:10px">طريقة ضبط ورقة الوصل<select id="pr-mode" style="width:100%;padding:8px;margin-top:4px"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E (القديمة)</option></select></label>
+    <button class="btn" onclick="savePrinterSettings().then(()=>printAllModes())" style="width:100%;justify-content:center;font-size:12px;margin-bottom:8px">طباعة اختبار الطرق كلها (5 أوراق)</button>
     <div style="display:flex;gap:8px;margin-bottom:10px"><button class="btn" onclick="savePrinterSettings().then(()=>printTestSheet('receipt'))" style="flex:1;justify-content:center;font-size:12px">ورقة تجربة الوصل</button><button class="btn" onclick="savePrinterSettings().then(()=>printTestSheet('label'))" style="flex:1;justify-content:center;font-size:12px">ورقة تجربة الملصق</button></div>
     <button class="btn btn-p" onclick="savePrinterSettings()" style="width:100%;justify-content:center">حفظ</button>
     <button class="btn" onclick="G('printerModal').classList.remove('on')" style="width:100%;justify-content:center;margin-top:8px">إلغاء</button>
@@ -2247,7 +2249,7 @@ async function enrichDonationForPrint(d){
 async function nativePrintHtml(html,opts){
   try{
     toast('🖨️ جاري الطباعة...','warning',1800);
-    const r=await window.nativePrint.print({html:html,kind:opts.kind,width:opts.width,height:opts.height});
+    const r=await window.nativePrint.print({html:html,kind:opts.kind,width:opts.width,height:opts.height,mode:opts.mode});
     if(r.ok){ toast('✅ أُرسل إلى الطابعة','success'); return; }
     if(r.error==='no-printer'){ toast('اختر الطابعة أولاً','warning'); openPrinterSettings(); return; }
     if(r.error==='not-ready'){ toast(opts.kind==='label'?'تعذّر تجهيز الملصق — قد تتجاوز البيانات مساحته، كبّر القياس أو قصّر الاسم':'تعذّر تجهيز الوصل للطباعة','error',6000); return; }
@@ -2260,6 +2262,7 @@ async function openPrinterSettings(){
     const [list,cfg]=await Promise.all([window.nativePrint.printers(),window.nativePrint.getConfig()]);
     const opt=(sel)=>'<option value="">— اختر —</option>'+list.map(p=>`<option value="${esc(p.name)}" ${p.name===sel?'selected':''}>${esc(p.displayName)}${p.isDefault?' (الافتراضية)':''}</option>`).join('');
     G('pr-receipt').innerHTML=opt(cfg.receiptPrinter); G('pr-label').innerHTML=opt(cfg.labelPrinter);
+    G('pr-mode').value=cfg.receiptMode||'A';
     G('printerModal').classList.add('on');
   }catch(e){ toast('تعذر قراءة الطابعات: '+e.message,'error'); }
 }
@@ -2275,8 +2278,16 @@ async function printTestSheet(kind){
   const d = kind==='label' ? {w:LABEL_SIZE.width,h:LABEL_SIZE.height,t:'LABEL TEST'} : {w:210,h:148,t:'RECEIPT TEST (A5 landscape)'};
   nativePrintHtml(buildPrintTestHtml(d.w,d.h,d.t),{kind:kind==='label'?'label':'receipt',width:d.w,height:d.h});
 }
+async function printAllModes(){
+  for(const m of ['A','B','C','D','E']){
+    const r=await window.nativePrint.print({html:buildPrintTestHtml(210,148,'MODE '+m),kind:'receipt',mode:m});
+    if(!r.ok){ toast('تعذرت الطباعة ('+m+'): '+r.error,'error',6000); return; }
+    await new Promise(x=>setTimeout(x,1500));
+  }
+  toast('✅ أُرسلت 5 أوراق اختبار','success');
+}
 async function savePrinterSettings(){
-  await window.nativePrint.setConfig({receiptPrinter:G('pr-receipt').value,labelPrinter:G('pr-label').value});
+  await window.nativePrint.setConfig({receiptPrinter:G('pr-receipt').value,labelPrinter:G('pr-label').value,receiptMode:G('pr-mode').value});
   G('printerModal').classList.remove('on'); toast('تم حفظ الطابعات','success');
 }
 async function exportDonorFormPDF(){
