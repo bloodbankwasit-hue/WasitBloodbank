@@ -26,22 +26,23 @@ function labelValidate(copies,size){
 }
 
 // data: { donorName, bagNumber, bagType, collectionDate, expiryDate }
-function buildLabelHtml(data,copies,size){
+function buildLabelHtml(data,copies,size,full){
+  if(full===undefined) full=1;
   labelValidate(copies,size);
   const json = JSON.stringify(data||{}).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
   return '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>ملصق القنينة</title>'
    + '<style>@page{size:'+size.width+'mm '+size.height+'mm;margin:0}</style><style>'+LABEL_CSS+'</style></head><body><div id="labels"></div>'
-   + '<script>' + LABEL_SCRIPT.replace('__DATA__',function(){return json;}).replace('__COPIES__',String(copies)).replace('__W__',String(size.width)).replace('__H__',String(size.height)) + '<\/script></body></html>';
+   + '<script>' + LABEL_SCRIPT.replace('__DATA__',function(){return json;}).replace('__COPIES__',String(copies)).replace('__FULL__',String(full)).replace('__W__',String(size.width)).replace('__H__',String(size.height)) + '<\/script></body></html>';
 }
 
 const LABEL_SCRIPT = [
-"function renderLabels(data,copies,size){",
+"function renderLabels(data,copies,size,full){",
 " var w=Number(size.width),h=Number(size.height);",
 " document.documentElement.style.setProperty('--label-width',w+'mm');document.documentElement.style.setProperty('--label-height',h+'mm');document.documentElement.style.setProperty('--u',Math.min(h,w/1.5)+'mm');",
 " var host=document.getElementById('labels');host.innerHTML='';",
 " for(var i=0;i<copies;i++){",
 "  var el=document.createElement('section');el.className='label';",
-"  var exp=(i===0)?'<div class=\"date-row\"><span>تاريخ النفاذ:</span><span class=\"date-value\" data-field=\"expiryDate\"></span></div>':'';",
+"  var exp=(i<full)?'<div class=\"date-row\"><span>تاريخ النفاذ:</span><span class=\"date-value\" data-field=\"expiryDate\"></span></div>':'';",
 "  el.innerHTML='<div class=\"name\" data-field=\"donorName\"></div><div class=\"bag-row\"><div class=\"type\" data-field=\"bagType\"></div><div class=\"number\" data-field=\"bagNumber\"></div></div><div class=\"dates\"><div class=\"date-row\"><span>تاريخ السحب:</span><span class=\"date-value\" data-field=\"collectionDate\"></span></div>'+exp+'</div>';",
 "  el.querySelectorAll('[data-field]').forEach(function(n){var v=data[n.dataset.field];n.textContent=(v===undefined||v===null)?'':v;});host.appendChild(el);",
 " }",
@@ -68,7 +69,7 @@ const LABEL_SCRIPT = [
 " if(bad){ try{ parent.toast('البيانات تتجاوز مساحة الملصق — كبّر القياس أو قصّر الاسم قبل الطباعة','error',6000); }catch(e){} return; }",
 " window.print();",
 "}",
-"window.onload=function(){ renderLabels(__DATA__,__COPIES__,{width:__W__,height:__H__}); setTimeout(printLabels,350); };"
+"window.onload=function(){ renderLabels(__DATA__,__COPIES__,{width:__W__,height:__H__},__FULL__); setTimeout(printLabels,350); };"
 ].join("\n");
 
 // ───── Canvas/PDF renderer (للآيفون) — نفس مقاييس القالب ─────
@@ -139,15 +140,16 @@ async function renderLabelCanvas(data,size,ppm){
   });
   return {canvas:cv, overflow:overflow};
 }
-async function labelToPdfBlob(data,copies,size){
+async function labelToPdfBlob(data,copies,size,full){
+  if(full===undefined) full=1;
   labelValidate(copies,size);
-  var r=await renderLabelCanvas(data,size,12);
+  var r=await renderLabelCanvas(full>0?data:Object.assign({},data,{_simple:true}),size,12);
   if(r.overflow) throw new Error('البيانات تتجاوز مساحة الملصق — كبّر القياس أو قصّر الاسم');
-  var r2=copies>1?await renderLabelCanvas(Object.assign({},data,{_simple:true}),size,12):null;
+  var r2=copies>full&&full>0?await renderLabelCanvas(Object.assign({},data,{_simple:true}),size,12):null;
   var jsPDF=window.jspdf.jsPDF, W=Number(size.width), H=Number(size.height), o=W>H?'landscape':'portrait';
   var doc=new jsPDF({orientation:o,unit:'mm',format:[W,H],compress:true});
   var img=r.canvas.toDataURL('image/png'), img2=r2?r2.canvas.toDataURL('image/png'):null;
   // الأول بالتصميم الكامل (مع تاريخ النفاذ)، والبقية بدون تاريخ النفاذ
-  for(var i=0;i<copies;i++){ if(i) doc.addPage([W,H],o); doc.addImage(i?img2:img,'PNG',0,0,W,H,i?'lbl2':'lbl','FAST'); }
+  for(var i=0;i<copies;i++){ if(i) doc.addPage([W,H],o); doc.addImage(i<full?img:(img2||img),'PNG',0,0,W,H,i<full?'lbl':'lbl2','FAST'); }
   return doc.output('blob');
 }
