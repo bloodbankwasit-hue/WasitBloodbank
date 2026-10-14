@@ -1738,10 +1738,10 @@ tbody tr:hover td{background:#fafafa}
   <div class="modal" style="width:420px">
     <div style="font-size:18px;font-weight:800;color:#166534;margin-bottom:14px;text-align:center">✅ تم الحفظ بنجاح — اختر ما تريد طباعته</div>
     <div style="display:flex;flex-direction:column;gap:8px">
-      <button class="btn btn-p" onclick="printChoice(1)" style="width:100%;justify-content:center">📄 1) طباعة كارت التبرع</button>
-      <button class="btn" onclick="printChoice(2)" style="width:100%;justify-content:center;border-color:#BE123C;color:#BE123C">🏷️ 2) طباعة ملصق القنينة (6 نسخ)</button>
-      <button class="btn" onclick="printChoice(3)" style="width:100%;justify-content:center;border-color:#0F766E;color:#0F766E">📄🏷️ 3) كارت التبرع + ملصق القنينة (6)</button>
-      <button class="btn" onclick="printChoice(4)" style="width:100%;justify-content:center;border-color:#6B7280;color:#374151">🏷️ 4) ملصق القنينة بدون نفاذ (5 نسخ)</button>
+      <button class="btn btn-p" onclick="printChoice(1)" style="width:100%;justify-content:center">📄 طباعة كارت التبرع</button>
+      <button class="btn" onclick="printChoice(2)" style="width:100%;justify-content:center;border-color:#BE123C;color:#BE123C">🏷️ طباعة ملصق القنينة</button>
+      <button class="btn" onclick="printChoice(3)" style="width:100%;justify-content:center;border-color:#0F766E;color:#0F766E">📄🏷️ طباعة كارت التبرع وملصق القنينة</button>
+      <button class="btn" onclick="printChoice(4)" style="width:100%;justify-content:center;border-color:#6B7280;color:#374151">🏷️ طباعة ملصق القنينة بدون نفاذ</button>
     </div>
     <button class="btn" id="rcEditBtn" onclick="G('rcPrintModal').classList.remove('on');openEditDonation(_lastDonation&&_lastDonation.id)" style="width:100%;justify-content:center;margin-top:10px;border-color:#2563EB;color:#2563EB">
       ✏️ تعديل البيانات
@@ -4822,10 +4822,10 @@ if('serviceWorker' in navigator){
   <div class="modal" style="max-width:380px">
     <div class="modal-title">🖨️ اختر ما تريد طباعته</div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:10px;padding:16px">
-      <button class="btn btn-p" onclick="G('printChoiceModal').classList.remove('on');printChoice(1)" style="width:100%;justify-content:center">📄 1) طباعة كارت التبرع</button>
-      <button class="btn" onclick="G('printChoiceModal').classList.remove('on');printChoice(2)" style="width:100%;justify-content:center;border-color:#BE123C;color:#BE123C">🏷️ 2) طباعة ملصق القنينة (6 نسخ)</button>
-      <button class="btn" onclick="G('printChoiceModal').classList.remove('on');printChoice(3)" style="width:100%;justify-content:center;border-color:#0F766E;color:#0F766E">📄🏷️ 3) كارت التبرع + ملصق القنينة (6)</button>
-      <button class="btn" onclick="G('printChoiceModal').classList.remove('on');printChoice(4)" style="width:100%;justify-content:center;border-color:#6B7280;color:#374151">🏷️ 4) ملصق القنينة بدون نفاذ (5 نسخ)</button>
+      <button class="btn btn-p" onclick="G('printChoiceModal').classList.remove('on');printChoice(1)" style="width:100%;justify-content:center">📄 طباعة كارت التبرع</button>
+      <button class="btn" onclick="G('printChoiceModal').classList.remove('on');printChoice(2)" style="width:100%;justify-content:center;border-color:#BE123C;color:#BE123C">🏷️ طباعة ملصق القنينة</button>
+      <button class="btn" onclick="G('printChoiceModal').classList.remove('on');printChoice(3)" style="width:100%;justify-content:center;border-color:#0F766E;color:#0F766E">📄🏷️ طباعة كارت التبرع وملصق القنينة</button>
+      <button class="btn" onclick="G('printChoiceModal').classList.remove('on');printChoice(4)" style="width:100%;justify-content:center;border-color:#6B7280;color:#374151">🏷️ طباعة ملصق القنينة بدون نفاذ</button>
       <button class="btn" onclick="G('printChoiceModal').classList.remove('on')" style="width:100%;justify-content:center">
         إلغاء
       </button>
