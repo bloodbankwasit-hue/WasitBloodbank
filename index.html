@@ -1729,7 +1729,7 @@ tbody tr:hover td{background:#fafafa}
 <div class="overlay" id="collectionModal" style="z-index:8000">
   <div class="modal" style="width:460px;max-width:96vw">
     <div style="font-size:17px;font-weight:800;margin-bottom:10px;text-align:center">🩸 استمارة سحب الدم (A4)</div>
-    <div style="display:flex;gap:8px;margin-bottom:10px"><button class="btn btn-p" id="colTabCur" onclick="colTab('cur')" style="flex:1;justify-content:center">الأسماء الحالية</button><button class="btn" id="colTabArc" onclick="colTab('arc')" style="flex:1;justify-content:center">الأرشيف</button></div>
+    <div style="display:flex;gap:6px;margin-bottom:10px"><button class="btn btn-p" id="colTabA" onclick="colTab('A')" style="flex:1;justify-content:center;font-size:13px">تريما وريفيوس</button><button class="btn" id="colTabB" onclick="colTab('B')" style="flex:1;justify-content:center;font-size:13px">بقية الأنواع</button><button class="btn" id="colTabArc" onclick="colTab('arc')" style="flex:1;justify-content:center;font-size:13px">الأرشيف</button></div>
     <div id="colBody"></div>
     <button class="btn" onclick="G('collectionModal').classList.remove('on')" style="width:100%;justify-content:center;margin-top:10px">إغلاق</button>
   </div>
@@ -4279,7 +4279,7 @@ function cardVisible(c,isAdmin,perms){ return isAdmin || perms.includes(c.key) |
 async function openCollectionFromNav(){
   if(UPROF?.role!=='admin' && !hasPermission('reception')){ toast('⛔ ما عندك صلاحية الوصول لهذا القسم','error'); return; }
   try{ await loadSectionScript('reception'); }catch(e){ toast('تعذر تحميل هذا القسم — تحقق من الاتصال بالإنترنت','error',4000); return; }
-  openCollectionModal('cur');
+  openCollectionModal('A');
 } // the donor-add flow is part of reception
 
 let CURRENT_MAIN_TAB = 'home';
