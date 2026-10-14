@@ -65,6 +65,17 @@ async function colPrintRows(items, formNo){
   printHtmlDocument(buildCollectionHtml(rows, meta), { kind:'form' });
 }
 
+// استمارة فارغة (10 صفوف) للمعاينة أو للتعبئة اليدوية — لا تحجز أي اسم
+async function colPrintBlank(){
+  try{
+    if(window.nativePrint && !window.nativePrint.supportsForm){ toast('نسخة برنامج الكمبيوتر قديمة — أعد تشغيل Install-BloodBank.bat','error',8000); return; }
+    await loadOneScript('collection-template.js');
+    const meta=_colMetaFor([], null);
+    if(isIOSDevice()){ await shareOrDownloadFile(await collectionToPdfBlob([],meta),'collection-form-blank.pdf'); return; }
+    printHtmlDocument(buildCollectionHtml([],meta),{kind:'form'});
+  }catch(e){ toast('خطأ: '+e.message,'error'); }
+}
+
 async function colReprint(formId, formNo){
   try{
     load(true);
@@ -90,6 +101,7 @@ async function colRender(){
       if(!shown.length) h += '<div style="text-align:center;padding:18px;color:#6B7280">لا توجد أسماء بانتظار الطباعة</div>';
       else h += '<div style="max-height:46vh;overflow:auto;border:1px solid #E5E7EB;border-radius:8px">' + shown.map((x,i)=>`<div style="display:flex;gap:8px;padding:7px 10px;border-bottom:1px solid #F3F4F6;font-size:14px"><b style="width:22px">${i+1}</b><span style="flex:1">${esc(x.donors?.full_name||'')}</span><span style="color:#6B7280">${esc(x.bottle_type||'')} ${esc(x.bottle_number||'')}</span></div>`).join('') + '</div>';
       h += `<button class="btn btn-p" ${shown.length?'':'disabled'} onclick="colPrintPending()" style="width:100%;justify-content:center;margin-top:12px">🖨️ طباعة الاستمارة (${shown.length} ${shown.length===1?'اسم':'أسماء'})</button>`;
+      h += `<button class="btn" onclick="colPrintBlank()" style="width:100%;justify-content:center;margin-top:8px">📄 طباعة استمارة فارغة (معاينة)</button>`;
       box.innerHTML = h;
     } else {
       const { data, error } = await db.from('collection_forms').select('id,form_no,names_count,printed_at').gt('form_no', 0).order('form_no', { ascending:false }).limit(60);
