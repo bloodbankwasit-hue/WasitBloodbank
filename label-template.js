@@ -4,8 +4,7 @@
 // يُطبع داخل iframe مخفي (CSS معزول). على iPhone/iPad يُرسم نفس التصميم على canvas ويُحفظ PDF بمقاس
 // الملصق (صفحة لكل ملصق) لأن طباعة iOS تضيف ترويسة/تذييل لا تُلغى بـ CSS.
 // ================================================================
-const LABEL_CSS = `*{box-sizing:border-box}body{margin:0;font-family:Arial,Tahoma,sans-serif;color:#000;background:#eee}.controls{padding:16px;background:white;text-align:center;font-size:14px;line-height:2}.controls input{width:70px}.controls button{padding:8px 18px}.label{width:var(--label-width,50mm);height:var(--label-height,50mm);padding:2mm;display:flex;flex-direction:column;justify-content:space-between;background:white;margin:12px auto;overflow:hidden;break-after:page;page-break-after:always;direction:rtl}.label:last-child{break-after:auto;page-break-after:auto}.name{font-size:15pt;font-weight:700;text-align:center;line-height:1.25;overflow-wrap:anywhere;max-height:38%;overflow:hidden}.bag-row{display:flex;align-items:center;justify-content:center;gap:2mm;width:100%}.number{font-size:25pt;font-weight:700;direction:ltr;white-space:nowrap;line-height:1.15}.type{font-size:11pt;font-weight:700;max-width:45%;overflow-wrap:anywhere;text-align:center}.dates{font-size:10pt;font-weight:700}.date-row{display:flex;justify-content:space-between;align-items:center;gap:1mm;line-height:1.6}.date-value{direction:ltr;white-space:nowrap}.screen-note{color:#555}.preview-note{font-size:12px;text-align:center;margin:10px}
-@media print{body{background:white}.controls,.preview-note{display:none}.label{margin:0}html,body{width:var(--label-width,50mm)}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
+const LABEL_CSS = `*{box-sizing:border-box}body{margin:0;font-family:Arial,Tahoma,sans-serif;color:#000;background:#eee}.label{width:var(--label-width,50mm);height:var(--label-height,50mm);padding:1.5mm 2mm;display:flex;flex-direction:column;justify-content:space-between;background:white;margin:12px auto;overflow:hidden;break-after:page;page-break-after:always;direction:rtl}.label:last-child{break-after:auto;page-break-after:auto}.name{font-size:calc(var(--u,50mm)*.14);font-weight:700;text-align:center;line-height:1.25;white-space:nowrap;overflow:hidden}.bag-row{display:flex;direction:ltr;height:calc(var(--u,50mm)*.24)}.type{flex:0 0 28%;display:flex;align-items:center;justify-content:center;text-align:center;direction:rtl;font-size:calc(var(--u,50mm)*.075);font-weight:700;line-height:1.15;border-right:.4mm solid #000;padding:0 1mm;overflow-wrap:anywhere;overflow:hidden}.number{flex:1;min-width:0;text-align:center;direction:ltr;font-size:calc(var(--u,50mm)*.2);font-weight:700;line-height:calc(var(--u,50mm)*.24);white-space:nowrap;overflow:hidden}.dates{font-size:calc(var(--u,50mm)*.105);font-weight:700}.date-row{display:flex;justify-content:space-between;align-items:center;gap:1mm;line-height:1.5}.date-row span{white-space:nowrap}.date-value{direction:ltr;white-space:nowrap}@media print{body{background:white}.label{margin:0}html,body{width:var(--label-width,50mm)}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
 const LABEL_LIMITS = {minW:25, maxW:100, minH:25, maxH:150, maxCopies:100};
 
 // Size is remembered per device (the real label stock / printer driver decides it, not the template's 50x50).
@@ -36,7 +35,7 @@ function buildLabelHtml(data,copies,size){
 const LABEL_SCRIPT = [
 "function renderLabels(data,copies,size){",
 " var w=Number(size.width),h=Number(size.height);",
-" document.documentElement.style.setProperty('--label-width',w+'mm');document.documentElement.style.setProperty('--label-height',h+'mm');",
+" document.documentElement.style.setProperty('--label-width',w+'mm');document.documentElement.style.setProperty('--label-height',h+'mm');document.documentElement.style.setProperty('--u',Math.min(h,w/1.5)+'mm');",
 " var host=document.getElementById('labels');host.innerHTML='';",
 " for(var i=0;i<copies;i++){",
 "  var el=document.createElement('section');el.className='label';",
@@ -46,14 +45,23 @@ const LABEL_SCRIPT = [
 " fitText();",
 "}",
 "function fitText(){",
-" document.querySelectorAll('.name,.number,.type').forEach(function(el){el.style.fontSize='';var size=parseFloat(getComputedStyle(el).fontSize);while((el.scrollWidth>el.clientWidth+1||el.scrollHeight>el.clientHeight+1)&&size>10){size-=.5;el.style.fontSize=size+'px'}});",
-" // the number never wraps: if number + type overflow the row, shrink the number (prevents overlap)",
-" document.querySelectorAll('.bag-row').forEach(function(row){var n=row.querySelector('.number');var size=parseFloat(getComputedStyle(n).fontSize);while(row.scrollWidth>row.clientWidth+1&&size>10){size-=.5;n.style.fontSize=size+'px'}});",
+" var H=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--u'))||50, px=96/25.4;",
+" var floors={name:H*.07*px,number:H*.1*px,type:H*.04*px};",
+" document.querySelectorAll('.name').forEach(function(el){el.style.whiteSpace='';el.style.maxHeight='';});",
+" document.querySelectorAll('.name,.number,.type').forEach(function(el){",
+"  el.style.fontSize='';",
+"  var key=el.classList.contains('name')?'name':el.classList.contains('number')?'number':'type';",
+"  var size=parseFloat(getComputedStyle(el).fontSize);",
+"  while((el.scrollWidth>el.clientWidth+1||el.scrollHeight>el.clientHeight+1)&&size>floors[key]){size-=.5;el.style.fontSize=size+'px';}",
+"  if(key==='name'&&el.scrollWidth>el.clientWidth+1){",
+"   el.style.whiteSpace='normal';el.style.maxHeight=(H*.2)+'mm';size=H*.09*px;el.style.fontSize=size+'px';",
+"   while(el.scrollHeight>el.clientHeight+1&&size>H*.05*px){size-=.5;el.style.fontSize=size+'px';}",
+"  }",
+" });",
 "}",
 "async function printLabels(){",
 " await document.fonts.ready;fitText();",
-" var bad=[].slice.call(document.querySelectorAll('.label *')).some(function(el){return el.clientWidth&&((el.scrollWidth>el.clientWidth+1)||(el.scrollHeight>el.clientHeight+1));})",
-"   || [].slice.call(document.querySelectorAll('.bag-row')).some(function(r){return r.scrollWidth>r.clientWidth+1;});",
+" var bad=[].slice.call(document.querySelectorAll('.label *')).some(function(el){return el.clientWidth&&((el.scrollWidth>el.clientWidth+1)||(el.scrollHeight>el.clientHeight+1));});",
 " if(bad){ try{ parent.toast('البيانات تتجاوز مساحة الملصق — كبّر القياس أو قصّر الاسم قبل الطباعة','error',6000); }catch(e){} return; }",
 " window.print();",
 "}",
@@ -80,34 +88,31 @@ function _lbWrap(ctx,text,maxW){
 }
 async function renderLabelCanvas(data,size,ppm){
   ppm=ppm||12; data=data||{};
-  var W=Number(size.width), H=Number(size.height), cv=document.createElement('canvas');
+  var W=Number(size.width), H=Number(size.height), U=Math.min(H,W/1.5), cv=document.createElement('canvas');
   cv.width=Math.round(W*ppm); cv.height=Math.round(H*ppm);
   var ctx=cv.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,cv.width,cv.height);
   try{ await document.fonts.ready; }catch(e){}
-  var fam='Arial, Tahoma, sans-serif', pad=2, cw=(W-2*pad), ch=(H-2*pad), overflow=false;
+  var fam='Arial, Tahoma, sans-serif', padX=2, padY=1.5, cw=W-2*padX, ch=H-2*padY, overflow=false;
   function font(mm){ ctx.font='bold '+(mm*ppm)+'px '+fam; }
-  try{ ctx.direction='rtl'; }catch(e){}
   var S=function(k){ var v=data[k]; return (v===undefined||v===null)?'':String(v); };
-  // name: 15pt, shrinks (0.5px steps, floor 10px) until it fits width and 38% of the content height
-  var namePx=_lbPt(15)/_lbPx(1), nameFont, nameLines, nameH;
-  for(;;){
-    nameFont=_lbPx(namePx); font(nameFont); nameLines=_lbWrap(ctx,S('donorName'),cw*ppm); nameH=nameLines.length*1.25*nameFont;
-    if(nameH<=0.38*ch+0.01 || namePx<=10) break; namePx-=0.5;
+  function fitW(text,start,floor,maxW){ var f=start; font(f); while(ctx.measureText(text).width/ppm>maxW+0.01 && f>floor){ f-=0.5*25.4/96; font(f);} if(ctx.measureText(text).width/ppm>maxW+0.01) overflow=true; return f; }
+  // name: one line, big, shrinks only as much as needed to fit the width
+  var nameLines=[S('donorName')], nameFont=U*.14, nameH;
+  nameFont=fitW(S('donorName'),U*.14,U*.07,cw); overflow=false;
+  font(nameFont);
+  if(ctx.measureText(S('donorName')).width/ppm>cw+0.01){ // too long for one line even at the floor: two lines within 20% of the height
+    nameFont=U*.09; for(;;){ font(nameFont); nameLines=_lbWrap(ctx,S('donorName'),cw*ppm); if(nameLines.length*1.25*nameFont<=U*.2+0.01||nameFont<=U*.05) break; nameFont-=0.5*25.4/96; }
+    if(nameLines.length*1.25*nameFont>U*.2+0.01) overflow=true;
   }
-  if(nameH>0.38*ch+0.01) overflow=true;
-  // bag row: type (11pt, up to 45% of the width, wraps) + number (25pt, never wraps), gap 2mm, centered
-  var typeFont=_lbPt(11); font(typeFont);
-  var typeLines=_lbWrap(ctx,S('bagType'),0.45*cw*ppm);
-  var typeW=Math.max.apply(null,typeLines.map(function(l){return ctx.measureText(l).width;}))/ppm; if(!S('bagType')) typeW=0;
-  var typeH=typeLines.length*1.15*typeFont;
-  var numPx=_lbPt(25)/_lbPx(1), numFont, numW, gap=S('bagType')?2:0;
-  for(;;){
-    numFont=_lbPx(numPx); font(numFont); numW=ctx.measureText(S('bagNumber')).width/ppm;
-    if(typeW+gap+numW<=cw+0.01 || numPx<=10) break; numPx-=0.5;
-  }
-  if(typeW+gap+numW>cw+0.01) overflow=true;
-  var rowH=Math.max(1.15*numFont, S('bagType')?typeH:0);
-  var dFont=_lbPt(10), dLine=1.6*dFont, datesH=2*dLine;
+  nameH=nameLines.length*1.25*nameFont;
+  // row: [type | number] — type on the left with a vertical divider, number centred in the rest
+  var rowH=U*.24, typeW=cw*.28, numW=cw-typeW;
+  var numFont=fitW(S('bagNumber'),U*.2,U*.1,numW-0.4);
+  var typeFont=U*.075, typeLines;
+  for(;;){ font(typeFont); typeLines=_lbWrap(ctx,S('bagType'),(typeW-2-0.4)*ppm); if(typeLines.length*1.15*typeFont<=rowH+0.01||typeFont<=U*.04) break; typeFont-=0.5*25.4/96; }
+  if(typeLines.length*1.15*typeFont>rowH+0.01) overflow=true;
+  var dFont=U*.105, dLine=1.5*dFont, datesH=2*dLine;
+  font(dFont); ['تاريخ السحب:','تاريخ النفاذ:'].forEach(function(t,i){ var v=S(i?'expiryDate':'collectionDate'); if((ctx.measureText(t).width+ctx.measureText(v).width)/ppm+1>cw) overflow=true; });
   var free=ch-nameH-rowH-datesH; if(free<-0.01) overflow=true;
   var g=Math.max(0,free)/2;
   function drawLine(text,align,x,top,lineH,fontMm,dir){
@@ -116,21 +121,18 @@ async function renderLabelCanvas(data,size,ppm){
     var m=ctx.measureText('Mهح'), asc=m.fontBoundingBoxAscent||fontMm*ppm*0.9, dsc=m.fontBoundingBoxDescent||fontMm*ppm*0.2;
     ctx.fillText(text,x*ppm,top*ppm+(lineH*ppm-(asc+dsc))/2+asc);
   }
-  var y=pad;
+  var y=padY;
   nameLines.forEach(function(l,i){ drawLine(l,'center',W/2,y+i*1.25*nameFont,1.25*nameFont,nameFont,'rtl'); });
   y+=nameH+g;
-  // row (RTL): type on the right, number to its left
-  var total=typeW+gap+numW, startX=(W-total)/2, rowTop=y;
-  if(S('bagType')){
-    var typeRight=startX+total;
-    typeLines.forEach(function(l,i){ drawLine(l,'center',typeRight-typeW/2,rowTop+(rowH-typeH)/2+i*1.15*typeFont,1.15*typeFont,typeFont,'rtl'); });
-  }
-  drawLine(S('bagNumber'),'left',startX,rowTop+(rowH-1.15*numFont)/2,1.15*numFont,numFont,'ltr');
+  var rowTop=y, left=padX;
+  ctx.fillStyle='#000'; ctx.fillRect(Math.round((left+typeW-0.4)*ppm),Math.round(rowTop*ppm),Math.max(1,Math.round(0.4*ppm)),Math.round(rowH*ppm));
+  typeLines.forEach(function(l,i){ drawLine(l,'center',left+(typeW-0.4)/2,rowTop+(rowH-typeLines.length*1.15*typeFont)/2+i*1.15*typeFont,1.15*typeFont,typeFont,'rtl'); });
+  drawLine(S('bagNumber'),'center',left+typeW+numW/2,rowTop,rowH,numFont,'ltr');
   y+=rowH+g;
   [['تاريخ السحب:','collectionDate'],['تاريخ النفاذ:','expiryDate']].forEach(function(r,i){
     var top=y+i*dLine;
-    drawLine(r[0],'right',W-pad,top,dLine,dFont,'rtl');
-    drawLine(S(r[1]),'left',pad,top,dLine,dFont,'ltr');
+    drawLine(r[0],'right',W-padX,top,dLine,dFont,'rtl');
+    drawLine(S(r[1]),'left',padX,top,dLine,dFont,'ltr');
   });
   return {canvas:cv, overflow:overflow};
 }

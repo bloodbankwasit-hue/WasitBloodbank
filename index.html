@@ -105,7 +105,7 @@ html{-webkit-text-size-adjust:100%}
 .ni.on i{color:#BE123C}
 .nbadge{margin-right:auto;background:#BE123C;color:#fff;font-size:12px;padding:2px 6px;border-radius:10px}
 .dt-logout{display:none;align-items:center;gap:6px;margin-right:10px;padding:5px 12px;border:1px solid #FECACA;background:#FFF1F2;color:#BE123C;border-radius:8px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
-@media(min-width:769px){.dt-logout{display:inline-flex}}
+@media(min-width:769px){.dt-logout{display:inline-flex}#dtPrinterBtn.on{display:inline-flex !important}}
 .sb-foot{padding:12px 14px 16px;border-top:1px solid #f0f0f0;background:#fafafa}
 .sf-user{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .sf-av{width:36px;height:36px;background:linear-gradient(135deg,#BE123C,#881337);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px;font-weight:700;flex-shrink:0;box-shadow:0 2px 8px rgba(198,40,40,.3)}
@@ -984,6 +984,7 @@ tbody tr:hover td{background:#fafafa}
       </button>
       <div class="ptb-title" id="pgTitle">لوحة التحكم</div>
       <span class="tb-date" id="tbDate"></span>
+      <button class="dt-logout" id="dtPrinterBtn" style="display:none" onclick="openPrinterSettings()" title="إعدادات الطابعات">🖨️ الطابعات</button>
       <button class="dt-logout" onclick="if(confirm('تسجيل الخروج؟'))doLogout()" title="تسجيل الخروج"><i class="ti ti-logout"></i> <span id="dtUserName"></span> · خروج</button>
     </div>
     <div class="page">
@@ -1672,7 +1673,16 @@ tbody tr:hover td{background:#fafafa}
 </div><!-- end app -->
 
 <!-- RECEPTION PRINT MODAL (shown centered after a successful save) -->
-<div class="overlay" id="labelModal">
+<div class="overlay" id="printerModal" style="z-index:7900">
+  <div class="modal" style="width:380px">
+    <div style="font-size:17px;font-weight:800;margin-bottom:12px;text-align:center">🖨️ إعدادات الطابعات</div>
+    <label style="font-size:13px;display:block;margin-bottom:10px">طابعة الوصل (الكبيرة)<select id="pr-receipt" style="width:100%;padding:8px;margin-top:4px"></select></label>
+    <label style="font-size:13px;display:block;margin-bottom:12px">طابعة الملصقات (الصغيرة)<select id="pr-label" style="width:100%;padding:8px;margin-top:4px"></select></label>
+    <button class="btn btn-p" onclick="savePrinterSettings()" style="width:100%;justify-content:center">حفظ</button>
+    <button class="btn" onclick="G('printerModal').classList.remove('on')" style="width:100%;justify-content:center;margin-top:8px">إلغاء</button>
+  </div>
+</div>
+<div class="overlay" id="labelModal" style="z-index:7800">
   <div class="modal" style="width:360px">
     <div style="font-size:17px;font-weight:800;margin-bottom:12px;text-align:center">🏷️ طباعة ملصق القنينة</div>
     <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -1680,7 +1690,7 @@ tbody tr:hover td{background:#fafafa}
       <label style="flex:1;font-size:13px">العرض (ملم)<input id="lb-w" type="text" inputmode="decimal" value="50" style="width:100%;padding:8px;margin-top:4px"></label>
       <label style="flex:1;font-size:13px">الارتفاع (ملم)<input id="lb-h" type="text" inputmode="decimal" value="50" style="width:100%;padding:8px;margin-top:4px"></label>
     </div>
-    <div style="font-size:12px;color:#92400E;background:#FEF3C7;border-radius:8px;padding:8px;margin-bottom:10px">اجعل «النسخ» في حوار الطباعة = 1 والمقياس 100% دون ترويسة/تذييل. القياس يُحفظ لهذا الجهاز.</div>
+    <div id="lb-note" style="font-size:12px;color:#92400E;background:#FEF3C7;border-radius:8px;padding:8px;margin-bottom:10px">اجعل «النسخ» في حوار الطباعة = 1 والمقياس 100% دون ترويسة/تذييل. القياس يُحفظ لهذا الجهاز.</div>
     <button class="btn btn-p" onclick="confirmLabelPrint()" style="width:100%;justify-content:center">🖨️ طباعة</button>
     <button class="btn" onclick="G('labelModal').classList.remove('on')" style="width:100%;justify-content:center;margin-top:8px">✕ إلغاء</button>
   </div>
@@ -2190,7 +2200,9 @@ async function shareOrDownloadFile(blob, filename, mimeType){
 // the app is launched from the home-screen icon). A single hidden, reused iframe is written to
 // and printed instead; this leaves the desktop experience completely unchanged (same layout,
 // same native print dialog) while making mobile printing unconditionally reliable.
-function printHtmlDocument(htmlString){
+function printHtmlDocument(htmlString,opts){
+  // Inside the desktop app (exe) the receipt/label print silently to their own printer — no dialog.
+  if(opts && opts.kind && window.nativePrint){ nativePrintHtml(htmlString,opts); return; }
   let ifr = document.getElementById('_printFrame');
   if(!ifr){
     ifr = document.createElement('iframe');
@@ -2233,6 +2245,29 @@ async function enrichDonationForPrint(d){
   return d;
 }
 
+async function nativePrintHtml(html,opts){
+  try{
+    toast('🖨️ جاري الطباعة...','warning',1800);
+    const r=await window.nativePrint.print({html:html,kind:opts.kind,width:opts.width,height:opts.height});
+    if(r.ok){ toast('✅ أُرسل إلى الطابعة','success'); return; }
+    if(r.error==='no-printer'){ toast('اختر الطابعة أولاً','warning'); openPrinterSettings(); return; }
+    if(r.error==='not-ready'){ toast(opts.kind==='label'?'تعذّر تجهيز الملصق — قد تتجاوز البيانات مساحته، كبّر القياس أو قصّر الاسم':'تعذّر تجهيز الوصل للطباعة','error',6000); return; }
+    toast('تعذرت الطباعة: '+r.error,'error',6000);
+  }catch(e){ toast('تعذرت الطباعة: '+e.message,'error',6000); }
+}
+async function openPrinterSettings(){
+  if(!window.nativePrint) return;
+  try{
+    const [list,cfg]=await Promise.all([window.nativePrint.printers(),window.nativePrint.getConfig()]);
+    const opt=(sel)=>'<option value="">— اختر —</option>'+list.map(p=>`<option value="${esc(p.name)}" ${p.name===sel?'selected':''}>${esc(p.displayName)}${p.isDefault?' (الافتراضية)':''}</option>`).join('');
+    G('pr-receipt').innerHTML=opt(cfg.receiptPrinter); G('pr-label').innerHTML=opt(cfg.labelPrinter);
+    G('printerModal').classList.add('on');
+  }catch(e){ toast('تعذر قراءة الطابعات: '+e.message,'error'); }
+}
+async function savePrinterSettings(){
+  await window.nativePrint.setConfig({receiptPrinter:G('pr-receipt').value,labelPrinter:G('pr-label').value});
+  G('printerModal').classList.remove('on'); toast('تم حفظ الطابعات','success');
+}
 async function exportDonorFormPDF(){
   let d = _lastDonation;
   if(!d){ toast('لا توجد بيانات','error'); return; }
@@ -2271,7 +2306,7 @@ async function exportDonorFormPDF(){
       return;
     }catch(e){ console.error('receipt pdf failed, falling back to print:',e); }
   }
-  printHtmlDocument(buildReceiptHtml(data));
+  printHtmlDocument(buildReceiptHtml(data),{kind:'receipt'});
 }
 
 // ---- Bottle label (small HPRT printer) — design/engine in label-template.js ----
@@ -2290,6 +2325,7 @@ async function exportBottleStickerPDF(rec){
   _labelRec=r;
   const sz=labelCfgLoad();
   G('lb-copies').value=1; G('lb-w').value=sz.width; G('lb-h').value=sz.height;
+  if(G('lb-note')) G('lb-note').style.display=window.nativePrint?'none':'';
   G('labelModal').classList.add('on');
 }
 async function confirmLabelPrint(){
@@ -2311,7 +2347,7 @@ async function confirmLabelPrint(){
       toast('✅ تم تجهيز الملصق','success'); return;
     }catch(e){ console.error('label pdf failed:',e); toast(e.message||'تعذر تجهيز الملصق','error'); return; }
   }
-  printHtmlDocument(buildLabelHtml(data,copies,size));
+  printHtmlDocument(buildLabelHtml(data,copies,size),{kind:'label',width:size.width,height:size.height});
 }
 function printBCLabel(){
   const r=BCDATA; if(!r){ toast('لا توجد بيانات','warning'); return; }
@@ -2775,6 +2811,7 @@ async function loadProf(){
   // Sidebar
   G('sfName').textContent = _nm;
   if(G('dtUserName')) G('dtUserName').textContent = _nm;
+  if(window.nativePrint) G('dtPrinterBtn')?.classList.add('on');
   G('sfAv').textContent   = _av;
   G('sfRole').textContent = _nm;
   G('navUsers').style.display = data.role==='admin'?'flex':'none';
