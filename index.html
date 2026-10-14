@@ -2318,8 +2318,8 @@ async function exportDonorFormPDF(){
     donorName: S(d.donor_name), motherName: S(d.mother_name), identityNumber: S(d.national_id),
     occupation: S(d.occupation), birthYear: by ? String(by) : '', age: age!=='' ? String(age) : '',
     gender: S(d.gender), phone: S(d.mobile), address: S(d.address),
-    donationType: S(d.donation_type), donationDate: S(d.donation_date),
-    donationTime: d.donation_time ? String(d.donation_time).substring(0,5) : '',
+    donationType: S(d.donation_type), donationDate: S(d.donation_date).replace(/-/g,'/'),
+    donationTime: (function(x){ var m=/^(\d{1,2}):(\d{2})/.exec(String(x||'')); if(!m) return ''; var h=+m[1]; return ((h%12)||12)+':'+m[2]+' '+(h>=12?'PM':'AM'); })(d.donation_time),
     patientName: S(d.patient_name), hospitalName: S(d.hospital_name),
     bloodPressure: S(d.blood_pressure), pulse: S(d.pulse), temperature: S(d.temperature),
     weight: S(d.weight), hemoglobin: S(d.hemoglobin)
