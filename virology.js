@@ -46,8 +46,8 @@ async function loadVirology(){
     <input type="checkbox" class="vm-chk" value="${r.id}" onclick="updateVmBulkBar()" style="width:18px;height:18px;flex-shrink:0">
     <div class="fc-av">${BAG}</div>
     <div style="flex:1">
-      <div class="fc-name">${esc(r.donors?.full_name||'—')}</div>
-      <div class="fc-sub">قنينة: ${r.bottle_number||'—'} | ${r.bottle_type}</div>
+      <div class="fc-name fc-bn">${r.bottle_number||'—'}</div>
+      <div class="fc-sub fc-dn">${esc(r.donors?.full_name||'—')} | ${r.bottle_type}</div>
     </div>
     <div class="fc-act">
       <button class="btn btn-p" onclick="openVirologyModal('${r.id}','${sq(r.donors?.full_name)}','${r.bottle_number||''}','${r.draw_date||''}')">

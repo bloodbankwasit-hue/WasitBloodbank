@@ -68,8 +68,8 @@ async function loadSeparationList(bottleType){
       <input type="checkbox" class="sep-chk" value="${r.id}" data-bt="${r.bottle_type}" onclick="updateSepBulkBar()" style="width:18px;height:18px;flex-shrink:0">
       <div class="fc-av">${tested?'✅':'⏳'}</div>
       <div style="flex:1">
-        <div class="fc-name">${name} — قنينة ${r.bottle_number||'—'}</div>
-        <div class="fc-sub">${r.bottle_type} | ${r.component_type||'دم كامل'} | ${r.blood_type||'—'} | ${fd(r.draw_date)}</div>
+        <div class="fc-name fc-bn">${r.bottle_number||'—'}</div>
+        <div class="fc-sub fc-dn">${name} | ${r.bottle_type} | ${r.component_type||'دم كامل'} | ${r.blood_type||'—'} | ${fd(r.draw_date)}</div>
         <div style="margin-top:4px">
           ${tested
             ? `<span class="pill pg">✅ سليمة — جاهزة للفصل</span>`
@@ -201,8 +201,8 @@ function loadPendingReleaseList(cat){
       ${(infected||!complete)?'<span style="width:18px"></span>':`<input type="checkbox" class="pr-chk" value="${r.id}" onclick="updatePrBulkBar()" style="width:18px;height:18px;flex-shrink:0">`}
       <div class="fc-av">${infected?'⛔':complete?'⏳':'🕓'}</div>
       <div style="flex:1">
-        <div class="fc-name">${name} — قنينة ${r.bottle_number||'—'}</div>
-        <div class="fc-sub">${r.bottle_type||'—'} | ${r.component_type||'دم كامل'} | ${btTag} | ${fd(r.draw_date)}</div>
+        <div class="fc-name fc-bn">${r.bottle_number||'—'}</div>
+        <div class="fc-sub fc-dn">${name} | ${r.bottle_type||'—'} | ${r.component_type||'دم كامل'} | ${btTag} | ${fd(r.draw_date)}</div>
         <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">
           ${!complete ? `<span class="pill py">${serTag}</span>` : ''}
           ${complete && !infected ? `<span class="pill py">⏳ بانتظار التأكيد</span>` : ''}
