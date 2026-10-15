@@ -473,7 +473,10 @@ async function saveReception(){
       // Show print options as a centered popup instead of resetting the form
       G('rcPrintModal').classList.add('on');
       { const eb=G('rcEditBtn'); if(eb) eb.style.display=_lastDonation?.id?'':'none'; }
-      G('rcSaveBtn').style.display='none';
+      // the form is cleared right away (behind the popup) so the next donor can be entered immediately;
+      // _lastDonation keeps what the print / edit buttons need
+      resetReception();
+      G('rcSaveBtn').style.display='flex';
       toast('✅ تم الحفظ — رقم القنينة: '+bnum,'success',4000);
       if(typeof colCheckAutoPopup==='function') colCheckAutoPopup();
     }
@@ -482,6 +485,7 @@ async function saveReception(){
 }
 
 function resetReception(){
+  { const f=G('s-reception'); if(f) delete f.dataset.existingDonorId; const bn=G('rcFilledBanner'); if(bn) bn.classList.remove('show'); }
   rcSetIdType('');
   { const f=G('s-reception'); if(f) f.dataset.hadIdType=''; }
   ['rc-name','rc-by','rc-age','rc-mom','rc-nid','rc-mob','rc-addr','rc-job','rc-pat','rc-hosp','rc-hosp-other','rc-bp','rc-pulse','rc-temp','rc-weight','rc-hgb'].forEach(id=>{const e=G(id);if(e)e.value='';});
