@@ -1910,6 +1910,7 @@ document.addEventListener('change',e=>{
 // section always has its functions available by the time it's actually used — whether opened
 // from the mobile tabs, the sidebar, or a desktop popup.
 const SECTION_SCRIPTS = {
+  backup: 'backup-auto.js',
   campaigns: 'campaigns.js',
   separation: 'campaigns.js',
   pending_release: 'campaigns.js',
@@ -3040,12 +3041,13 @@ async function showApp(){
   // (inside loadSupply) removes moments later, making the badge appear then shrink/vanish.
   await autoMarkExpiredDamaged();
   refreshExpiryNotifications();
+  bbAutoBackupInit();
 }
 
 // The notifications tab itself is permission-gated — an account only sees it (badge included)
 // if explicitly granted the 'notifications' permission (or is admin).
 function setupNotifTabVisibility(){
-  const canSee = (UPROF?.role==='admin') || hasPermission('notifications');
+  const canSee = (UPROF?.role==='admin') || hasPermission('notifications') || (canAutoBackup() && bbNoticeList().length>0);
   const btn=G('tab-notif-btn');
   if(btn) btn.style.display = canSee ? '' : 'none';
 }
@@ -3058,6 +3060,7 @@ let _scrollMemory = {};
 
 async function nav(name, el){
   if(name==='collection'){ await openCollectionFromNav(); return; }
+  if(name==='backup'){ await openBackupAutoFromNav(); return; }
   // Permission gate — defense in depth. Without this, nav() would happily load ANY section's
   // data and UI for ANY logged-in user who calls it directly (e.g. from the browser console),
   // even though the tile to reach it is hidden from them — hiding the tile alone was never
@@ -3799,7 +3802,7 @@ async function refreshExpiryNotifications(){
   // Each distinct (blood type + content type + date) combination is its own expiry alert —
   // e.g. 5 B+ and 6 A+ expiring the same day are two separate alerts, not one merged alert.
   const groupKeys=new Set(expiryList.map(r=>(r.blood_type||'—')+'|'+(r.component_type||'دم كامل')+'|'+r.expiry_date));
-  const total = groupKeys.size + infectedList.length + seqNew;
+  const total = groupKeys.size + infectedList.length + seqNew + bbNoticeUnseen();
   if(total){
     badge.textContent=total>99?'99+':total;
     badge.style.display='flex';
@@ -3857,7 +3860,14 @@ function openNotifPanel(){
     </div>`;
   }).join('');
 
-  G('notifList').innerHTML = (seqRows+infRows+expRows) || '<div class="empty"><i class="ti ti-bell-off"></i><p>لا توجد تنبيهات حالياً</p></div>';
+  const bkList=bbNoticeList().slice(0,12);
+  const bkRows=bkList.map(n=>{ const ok=n.kind!=='err', d=new Date(n.t); const dt=d.toLocaleDateString('en-CA')+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    return `<div style="padding:12px 14px;border:1px solid ${ok?'#BBF7D0':'#FECACA'};background:${ok?'#F0FDF4':'#FEF2F2'};border-radius:10px;margin-bottom:8px">
+      <div style="font-weight:700;font-size:16.5px;color:${ok?'#166534':'#7F1D1D'}">${ok?'✅':'⛔'} ${esc(n.title)}</div>
+      <div style="font-size:14px;color:#757575;margin-top:2px;direction:ltr;text-align:right;word-break:break-all">${esc(n.sub||'')}</div>
+      <div style="font-size:13px;color:#9e9e9e;margin-top:2px">${dt}</div></div>`; }).join('');
+  bbNoticeMarkSeen();
+  G('notifList').innerHTML = (bkRows+seqRows+infRows+expRows) || '<div class="empty"><i class="ti ti-bell-off"></i><p>لا توجد تنبيهات حالياً</p></div>';
   G('notifModal').classList.add('on');
 }
 setInterval(refreshExpiryNotifications, 5*60*1000);
@@ -4305,6 +4315,7 @@ const WORK_CARDS = [
   {key:'rare',      icon:'💎', name:'الفصائل النادرة', desc:'O− و AB−'},
   {key:'damaged_store', icon:'🗑️', name:'مخزن القناني التالفة', desc:'استلام التالف وإتلافه بمحضر وأرشيفه'},
   {key:'stats',     icon:'📈', name:'الإحصائيات',  desc:'تقارير وطباعة'},
+  {key:'backup',    icon:'💾', name:'النسخ الاحتياطي', desc:'تلقائي كل 3 أيام على هذه الحاسبة'},
 ];
 
 const ADMIN_ONLY_CARDS = [
@@ -4319,7 +4330,35 @@ const SECTION_PERM = {};
 [...WORK_CARDS, ...ADMIN_ONLY_CARDS].forEach(c=>{ SECTION_PERM[c.key]=c.key; });
 SECTION_PERM.add = 'reception';
 SECTION_PERM.collection = 'reception'; // the A4 draw form is a reception task
-function cardVisible(c,isAdmin,perms){ return isAdmin || perms.includes(c.key) || (c.key==='collection' && perms.includes('reception')); }
+function cardVisible(c,isAdmin,perms){
+  if(c.key==='backup') return !!window.nativeBackup && (isAdmin || perms.includes('backup')); // desktop app only
+  return isAdmin || perms.includes(c.key) || (c.key==='collection' && perms.includes('reception'));
+}
+// ── Automatic backup (desktop app only): launcher, notices, startup hook ──────────────────────
+function canAutoBackup(){ return !!window.nativeBackup && !!UPROF && (UPROF.role==='admin' || hasPermission('backup')); }
+async function openBackupAutoFromNav(){
+  if(!canAutoBackup()){ toast('⛔ النسخ الاحتياطي متاح في تطبيق الويندوز للحسابات المصرّح لها فقط','error'); return; }
+  try{ await loadSectionScript('backup'); }catch(e){ toast('تعذر تحميل هذا القسم — تحقق من الاتصال بالإنترنت','error',4000); return; }
+  openBackupAutoModal();
+}
+function bbAutoBackupInit(){
+  if(!canAutoBackup()) return;
+  loadSectionScript('backup').then(()=>{ if(typeof bbAutoStart==='function') bbAutoStart(); }).catch(()=>{});
+}
+// notices shown in the bell, kept per account on this computer
+function _bbNKey(){ return 'bb_backup_notices_'+(SES?.user?.id||'x'); }
+function bbNoticeList(){ try{ return JSON.parse(localStorage.getItem(_bbNKey())||'[]'); }catch(e){ return []; } }
+function bbNoticeAdd(kind,title,sub,uid){
+  try{
+    const k='bb_backup_notices_'+(uid||SES?.user?.id||'x');
+    const l=JSON.parse(localStorage.getItem(k)||'[]');
+    l.unshift({t:new Date().toISOString(),kind,title,sub:sub||'',seen:false});
+    localStorage.setItem(k,JSON.stringify(l.slice(0,40)));
+  }catch(e){}
+  try{ refreshExpiryNotifications(); }catch(e){}
+}
+function bbNoticeUnseen(){ return bbNoticeList().filter(n=>!n.seen).length; }
+function bbNoticeMarkSeen(){ try{ const l=bbNoticeList(); l.forEach(n=>n.seen=true); localStorage.setItem(_bbNKey(),JSON.stringify(l)); }catch(e){} }
 async function openCollectionFromNav(){
   if(UPROF?.role!=='admin' && !hasPermission('reception')){ toast('⛔ ما عندك صلاحية الوصول لهذا القسم','error'); return; }
   try{ await loadSectionScript('reception'); }catch(e){ toast('تعذر تحميل هذا القسم — تحقق من الاتصال بالإنترنت','error',4000); return; }
@@ -4366,6 +4405,7 @@ let _popupSectionId=null, _popupHostParent=null, _popupHostNext=null;
 
 async function openSectionPopup(key, title){
   if(key==='collection'){ await openCollectionFromNav(); return; }
+  if(key==='backup'){ await openBackupAutoFromNav(); return; }
   const sec=G('s-'+key);
   if(!sec) return;
   _popupSectionId='s-'+key;
@@ -4916,6 +4956,15 @@ if('serviceWorker' in navigator){
       <button class="btn" onclick="G('editUserModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
       <button class="btn btn-p" onclick="saveUserEdit()"><i class="ti ti-device-floppy"></i> حفظ التعديلات</button>
     </div>
+  </div>
+</div>
+
+<!-- AUTO BACKUP (desktop app) -->
+<div class="overlay" id="backupAutoModal">
+  <div class="modal" style="width:520px">
+    <div class="modal-title"><i class="ti ti-database-export"></i> النسخ الاحتياطي التلقائي</div>
+    <div class="modal-body" id="backupAutoBody"></div>
+    <div class="modal-footer"><button class="btn" onclick="G('backupAutoModal').classList.remove('on')"><i class="ti ti-x"></i> إغلاق</button></div>
   </div>
 </div>
 
