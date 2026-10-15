@@ -184,8 +184,7 @@ async function confirmDrawSuccess(){
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'pending_lab'}});
     toast('✅ تم تسجيل السحب — أُرسل للمختبر','success',4000);
     G('drawModal').classList.remove('on');
-    const{data:don}=await db.from('blood_donations').select('*,donors(full_name,donor_number)').eq('id',id).single();
-    if(don){ BCDATA=don; setTimeout(()=>printBC('full'),300); }
+    // no automatic printing after a draw — printing happens only when the user asks for it
     await reloadDrawView();
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }
