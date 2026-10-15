@@ -1,4 +1,59 @@
 // ================================================================
+// ID TYPE (نوع الهوية): national card (12 digits) or another document
+// donors.id_type = null/'' → national card; otherwise the document name
+// (for «أخرى» the name the user typed). The number stays in donors.national_id.
+// ================================================================
+// RC_ID_TYPES (type → label wording) is defined in index.html
+function rcFitText(el){
+  if(!el) return;
+  const base = el.id==='rc-idother' ? 16 : 16.5;
+  el.style.fontSize = base+'px';
+  let sz = base;
+  while(el.scrollWidth > el.clientWidth + 1 && sz > 8){ sz -= 0.5; el.style.fontSize = sz+'px'; }
+}
+function rcIdTypeChange(){
+  const sel=G('rc-idtype'), nid=G('rc-nid'), oth=G('rc-idother'), lab=G('rc-nid-label');
+  if(!sel||!nid) return;
+  const v=sel.value;
+  nid.value=''; if(oth) oth.value='';
+  if(oth) oth.style.display = v==='__other' ? '' : 'none';
+  if(v===''){
+    lab.textContent='رقم البطاقة الوطنية';
+    nid.placeholder='19XXXXXXXXXX'; nid.maxLength=12; nid.setAttribute('inputmode','numeric');
+  } else {
+    const nm = v==='__other' ? 'الهوية' : RC_ID_TYPES[v];
+    lab.textContent = v==='__other' ? 'اسم ورقم الوثيقة' : 'رقم '+nm;
+    nid.placeholder = v==='__other' ? 'اكتب رقم الوثيقة' : 'اكتب رقم '+nm;
+    nid.maxLength=30; nid.setAttribute('inputmode','text');
+  }
+  rcFitText(nid);
+}
+function rcNidInput(el){
+  const nat = !G('rc-idtype') || G('rc-idtype').value==='';
+  if(nat) el.value = normDigits(el.value).replace(/[^0-9]/g,'');
+  else    el.value = normDigits(el.value).replace(/[^A-Za-z0-9\-\/]/g,'').toUpperCase();
+  rcFitText(el);
+  donorSearch('nid', el.value);
+}
+// the id_type value to store: '' (national) | document name
+function rcIdTypeValue(){
+  const v=G('rc-idtype')?.value||'';
+  if(v==='__other') return (G('rc-idother')?.value||'').trim();
+  return v;
+}
+function rcSetIdType(t){
+  const sel=G('rc-idtype'); if(!sel) return;
+  t=(t||'').trim();
+  const known = t==='' || [...sel.options].some(o=>o.value===t && o.value!=='__other');
+  sel.value = known ? t : '__other';
+  const nid=G('rc-nid'), keep=nid.value;
+  rcIdTypeChange();
+  nid.value=keep;
+  if(!known && G('rc-idother')) G('rc-idother').value=t;
+  rcFitText(nid); rcFitText(G('rc-idother'));
+}
+
+// ================================================================
 // DONOR AUTOCOMPLETE — Smooth & Auto-fill
 // ================================================================
 let _acTimer = null;
@@ -18,7 +73,7 @@ async function donorSearch(field, val){
   _acTimer = setTimeout(async()=>{
     try{
       let q = db.from('donors')
-        .select('id,full_name,birth_year,gender,mother_name,national_id,mobile,address,occupation,donor_number')
+        .select('id,full_name,birth_year,gender,mother_name,national_id,id_type,mobile,address,occupation,donor_number')
         .eq('is_deleted',false).limit(6);
       if(field==='name') q=q.ilike('full_name','%'+val.trim().replace(/ة/g,'ه')+'%');
       if(field==='nid')  q=q.eq('national_id',val.trim());
@@ -52,6 +107,7 @@ function fillDonor(d){
   if(G('rc-gen'))   G('rc-gen').value  = d.gender||'ذكر';
   if(G('rc-mom'))   G('rc-mom').value  = d.mother_name||'';
   if(G('rc-nid'))   G('rc-nid').value  = d.national_id||'';
+  rcSetIdType(d.id_type||'');
   if(G('rc-mob'))   G('rc-mob').value  = d.mobile||'';
   if(G('rc-addr'))  G('rc-addr').value = d.address||'';
   if(G('rc-job'))   G('rc-job').value  = d.occupation||'';
@@ -60,7 +116,7 @@ function fillDonor(d){
 
   // Mark as returning donor
   const form=G('s-reception');
-  if(form) form.dataset.existingDonorId=d.id;
+  if(form){ form.dataset.existingDonorId=d.id; form.dataset.hadIdType=d.id_type?'1':''; }
 
   // Show filled banner with blood type if known
   const banner=G('rcFilledBanner');
@@ -276,7 +332,11 @@ async function saveReception(){
   const _mobVal=G('rc-mob')?.value.trim()||'';
   if(_mobVal && !/^07[0-9]{9}$/.test(_mobVal)){ toast('رقم الموبايل يجب أن يكون 11 رقم ويبدأ بـ 07','error'); return; }
   const _nidVal=G('rc-nid')?.value.trim()||'';
-  if(_nidVal && _nidVal.length!==12){ toast('رقم البطاقة الوطنية يجب أن يكون 12 رقم','error'); return; }
+  const _idType=rcIdTypeValue();
+  if(G('rc-idtype')?.value==='__other' && !_idType && _nidVal){ toast('اكتب اسم الهوية','error'); return; }
+  if(!_idType && G('rc-idtype')?.value!=='__other'){
+    if(_nidVal && _nidVal.length!==12){ toast('رقم البطاقة الوطنية يجب أن يكون 12 رقم','error'); return; }
+  } else if(_nidVal && _nidVal.length<3){ toast('رقم الهوية قصير جداً','error'); return; }
   load(true);
   // Safety net: re-check by national ID / mobile even if no autocomplete suggestion was picked
   const _intervalBlock = await checkIntervalBeforeSave(G('rc-nid')?.value, G('rc-mob')?.value);
@@ -293,6 +353,7 @@ async function saveReception(){
       full_name:nm, birth_year:by, gender:G('rc-gen').value,
       mother_name:G('rc-mom').value.trim()||null,
       national_id:G('rc-nid').value.trim()||null,
+      id_type:(G('rc-nid').value.trim() && _idType) ? _idType : null,
       mobile:G('rc-mob').value.trim()||null,
       address:G('rc-addr').value.trim()||null,
       occupation:G('rc-job').value.trim()||null,
@@ -327,12 +388,13 @@ async function saveReception(){
           toast('ℹ️ تم التعرف على متبرع معروف تلقائياً: '+fallbackMatch.full_name,'info',4000);
         }
       }
+      const _hadIdType = G('s-reception')?.dataset?.hadIdType==='1';
       let dn;
       if(existingId){
         // Update existing donor with any newly filled fields
         const updateFields = {};
         if(payload.mother_name)  updateFields.mother_name  = payload.mother_name;
-        if(payload.national_id)  updateFields.national_id  = payload.national_id;
+        if(payload.national_id){ updateFields.national_id = payload.national_id; if(payload.id_type) updateFields.id_type = payload.id_type; else if(_hadIdType) updateFields.id_type = null; }
         if(payload.mobile)       updateFields.mobile        = payload.mobile;
         if(payload.address)      updateFields.address       = payload.address;
         if(payload.occupation)   updateFields.occupation    = payload.occupation;
@@ -346,6 +408,7 @@ async function saveReception(){
         const{data:nd,error:de}=await db.from('donors').insert({
           full_name:payload.full_name, birth_year:payload.birth_year, gender:payload.gender,
           mother_name:payload.mother_name, national_id:payload.national_id,
+          ...(payload.id_type?{id_type:payload.id_type}:{}),
           mobile:payload.mobile, address:payload.address, occupation:payload.occupation,
           created_by:payload.created_by
         }).select().single();
@@ -393,6 +456,7 @@ async function saveReception(){
         gender:G('rc-gen').value,
         mobile:G('rc-mob').value.trim(),
         national_id:G('rc-nid').value.trim(),
+        id_type:(G('rc-nid').value.trim() && _idType) ? _idType : '',
         mother_name:G('rc-mom').value.trim(),
         address:G('rc-addr').value.trim(),
         occupation:G('rc-job').value.trim(),
@@ -418,6 +482,8 @@ async function saveReception(){
 }
 
 function resetReception(){
+  rcSetIdType('');
+  { const f=G('s-reception'); if(f) f.dataset.hadIdType=''; }
   ['rc-name','rc-by','rc-age','rc-mom','rc-nid','rc-mob','rc-addr','rc-job','rc-pat','rc-hosp','rc-hosp-other','rc-bp','rc-pulse','rc-temp','rc-weight','rc-hgb'].forEach(id=>{const e=G(id);if(e)e.value='';});
   const _ho=G('rc-hosp-other'); if(_ho) _ho.style.display='none';
   if(G('rc-date')){ const t=new Date().toISOString().split('T')[0]; G('rc-date').value=fd(t); }

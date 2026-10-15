@@ -701,31 +701,41 @@ tbody tr:hover td{background:#fafafa}
   .modal .btn:hover{background:#F8FAFC}
 }
 
-/* ═══════ RECEPTION — ONE SCREEN (desktop): everything visible without scrolling ═══════ */
+/* ═══════ RECEPTION — ONE SCREEN (desktop): one row per field, label right / input left ═══════ */
 @media(min-width:769px){
-  #sectionPopup:has(#s-reception) .sec-popup-box{width:min(1280px,97vw);max-height:97vh}
-  #sectionPopup:has(#s-reception) .sec-popup-head{padding:8px 20px}
-  #sectionPopup:has(#s-reception) .sec-popup-body{padding:8px 16px 10px}
+  #sectionPopup:has(#s-reception) .sec-popup-box{width:min(1100px,97vw);max-height:98vh}
+  #sectionPopup:has(#s-reception) .sec-popup-head{padding:6px 20px}
+  #sectionPopup:has(#s-reception) .sec-popup-body{padding:6px 16px 8px}
   #s-reception{max-width:none}
-  #s-reception .fsec{padding:10px 18px 12px;border-radius:14px;margin-bottom:6px}
-  #s-reception .fst{font-size:17px;padding-bottom:6px;margin-bottom:8px}
-  #s-reception .fst i{font-size:19px}
-  #s-reception .fgrid:not(.rc-vitals){grid-template-columns:repeat(6,minmax(0,1fr));gap:7px 12px}
-  #s-reception .rc-row3{display:contents}
-  #s-reception .rc-row3 .fgrp label{font-size:13.5px;white-space:nowrap}
-  #s-reception .fgrp{gap:2px}
-  #s-reception .fgrp label{font-size:13.5px;margin-bottom:0}
-  #s-reception .fgrp input,#s-reception .fgrp select{padding:8px 10px;font-size:16.5px;border-radius:9px;width:100%;min-width:0}
-  #s-reception .rc-row3 .fgrp input{padding:8px 6px;font-size:15.5px}
+  #s-reception .fsec{padding:8px 18px 10px;border-radius:14px;margin-bottom:6px}
+  #s-reception .fst{font-size:16px;padding-bottom:4px;margin-bottom:6px}
+  #s-reception .fst i{font-size:18px}
+  #s-reception .rc-form{display:flex;flex-direction:column;gap:5px}
+  #s-reception .rc-r{display:flex;gap:14px;align-items:center}
+  #s-reception .rc-r .fgrp{flex:1;min-width:0;display:flex;flex-direction:row;align-items:center;gap:8px;grid-column:auto}
+  #s-reception .rc-r .fgrp.s2{flex:1}
+  #s-reception .rc-r .fgrp>label{flex:0 0 auto;margin:0;font-size:14px;white-space:nowrap;min-width:auto}
+  #s-reception .rc-r .fgrp:first-child>label{flex:0 0 168px}
+  #s-reception .rc-r .fgrp>.ac-wrap,#s-reception .rc-r .fgrp>select,#s-reception .rc-r .fgrp>input{flex:1;min-width:0}
+  #s-reception .rc-r .fgrp input,#s-reception .rc-r .fgrp select{padding:5px 10px;font-size:16px;border-radius:8px;width:100%;min-width:0;height:34px;box-sizing:border-box}
   #s-reception input#rc-bnum{font-size:16px !important}
-  #s-reception .fgrp:has(#rc-name),#s-reception .fgrp:has(#rc-mom),#s-reception #rc-pat-grp,#s-reception #rc-hosp-grp{grid-column:span 3}
-  #s-reception .fgrp:has(#rc-btype){grid-column:span 2}
-  #s-reception .rc-vlabel{font-size:13.5px;margin:8px 0 4px !important}
-  #s-reception .rc-vitals{grid-template-columns:repeat(5,minmax(0,1fr));gap:7px 12px}
-  #s-reception #rc-hosp-other{margin-top:4px !important}
+  #s-reception #rc-hosp-grp{flex-wrap:wrap}
+  #s-reception #rc-hosp-grp>select{flex:1}
+  #s-reception #rc-hosp-other{flex:1 1 100%;margin:3px 0 0 0 !important}
+  #s-reception .rc-idbox{flex:1;min-width:0;display:flex;gap:8px;align-items:center}
+  #s-reception .rc-idbox>select{flex:0 0 190px;width:190px}
+  #s-reception .rc-idbox>input,#s-reception .rc-idbox>.ac-wrap{flex:1;min-width:0}
+  #s-reception .rc-vrow .fgrp{flex-direction:column;align-items:stretch;gap:1px}
+  #s-reception .rc-vrow .fgrp:first-child>label{flex:0 0 auto}
+  #s-reception .rc-vrow .fgrp>label{font-size:13px}
   #s-reception .rc-actions{display:flex;gap:10px;align-items:stretch}
-  #s-reception .rc-actions .btn-action{flex:3;max-width:none;margin:0;padding:11px;font-size:17px;border-radius:12px}
+  #s-reception .rc-actions .btn-action{flex:3;max-width:none;margin:0;padding:10px;font-size:17px;border-radius:12px}
   #s-reception .rc-actions .btn{flex:1;margin:0 !important;width:auto !important}
+}
+@media(max-width:768px){
+  #s-reception .rc-r{display:contents}
+  .rc-idbox{display:flex;flex-direction:column;gap:6px;width:100%}
+  .rc-idbox>select{width:100%}
 }
 @media(max-width:768px){
   #s-dthome{display:none !important}
@@ -1515,46 +1525,67 @@ tbody tr:hover td{background:#fafafa}
         </div>
         <div class="fsec">
           <div class="fst"><i class="ti ti-user"></i> بيانات الاستقبال</div>
-          <div class="fgrid">
-            <div class="rc-row3">
-              <div class="fgrp"><label>تسلسل المتبرع</label><input type="text" id="rc-donornum" class="ro" readonly placeholder="تلقائي" style="background:#f0f9ff;color:#0F766E;font-weight:700"></div>
+          <div class="fgrid rc-form">
+            <div class="rc-r">
               <div class="fgrp"><label>تاريخ التبرع</label>
                 <input type="text" id="rc-date" class="ro" readonly style="background:#f0f9ff;color:#0F766E;font-weight:600">
               </div>
               <div class="fgrp"><label>وقت التبرع</label>
                 <input type="text" id="rc-time" class="ro" readonly style="background:#f0f9ff;color:#0F766E;font-weight:600">
               </div>
+              <div class="fgrp"><label>تسلسل المتبرع</label><input type="text" id="rc-donornum" class="ro" readonly placeholder="تلقائي" style="background:#f0f9ff;color:#0F766E;font-weight:700"></div>
             </div>
 
-            <div class="fgrp s2">
-              <label>الاسم الرباعي واللقب *</label>
-              <div class="ac-wrap">
-                <input type="text" id="rc-name" placeholder="ابدأ بكتابة الاسم..."
-                  oninput="donorSearch('name',this.value)"
-                  onblur="checkRejectedName()"
-                  autocomplete="off">
-                <div class="ac-list" id="ac-name"></div>
+            <div class="rc-r">
+              <div class="fgrp s2">
+                <label>الاسم الرباعي واللقب *</label>
+                <div class="ac-wrap">
+                  <input type="text" id="rc-name" placeholder="ابدأ بكتابة الاسم..."
+                    oninput="donorSearch('name',this.value)"
+                    onblur="checkRejectedName()"
+                    autocomplete="off">
+                  <div class="ac-list" id="ac-name"></div>
+                </div>
               </div>
             </div>
 
-            <div class="fgrp"><label>سنة التولد *</label><input type="text" inputmode="numeric" id="rc-by" placeholder="1995" min="1920" max="2007" oninput="this.value=this.value.replace(/[^0-9]/g,'');calcRcAge()"></div>
-            <div class="fgrp"><label>الجنس *</label><select id="rc-gen"><option value="ذكر">ذكر</option><option value="أنثى">أنثى</option></select></div>
-            <div class="fgrp"><label>العمر</label><input type="text" id="rc-age" class="ro" readonly placeholder="تلقائي"></div>
+            <div class="rc-r">
+              <div class="fgrp"><label>سنة التولد *</label><input type="text" inputmode="numeric" id="rc-by" placeholder="1995" min="1920" max="2007" oninput="this.value=this.value.replace(/[^0-9]/g,'');calcRcAge()"></div>
+              <div class="fgrp"><label>العمر</label><input type="text" id="rc-age" class="ro" readonly placeholder="تلقائي"></div>
+              <div class="fgrp"><label>الجنس *</label><select id="rc-gen"><option value="ذكر">ذكر</option><option value="أنثى">أنثى</option></select></div>
+            </div>
 
-            <div class="fgrp s2"><label>اسم الأم</label><input type="text" id="rc-mom" placeholder="اسم الأم الثلاثي"></div>
+            <div class="rc-r"><div class="fgrp s2"><label>اسم الأم</label><input type="text" id="rc-mom" placeholder="اسم الأم الثلاثي"></div></div>
 
-            <div class="fgrp s2">
-              <label>رقم البطاقة الوطنية</label>
-              <div class="ac-wrap">
-                <input type="text" id="rc-nid" placeholder="19XXXXXXXXXX"
-                  inputmode="numeric" maxlength="12"
-                  oninput="this.value=this.value.replace(/[^0-9]/g,'');donorSearch('nid',this.value)"
-                  autocomplete="off">
-                <div class="ac-list" id="ac-nid"></div>
+            <div class="rc-r rc-idrow" id="rc-idrow">
+              <div class="fgrp s2 rc-idgrp">
+                <label id="rc-nid-label">رقم البطاقة الوطنية</label>
+                <div class="rc-idbox">
+                  <select id="rc-idtype" onchange="rcIdTypeChange()" title="نوع الهوية">
+                    <option value="">البطاقة الوطنية</option>
+                    <option value="هوية عسكرية">هوية عسكرية</option>
+                    <option value="هوية موظف">هوية موظف</option>
+                    <option value="جواز سفر">جواز سفر</option>
+                    <option value="إجازة سوق">إجازة سوق</option>
+                    <option value="بطاقة ناخب">بطاقة ناخب</option>
+                    <option value="بطاقة سكن">بطاقة سكن</option>
+                    <option value="هوية نقابة">هوية نقابة</option>
+                    <option value="__other">أخرى</option>
+                  </select>
+                  <input type="text" id="rc-idother" placeholder="اكتب اسم الهوية" style="display:none" maxlength="40"
+                    oninput="rcFitText(this)" autocomplete="off">
+                  <div class="ac-wrap">
+                    <input type="text" id="rc-nid" placeholder="19XXXXXXXXXX"
+                      inputmode="numeric" maxlength="12"
+                      oninput="rcNidInput(this)"
+                      autocomplete="off">
+                    <div class="ac-list" id="ac-nid"></div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div class="fgrp s2">
+            <div class="rc-r"><div class="fgrp s2">
               <label>رقم الموبايل</label>
               <div class="ac-wrap">
                 <input type="tel" id="rc-mob" placeholder="07XXXXXXXXX"
@@ -1564,14 +1595,15 @@ tbody tr:hover td{background:#fafafa}
                   autocomplete="off">
                 <div class="ac-list" id="ac-mob"></div>
               </div>
-            </div>
+            </div></div>
 
-            <div class="fgrp s2"><label>عنوان السكن</label><input type="text" id="rc-addr" placeholder="المحلة / الحي / المدينة"></div>
-            <div class="fgrp s2"><label>المهنة</label><select id="rc-job"><option value="">اختر...</option><option value="موظف">موظف</option><option value="كاسب">كاسب</option><option value="متقاعد">متقاعد</option><option value="عسكري">عسكري</option><option value="طالب">طالب</option></select></div>
+            <div class="rc-r"><div class="fgrp s2"><label>عنوان السكن</label><input type="text" id="rc-addr" placeholder="المحلة / الحي / المدينة"></div></div>
+            <div class="rc-r"><div class="fgrp s2"><label>المهنة</label><select id="rc-job"><option value="">اختر...</option><option value="موظف">موظف</option><option value="كاسب">كاسب</option><option value="متقاعد">متقاعد</option><option value="عسكري">عسكري</option><option value="طالب">طالب</option></select></div></div>
 
-            <div class="fgrp"><label>نوع التبرع *</label><select id="rc-dtype" onchange="toggleRcPat()"><option value="تعويضي">تعويضي</option><option value="طوعي">طوعي</option></select></div>
-            <div class="fgrp"><label>نوع القنينة *</label>
-              <select id="rc-btype" onchange="fetchNextBN()">
+            <div class="rc-r">
+              <div class="fgrp"><label>نوع التبرع *</label><select id="rc-dtype" onchange="toggleRcPat()"><option value="تعويضي">تعويضي</option><option value="طوعي">طوعي</option></select></div>
+              <div class="fgrp"><label>نوع القنينة *</label>
+                <select id="rc-btype" onchange="fetchNextBN()">
                 <option value="">اختر نوع القنينة</option>
                 <option value="مفلتر">مفلتر</option>
                 <option value="ريفيوس">ريفيوس</option>
@@ -1581,13 +1613,14 @@ tbody tr:hover td{background:#fafafa}
                 <option value="تريما">تريما (سحب آلي)</option>
                 <option value="أحادي">أحادي</option>
               </select>
-            </div>
-            <div class="fgrp"><label>رقم القنينة (تلقائي)</label>
-              <input type="text" id="rc-bnum" class="ro" readonly placeholder="اختر النوع أولاً" style="background:#f0f9ff;color:#0F766E;font-weight:700;font-size:19px">
+              </div>
+              <div class="fgrp"><label>رقم القنينة (تلقائي)</label>
+                <input type="text" id="rc-bnum" class="ro" readonly placeholder="اختر النوع أولاً" style="background:#f0f9ff;color:#0F766E;font-weight:700;font-size:19px">
+              </div>
             </div>
 
-            <div class="fgrp s2" id="rc-pat-grp"><label>اسم المريض</label><input type="text" id="rc-pat" placeholder="اسم المريض"></div>
-            <div class="fgrp s2" id="rc-hosp-grp"><label>اسم المستشفى</label>
+            <div class="rc-r"><div class="fgrp s2" id="rc-pat-grp"><label>اسم المريض</label><input type="text" id="rc-pat" placeholder="اسم المريض"></div></div>
+            <div class="rc-r"><div class="fgrp s2" id="rc-hosp-grp"><label>اسم المستشفى</label>
               <select id="rc-hosp" onchange="G('rc-hosp-other').style.display=this.value==='أخرى'?'block':'none'; if(this.value!=='أخرى') G('rc-hosp-other').value=''">
                 <option value="">— اختر —</option>
                 <option value="مستشفى الكوت للنسائية والاطفال">مستشفى الكوت للنسائية والاطفال</option>
@@ -1609,15 +1642,15 @@ tbody tr:hover td{background:#fafafa}
                 <option value="أخرى">أخرى</option>
               </select>
               <input type="text" id="rc-hosp-other" placeholder="اكتب اسم المستشفى" style="display:none;margin-top:6px">
+            </div></div>
+
+            <div class="rc-r rc-vrow">
+              <div class="fgrp"><label>الهيموغلوبين</label><input type="text" id="rc-hgb" inputmode="decimal" placeholder="g/dL" oninput="this.value=normDec(this.value)"></div>
+              <div class="fgrp"><label>الوزن</label><input type="text" inputmode="decimal" id="rc-weight" placeholder="كغم" oninput="this.value=normDec(this.value)"></div>
+              <div class="fgrp"><label>النبض</label><input type="text" inputmode="numeric" id="rc-pulse" placeholder="نبضة/دقيقة" oninput="this.value=normDigits(this.value).replace(/[^0-9]/g,'')"></div>
+              <div class="fgrp"><label>ضغط الدم</label><input type="text" id="rc-bp" placeholder="مثال: 120/80" oninput="this.value=normDigits(this.value)"></div>
+              <div class="fgrp"><label>درجة الحرارة</label><input type="text" inputmode="decimal" id="rc-temp" placeholder="°م" oninput="this.value=normDec(this.value)"></div>
             </div>
-          </div>
-          <div class="rc-vlabel" style="font-size:15.5px;font-weight:700;color:#374151;margin:14px 0 8px">العلامات الحيوية (اختياري)</div>
-          <div class="fgrid rc-vitals">
-            <div class="fgrp"><label>ضغط الدم</label><input type="text" id="rc-bp" placeholder="مثال: 120/80" oninput="this.value=normDigits(this.value)"></div>
-            <div class="fgrp"><label>النبض</label><input type="text" inputmode="numeric" id="rc-pulse" placeholder="نبضة/دقيقة" oninput="this.value=normDigits(this.value).replace(/[^0-9]/g,'')"></div>
-            <div class="fgrp"><label>درجة الحرارة</label><input type="text" inputmode="decimal" id="rc-temp" placeholder="°م" oninput="this.value=normDec(this.value)"></div>
-            <div class="fgrp"><label>الوزن</label><input type="text" inputmode="decimal" id="rc-weight" placeholder="كغم" oninput="this.value=normDec(this.value)"></div>
-            <div class="fgrp"><label>الهيموغلوبين</label><input type="text" inputmode="decimal" id="rc-hgb" placeholder="g/dL" oninput="this.value=normDec(this.value)"></div>
           </div>
         </div>
         <div class="rc-actions">
@@ -2134,7 +2167,7 @@ function buildDonorFormCanvas(d){
       ['التاريخ', d.donation_date||'—', 'الوقت', d.donation_time||'—'],
       ['سنة الميلاد', d.birth_year||'—', 'العمر', d.birth_year?new Date().getFullYear()-d.birth_year+'':'—'],
       ['الجنس', d.gender||'—', 'نوع التبرع', d.donation_type||'—'],
-      ['رقم الهاتف', d.mobile||'—', 'رقم البطاقة', d.national_id||'—'],
+      ['رقم الهاتف', d.mobile||'—', (d.id_type?('رقم '+(RC_ID_TYPES[d.id_type]||d.id_type)):'رقم البطاقة'), d.national_id||'—'],
       ['نوع القنينة', d.bottle_type||'—', 'العنوان', d.address||'—'],
     ];
 
@@ -2259,6 +2292,13 @@ function printHtmlDocument(htmlString,opts){
 function isIOSDevice(){ return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
 
 // Fill in the fields a list row doesn't carry by fetching the full record (online only).
+var RC_ID_TYPES = {
+  'هوية عسكرية':'الهوية العسكرية', 'هوية موظف':'هوية الموظف', 'جواز سفر':'جواز السفر',
+  'إجازة سوق':'إجازة السوق', 'بطاقة ناخب':'بطاقة الناخب', 'بطاقة سكن':'بطاقة السكن', 'هوية نقابة':'هوية النقابة'
+};
+// printed label for the ID row: national card by default, else «رقم <document>:»
+function idPrintLabel(t){ t=(t||'').trim(); return t ? 'رقم '+(RC_ID_TYPES[t]||t)+':' : 'رقم البطاقة الوطنية:'; }
+
 async function enrichDonationForPrint(d){
   if(d.id && IS_ONLINE){
     try{
@@ -2267,7 +2307,7 @@ async function enrichDonationForPrint(d){
         const dn=full.donors||{}, pick=(a,b)=> (a!=null&&a!=='') ? a : b;
         d={...d,
           donor_name:pick(dn.full_name,d.donor_name), donor_number:pick(dn.donor_number,d.donor_number),
-          mother_name:pick(dn.mother_name,d.mother_name), national_id:pick(dn.national_id,d.national_id),
+          mother_name:pick(dn.mother_name,d.mother_name), national_id:pick(dn.national_id,d.national_id), id_type:pick(dn.id_type,d.id_type),
           occupation:pick(dn.occupation,d.occupation), gender:pick(dn.gender,d.gender),
           birth_year:pick(dn.birth_year,d.birth_year), mobile:pick(dn.mobile,d.mobile), address:pick(dn.address,d.address),
           bottle_type:pick(full.bottle_type,d.bottle_type), bottle_number:pick(full.bottle_number,d.bottle_number),
@@ -2342,7 +2382,7 @@ async function exportDonorFormPDF(){
   const data = {
     barcodeValue: d.donor_number!=null ? S(d.donor_number) : '',
     donationProduct: S(d.bottle_type), bagNumber: S(d.bottle_number),
-    donorName: S(d.donor_name), motherName: S(d.mother_name), identityNumber: S(d.national_id),
+    donorName: S(d.donor_name), motherName: S(d.mother_name), identityNumber: S(d.national_id), identityLabel: idPrintLabel(d.id_type),
     occupation: S(d.occupation), birthYear: by ? String(by) : '', age: age!=='' ? String(age) : '',
     gender: S(d.gender), phone: S(d.mobile), address: S(d.address),
     donationType: S(d.donation_type), donationDate: S(d.donation_date).replace(/-/g,'/'),
@@ -2622,7 +2662,7 @@ async function processQueuedOp(op){
     // Create donor + donation
     const{data:dn,error:de}=await db.from('donors').insert({
       full_name:d.full_name,birth_year:d.birth_year,gender:d.gender,
-      mother_name:d.mother_name,national_id:d.national_id,mobile:d.mobile,
+      mother_name:d.mother_name,national_id:d.national_id,...(d.id_type?{id_type:d.id_type}:{}),mobile:d.mobile,
       address:d.address,occupation:d.occupation,created_by:d.created_by
     }).select().single();
     if(de) throw de;

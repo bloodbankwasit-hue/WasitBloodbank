@@ -21,7 +21,7 @@ const RECEIPT_MAIN = `<main class="sheet"><div class="frame"><header class="head
 <table class="data"><colgroup><col style="width:42mm"><col style="width:18mm"><col style="width:52mm"><col style="width:33mm"><col style="width:34.5mm"><col style="width:7.5mm"><col style="width:28.5mm"><col></colgroup><tbody>
 <tr><td class="label">الاسم الرباعي:</td><td colspan="7" data-field="donorName"></td></tr>
 <tr><td class="label">اسم الأم:</td><td colspan="5" data-field="motherName"></td><td class="label">رقم القنينة:</td><td class="empty"></td></tr>
-<tr><td class="label" colspan="2">رقم البطاقة الوطنية:</td><td colspan="4" class="ltr" data-field="identityNumber"></td><td class="label">المهنة</td><td data-field="occupation"></td></tr>
+<tr><td class="label" colspan="2" data-field="identityLabel">رقم البطاقة الوطنية:</td><td colspan="4" class="ltr" data-field="identityNumber"></td><td class="label">المهنة</td><td data-field="occupation"></td></tr>
 <tr><td class="label">سنة التولد:</td><td colspan="2" class="ltr" data-field="birthYear"></td><td class="label">العمر:</td><td colspan="2" class="ltr" data-field="age"></td><td class="label">الجنس</td><td data-field="gender"></td></tr>
 <tr><td class="label">رقم الموبايل:</td><td colspan="7" class="ltr" data-field="phone"></td></tr>
 <tr><td class="label">عنوان السكن:</td><td colspan="7" data-field="address"></td></tr>
@@ -32,7 +32,7 @@ const RECEIPT_MAIN = `<main class="sheet"><div class="frame"><header class="head
 </div></main>`;
 
 // data: { barcodeValue, donationProduct, bagNumber, donorName, motherName, identityNumber, occupation,
-//         birthYear, age, gender, phone, address, donationType, donationDate, donationTime,
+//         identityLabel (optional, default رقم البطاقة الوطنية:), birthYear, age, gender, phone, address, donationType, donationDate, donationTime,
 //         patientName, hospitalName, bloodPressure, pulse, temperature, weight, hemoglobin }
 function buildReceiptHtml(data){
   const json = JSON.stringify(data||{}).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
@@ -44,7 +44,7 @@ function buildReceiptHtml(data){
 
 const RECEIPT_SCRIPT = [
 "// textContent prevents HTML injection.",
-"function setReceiptData(data){data=data||{};document.querySelectorAll('[data-field]').forEach(function(el){var v=data[el.dataset.field];el.textContent=(v===undefined||v===null)?'':v});renderBarcode(String(data.barcodeValue===undefined||data.barcodeValue===null?'':data.barcodeValue));fitReceiptCells();}",
+"function setReceiptData(data){data=data||{};document.querySelectorAll('[data-field]').forEach(function(el){var v=data[el.dataset.field];if(el.dataset.field==='identityLabel'&&!v)return;el.textContent=(v===undefined||v===null)?'':v});renderBarcode(String(data.barcodeValue===undefined||data.barcodeValue===null?'':data.barcodeValue));fitReceiptCells();}",
 "function fitReceiptCells(){document.querySelectorAll('td[data-field],.bag div').forEach(function(el){el.style.whiteSpace='nowrap';var cs=getComputedStyle(el);var avail=el.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight)-2;var fs=parseFloat(cs.fontSize);var r=document.createRange();r.selectNodeContents(el);var n=0;while(r.getBoundingClientRect().width>avail&&fs>11&&n<60){fs-=0.5;el.style.fontSize=fs+'px';n++;}});}",
 "function setReceiptLogo(src){document.getElementById('receiptLogo').src=src;}",
 "// The app's own barcode: CODE128 via JsBarcode (same library, format and value the app already used).",
@@ -123,7 +123,7 @@ async function renderReceiptCanvas(data,ppm){
   });
   if(logo){ var lr=L.logo, s=Math.min(lr.w/logo.naturalWidth,lr.h/logo.naturalHeight), w=logo.naturalWidth*s, h=logo.naturalHeight*s;
     ctx.drawImage(logo,(lr.x+(lr.w-w)/2)*ppm,(lr.y+(lr.h-h)/2)*ppm,w*ppm,h*ppm); }
-  L.texts.forEach(function(t){ _rcDrawText(ctx,t.text,t.x+t.w/2,t.y+t.h/2,t.font,t.w+2,ppm,t.ltr,t.font.color); });
+  L.texts.forEach(function(t){ if(t.text==='رقم البطاقة الوطنية:'&&data.identityLabel) t=Object.assign({},t,{text:data.identityLabel}); _rcDrawText(ctx,t.text,t.x+t.w/2,t.y+t.h/2,t.font,t.w+2,ppm,t.ltr,t.font.color); });
   L.fields.forEach(function(f){
     var v=data[f.name]; v=(v===undefined||v===null)?'':String(v); if(!v) return;
     if(f.name==='barcodeValue'){ _rcDrawText(ctx,v,f.x+f.w/2,L.barcodeSlot.y+L.barcodeSlot.h+3.4,f.font,f.w,ppm,true,f.font.color); return; }
