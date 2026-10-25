@@ -1,10 +1,12 @@
 // استمارة سحب الدم (A4) — من مهام الاستقبال. كل استمارة = 10 أسماء بالضبط، والأسماء المطبوعة لا تظهر في التالية.
 // القاعدة: blood_donations.collection_form_id فارغ = لم تُطبع بعد. الطباعة تحجز الأسماء أولاً (collection_forms) ثم تطبع.
 const COLLECTION_SIZE = 10;
-// قائمتان منفصلتان: A = تريما + ريفيوس، B = بقية الأنواع. لكل قائمة 10 أسماء، وتُطبع متى شاء (حتى لو أقل من 10).
-const COL_GROUPS = { A:{ name:'تريما وريفيوس', types:['تريما','ريفيوس'] }, B:{ name:'بقية الأنواع' } };
-function colGroupOf(bottleType){ return COL_GROUPS.A.types.includes(String(bottleType||'').trim()) ? 'A' : 'B'; }
-let _colTab = 'A', _colBusy = false;
+// ثلاث قوائم منفصلة: T = تريما، R = ريفيوس، B = بقية الأنواع. لكل قائمة 10 أسماء، وتُطبع متى شاء (حتى لو أقل من 10).
+// A = رمز قديم (تريما+ريفيوس معاً) يبقى فقط لعرض اسمه في الأرشيف.
+const COL_GROUPS = { T:{ name:'تريما', types:['تريما'] }, R:{ name:'ريفيوس', types:['ريفيوس'] }, B:{ name:'بقية الأنواع' }, A:{ name:'تريما وريفيوس (قديمة)' } };
+const COL_LISTS = ['T','R','B'];
+function colGroupOf(bottleType){ const t=String(bottleType||'').trim(); return COL_GROUPS.T.types.includes(t)?'T':(COL_GROUPS.R.types.includes(t)?'R':'B'); }
+let _colTab = 'T', _colBusy = false;
 
 function _colMetaFor(rows, formNo){
   const bags = [...new Set(rows.map(r=>r.bagType).filter(Boolean))].join(' / ');
@@ -29,7 +31,7 @@ async function colPendingCount(g){ return (await colFetchPending(g)).length; }
 
 // اطبع الأقدم n (<=10) من غير المطبوعين. ids اختيارية لتحديد أسماء بعينها.
 async function colPrintPending(g){
-  g = g || (_colTab==='B'?'B':'A');
+  g = g || (COL_LISTS.includes(_colTab)?_colTab:'T');
   if(_colBusy) return; _colBusy = true;
   try{
     if(window.nativePrint && !window.nativePrint.supportsForm){ toast('نسخة برنامج الكمبيوتر قديمة — أعد تشغيل Install-BloodBank.bat لتفعيل طباعة الاستمارة A4','error',8000); return; }
@@ -89,14 +91,14 @@ async function colReprint(formId, formNo){
 }
 
 function colTab(t){ _colTab = t; colRender(); }
-async function openCollectionModal(t){ _colTab = t||'A'; G('collectionModal').classList.add('on'); await colRender(); }
+async function openCollectionModal(t){ _colTab = t||'T'; G('collectionModal').classList.add('on'); await colRender(); }
 
 async function colRender(){
   const box = G('colBody'); if(!box) return;
-  ['A','B','Arc'].forEach(k=>{ const e=G('colTab'+k); if(e) e.classList.toggle('btn-p', _colTab===(k==='Arc'?'arc':k)); });
+  ['T','R','B','Arc'].forEach(k=>{ const e=G('colTab'+k); if(e) e.classList.toggle('btn-p', _colTab===(k==='Arc'?'arc':k)); });
   box.innerHTML = '<div style="text-align:center;padding:20px;color:#6B7280">جاري التحميل...</div>';
   try{
-    if(_colTab==='A' || _colTab==='B'){
+    if(COL_LISTS.includes(_colTab)){
       const g=_colTab, all = await colFetchPending(g), shown = all.slice(0, COLLECTION_SIZE);
       let h = `<div style="font-size:13px;color:#374151;margin-bottom:8px">استمارة <b>${COL_GROUPS[g].name}</b> — غير المطبوعة: <b>${all.length}</b>. تحمل ${COLLECTION_SIZE} أسماء كحد أقصى${all.length>COLLECTION_SIZE?' (تُطبع الأقدم أولاً والباقي للاستمارة التالية)':''}، ويمكنك طباعتها قبل اكتمال العشرة.</div>`;
       if(!shown.length) h += '<div style="text-align:center;padding:18px;color:#6B7280">لا توجد أسماء بانتظار الطباعة</div>';
@@ -118,7 +120,7 @@ async function colCheckAutoPopup(){
   try{
     if(!IS_ONLINE) return;
     // نبدأ بقائمة المتبرع الذي حُفظ للتو، ثم الأخرى
-    const first = colGroupOf(typeof _lastDonation!=='undefined' && _lastDonation ? _lastDonation.bottle_type : ''), order=[first, first==='A'?'B':'A'];
+    const first = colGroupOf(typeof _lastDonation!=='undefined' && _lastDonation ? _lastDonation.bottle_type : ''), order=[first, ...COL_LISTS.filter(x=>x!==first)];
     const all = await colFetchPending();
     for(const g of order){
       if(all.filter(x=>colGroupOf(x.bottle_type)===g).length >= COLLECTION_SIZE){
