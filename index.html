@@ -1955,11 +1955,18 @@ function loadSectionScript(key){
 function enableEnterAsTab(containerSelector){
   const container = document.querySelector(containerSelector);
   if(!container) return;
+  container.addEventListener('focusin', function(e){ if(e.target.tagName === 'SELECT') delete e.target.dataset.enterOpened; });
   container.addEventListener('keydown', function(e){
     if(e.key !== 'Enter') return;
     if(e.target.tagName === 'TEXTAREA') return;
     if(e.target.closest('.ac-list')) return;
     e.preventDefault();
+    // Dropdown (select): the first Enter on it opens its list (arrows + Enter pick an item); the next
+    // Enter, once the choice is made, moves on to the following field.
+    if(e.target.tagName === 'SELECT' && e.target.dataset.enterOpened !== '1' && typeof e.target.showPicker === 'function'){
+      try{ e.target.dataset.enterOpened = '1'; e.target.showPicker(); return; }catch(err){ delete e.target.dataset.enterOpened; }
+    }
+    if(e.target.tagName === 'SELECT') delete e.target.dataset.enterOpened;
     const focusable = Array.from(container.querySelectorAll('input, select, textarea'))
       .filter(el => !el.disabled && !el.readOnly && el.offsetParent !== null);
     const idx = focusable.indexOf(e.target);
@@ -1970,12 +1977,29 @@ function enableEnterAsTab(containerSelector){
     }
   });
 }
+// A word-final «ة» is always written «ه» (the bank's convention): converted while typing in the donor forms,
+// and also applied when printing so older records print the same way.
+function bbTa(v){ return (typeof v==='string') ? v.replace(/\u0629(?=\s|$)/g,'\u0647') : v; }
+function enableTaNormalize(containerSelector){
+  const c=document.querySelector(containerSelector); if(!c) return;
+  const isTxt=el=>el && (el.tagName==='TEXTAREA' || (el.tagName==='INPUT' && (el.type==='text'||el.type==='search'||!el.type)));
+  c.addEventListener('input', function(e){
+    const el=e.target; if(!isTxt(el) || e.isComposing) return;
+    const v=el.value.replace(/\u0629(?=\s)/g,'\u0647');
+    if(v!==el.value){ const a=el.selectionStart,b=el.selectionEnd; el.value=v; try{ el.setSelectionRange(a,b); }catch(x){} }
+  });
+  c.addEventListener('focusout', function(e){
+    const el=e.target; if(!isTxt(el)) return;
+    const v=bbTa(el.value); if(v!==el.value) el.value=v;
+  });
+}
 ['#s-reception', '#s-add', '#editDonorModal'].forEach(sel=>{
   if(document.readyState==='loading'){
     document.addEventListener('DOMContentLoaded', ()=>enableEnterAsTab(sel));
   } else {
     enableEnterAsTab(sel);
   }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', ()=>enableTaNormalize(sel)); else enableTaNormalize(sel);
 });
 function N(n){ return n == null ? '—' : n; }
 
@@ -2445,7 +2469,7 @@ async function printLabelsNow(rec,copies,full){
   try{ labelValidate(copies,size); }catch(e){ toast(e.message,'error'); return false; }
   d=await enrichDonationForPrint(d);
   const S=v=> (v==null||v===0) ? '' : String(v);
-  const data={ donorName:S(d.donor_name||(d.donors&&d.donors.full_name)), bagNumber:S(d.bottle_number),
+  const data={ donorName:bbTa(S(d.donor_name||(d.donors&&d.donors.full_name))), bagNumber:S(d.bottle_number),
     bagType:S(d.bottle_type), collectionDate:S(d.draw_date||d.donation_date), expiryDate:labelExpiry(d) };
   if(isIOSDevice() && window.jspdf){
     try{
@@ -2459,13 +2483,13 @@ async function printLabelsNow(rec,copies,full){
   return true;
 }
 // The four print choices (reception popup + the donors-list print icon):
-// 1 card once · 2 sticker x6 (first with expiry, 5 without) · 3 card once + sticker x6 · 4 sticker x5 without expiry
+// 1 card once · 2 sticker x6 (first with expiry, 5 without) · 3 card once + sticker x6 · 4 one sticker without expiry
 async function printChoice(n){
   const rec=_lastDonation; if(!rec){ toast('لا توجد بيانات','error'); return; }
   if(n===1){ await exportDonorFormPDF(); }
   else if(n===2){ await printLabelsNow(rec,6,1); }
   else if(n===3){ await exportDonorFormPDF(); await new Promise(r=>setTimeout(r,2500)); await printLabelsNow(rec,6,1); }
-  else if(n===4){ await printLabelsNow(rec,5,0); }
+  else if(n===4){ await printLabelsNow(rec,1,0); }
 }
 function printBCLabel(){
   const r=BCDATA; if(!r){ toast('لا توجد بيانات','warning'); return; }

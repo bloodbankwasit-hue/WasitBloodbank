@@ -16,7 +16,7 @@ function _colMetaFor(rows, formNo){
 function _colRow(x){
   const dn = x.donors||{};
   // لا نملأ نتائج الفحوصات: الاستمارة تُعبّأ يدوياً بعد الفحص
-  return { donorName: dn.full_name||'', donorNo: dn.donor_number!=null?String(dn.donor_number):'', bagType: x.bottle_type||'', hospitalName: x.hospital_name||'', patientName: x.patient_name||'' };
+  return { donorName: bbTa(dn.full_name||''), donorNo: x.bottle_number!=null?String(x.bottle_number):'', bagType: x.bottle_type||'', hospitalName: bbTa(x.hospital_name||''), patientName: bbTa(x.patient_name||'') };
 }
 const _colSel = 'id,bottle_type,bottle_number,hospital_name,patient_name,created_at,donors(full_name,donor_number)';
 
