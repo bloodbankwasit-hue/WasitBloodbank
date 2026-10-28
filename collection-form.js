@@ -1,74 +1,74 @@
-// استمارة سحب الدم (A4) — من مهام الاستقبال. كل استمارة = 10 أسماء بالضبط، والأسماء المطبوعة لا تظهر في التالية.
-// القاعدة: blood_donations.collection_form_id فارغ = لم تُطبع بعد. الطباعة تحجز الأسماء أولاً (collection_forms) ثم تطبع.
+// استمارة سحب الدم (A4) — الاستمارة تُفتح تلقائياً عند حفظ أول متبرع، وتتراكم فيها الأسماء حتى 10 ثم تُغلق وتُفتح غيرها.
+// الاستمارة نفسها هي ما يظهر في وحدات العمل (السحب...) — راجع forms-view.js. بعد الطباعة لا تُضاف لها أسماء.
+// ثلاث قوائم منفصلة: T = تريما، R = ريفيوس، B = بقية الأنواع. A = رمز قديم يبقى لاسم الأرشيف فقط.
 const COLLECTION_SIZE = 10;
-// ثلاث قوائم منفصلة: T = تريما، R = ريفيوس، B = بقية الأنواع. لكل قائمة 10 أسماء، وتُطبع متى شاء (حتى لو أقل من 10).
-// A = رمز قديم (تريما+ريفيوس معاً) يبقى فقط لعرض اسمه في الأرشيف.
-const COL_GROUPS = { T:{ name:'تريما', types:['تريما'] }, R:{ name:'ريفيوس', types:['ريفيوس'] }, B:{ name:'بقية الأنواع' }, A:{ name:'تريما وريفيوس (قديمة)' } };
+const COL_GROUPS = { T:{ name:'تريما' }, R:{ name:'ريفيوس' }, B:{ name:'بقية الأنواع' }, A:{ name:'تريما وريفيوس (قديمة)' } };
 const COL_LISTS = ['T','R','B'];
-function colGroupOf(bottleType){ const t=String(bottleType||'').trim(); return COL_GROUPS.T.types.includes(t)?'T':(COL_GROUPS.R.types.includes(t)?'R':'B'); }
-let _colTab = 'T', _colBusy = false;
+function colGroupOf(bottleType){ return bbFormGroup(bottleType); }
+let _colTab = 'T', _colBusy = false, _colPopupTimer = null;
 
-function _colMetaFor(rows, formNo){
+const _colDate = v => { if(!v) return ''; const d=new Date(v); return isNaN(d)?'':d.toLocaleDateString('en-CA').replace(/-/g,'/'); };
+async function _colRpc(fn,args){ const r=await db.rpc(fn,args||{}); if(r.error) throw r.error; return r.data; }
+async function colForms(groups,limit){ return await _colRpc('forms_recent',{p_groups:groups,p_limit:limit||60}) || []; }
+async function colMembers(ids){
+  if(!ids.length) return {};
+  const rows = await _colRpc('form_members',{p_forms:ids}) || [], by = {};
+  rows.forEach(m=>{ (by[m.form_id]=by[m.form_id]||[]).push(m); });
+  return by;
+}
+
+function _colMetaFor(rows, formNo, dateStr){
   const bags = [...new Set(rows.map(r=>r.bagType).filter(Boolean))].join(' / ');
   const d = new Date();
-  return { batch: formNo!=null ? String(formNo) : '', date: d.getFullYear()+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0'), bagTypes: bags };
+  return { batch: formNo!=null ? String(formNo) : '', date: dateStr || (d.getFullYear()+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0')), bagTypes: bags };
 }
 function _colRow(x){
-  const dn = x.donors||{};
   // لا نملأ نتائج الفحوصات: الاستمارة تُعبّأ يدوياً بعد الفحص
-  return { donorName: bbTa(dn.full_name||''), donorNo: x.bottle_number!=null?String(x.bottle_number):'', bagType: x.bottle_type||'', hospitalName: bbTa(x.hospital_name||''), patientName: bbTa(x.patient_name||'') };
-}
-const _colSel = 'id,bottle_type,bottle_number,hospital_name,patient_name,created_at,donors(full_name,donor_number)';
-
-async function colFetchPending(g){
-  const { data, error } = await db.from('blood_donations').select(_colSel)
-    .is('collection_form_id', null).order('created_at', { ascending: true }).limit(500);
-  if(error) throw error;
-  const all = data || [];
-  return g ? all.filter(x=>colGroupOf(x.bottle_type)===g) : all;
-}
-async function colPendingCount(g){ return (await colFetchPending(g)).length; }
-
-// اطبع الأقدم n (<=10) من غير المطبوعين. ids اختيارية لتحديد أسماء بعينها.
-async function colPrintPending(g){
-  g = g || (COL_LISTS.includes(_colTab)?_colTab:'T');
-  if(_colBusy) return; _colBusy = true;
-  try{
-    if(window.nativePrint && !window.nativePrint.supportsForm){ toast('نسخة برنامج الكمبيوتر قديمة — أعد تشغيل Install-BloodBank.bat لتفعيل طباعة الاستمارة A4','error',8000); return; }
-    if(!IS_ONLINE){ toast('الطباعة تحتاج اتصالاً بالإنترنت','warning'); return; }
-    load(true);
-    const pend = (await colFetchPending(g)).slice(0, COLLECTION_SIZE);
-    if(!pend.length){ toast('لا توجد أسماء غير مطبوعة','info'); load(false); return; }
-    // 1) إنشاء الاستمارة  2) حجز الأسماء (فقط الي لسه فارغة — حماية من طباعة نفس الاسم مرتين)
-    const { data: form, error: fe } = await db.from('collection_forms').insert({ names_count: pend.length, form_group: g, printed_by: SES?.user?.id||null }).select().single();
-    if(fe) throw fe;
-    const { data: got, error: ue } = await db.from('blood_donations').update({ collection_form_id: form.id })
-      .in('id', pend.map(p=>p.id)).is('collection_form_id', null).select('id');
-    if(ue){ await db.from('collection_forms').delete().eq('id', form.id); throw ue; }
-    const gotIds = new Set((got||[]).map(g=>g.id));
-    const mine = pend.filter(p=>gotIds.has(p.id));
-    if(!mine.length){ await db.from('collection_forms').delete().eq('id', form.id); toast('الأسماء طُبعت من جهاز آخر — حدّث القائمة','warning'); load(false); return; }
-    if(mine.length !== pend.length) await db.from('collection_forms').update({ names_count: mine.length }).eq('id', form.id);
-    load(false);
-    await colPrintRows(mine, form.form_no);
-    try{ await colRender(); }catch(e){}
-  }catch(e){ load(false); toast('خطأ: '+e.message,'error',6000); }
-  finally{ _colBusy = false; }
+  const nm = x.full_name!=null ? x.full_name : (x.donors&&x.donors.full_name)||'';
+  return { donorName: bbTa(nm||''), donorNo: x.bottle_number!=null?String(x.bottle_number):'', bagType: x.bottle_type||'', hospitalName: bbTa(x.hospital_name||''), patientName: bbTa(x.patient_name||'') };
 }
 
-async function colPrintRows(items, formNo){
-  if(window.nativePrint && !window.nativePrint.supportsForm){ toast('نسخة برنامج الكمبيوتر قديمة — أعد تشغيل Install-BloodBank.bat لتفعيل طباعة الاستمارة A4','error',8000); return; }
+async function colPrintRows(items, formNo, dateStr){
+  if(window.nativePrint && !window.nativePrint.supportsForm){ toast('نسخة برنامج الكمبيوتر قديمة — أعد تشغيل Install-BloodBank.bat لتفعيل طباعة الاستمارة A4','error',8000); return false; }
   await loadOneScript('collection-template.js');
-  const rows = items.map(_colRow), meta = _colMetaFor(rows, formNo);
+  const rows = items.map(_colRow), meta = _colMetaFor(rows, formNo, dateStr);
   if(isIOSDevice()){
     const blob = await collectionToPdfBlob(rows, meta);
     await shareOrDownloadFile(blob, 'collection-form-'+formNo+'.pdf');
-    return;
+    return true;
   }
   printHtmlDocument(buildCollectionHtml(rows, meta), { kind:'form' });
+  return true;
 }
 
-// استمارة فارغة (10 صفوف) للمعاينة أو للتعبئة اليدوية — لا تحجز أي اسم
+// اطبع استمارة (تُغلق وتُسجَّل مطبوعة). المرفوض طبياً لا يُطبع لأنه لم يُسحب منه دم.
+async function colPrintForm(formId, formNo, dateStr, alreadyPrinted){
+  if(_colBusy) return; _colBusy = true;
+  try{
+    if(!IS_ONLINE){ toast('الطباعة تحتاج اتصالاً بالإنترنت','warning'); return; }
+    load(true);
+    const by = await colMembers([formId]);
+    const items = (by[formId]||[]).filter(m=>m.exit_reason!=='medical_reject');
+    load(false);
+    if(!items.length){ toast('لا توجد أسماء بهذه الاستمارة','info'); return; }
+    const ok = await colPrintRows(items, formNo, dateStr);
+    if(ok && !alreadyPrinted) await _colRpc('form_set_state',{p_form:formId,p_action:'printed'});
+    try{ await colRender(); }catch(e){}
+    try{ refreshExpiryNotifications(); }catch(e){}
+  }catch(e){ load(false); toast('خطأ: '+(e.message||e),'error',6000); }
+  finally{ _colBusy = false; }
+}
+async function colMoveWaiting(formId){
+  try{
+    await _colRpc('form_set_state',{p_form:formId,p_action:'waiting'});
+    toast('⏳ نُقلت الاستمارة للانتظار — تجدها بالأرشيف وسيصلك تنبيه','success',4000);
+    try{ refreshExpiryNotifications(); }catch(e){}
+    G('collectionModal').classList.remove('on');
+    await colRender();
+  }catch(e){ toast('خطأ: '+(e.message||e),'error',5000); }
+}
+
+// استمارة فارغة (10 صفوف) للمعاينة أو للتعبئة اليدوية — لا تمس أي اسم
 async function colPrintBlank(){
   try{
     if(window.nativePrint && !window.nativePrint.supportsForm){ toast('نسخة برنامج الكمبيوتر قديمة — أعد تشغيل Install-BloodBank.bat','error',8000); return; }
@@ -79,19 +79,19 @@ async function colPrintBlank(){
   }catch(e){ toast('خطأ: '+e.message,'error'); }
 }
 
-async function colReprint(formId, formNo){
-  try{
-    load(true);
-    const { data, error } = await db.from('blood_donations').select(_colSel).eq('collection_form_id', formId).order('created_at', { ascending:true });
-    load(false);
-    if(error) throw error;
-    if(!data || !data.length){ toast('لا توجد أسماء لهذه الاستمارة','warning'); return; }
-    await colPrintRows(data, formNo);
-  }catch(e){ load(false); toast('خطأ: '+e.message,'error'); }
-}
-
 function colTab(t){ _colTab = t; colRender(); }
 async function openCollectionModal(t){ _colTab = t||'T'; G('collectionModal').classList.add('on'); await colRender(); }
+
+function _colFormBlock(f, members, mode){
+  const act = members.filter(m=>m.exit_reason!=='medical_reject');
+  const names = members.map((m,i)=>`<div style="display:flex;gap:8px;padding:6px 10px;border-bottom:1px solid #F3F4F6;font-size:14px"><b style="width:22px">${i+1}</b><span style="flex:1;${m.exit_reason==='medical_reject'?'color:#B91C1C;text-decoration:line-through':''}">${esc(bbTa(m.full_name||''))}</span><span style="color:#6B7280">${esc(m.bottle_type||'')} ${esc(m.bottle_number||'')}</span></div>`).join('');
+  const dt = _colDate(f.last_name_at);
+  const head = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px"><b style="font-size:15px">استمارة #${f.form_no} — ${esc((COL_GROUPS[f.form_group]||{}).name||'')}</b><span style="font-size:12.5px;color:#6B7280">${esc(dt)} — ${members.length} أسماء${f.status==='open'?' (مفتوحة)':''}</span></div>`;
+  const args = `'${f.id}',${f.form_no},'${dt}',${f.printed_at?'true':'false'}`;
+  const btns = `<div style="display:flex;gap:6px;margin-top:8px"><button class="btn btn-p" style="flex:1;justify-content:center" ${act.length?'':'disabled'} onclick="colPrintForm(${args})">🖨️ طباعة (${act.length})</button>`
+    + (mode==='print' && !f.printed_at && !f.waiting_print_at ? `<button class="btn" style="flex:1;justify-content:center" onclick="colMoveWaiting('${f.id}')">⏳ نقل للانتظار</button>` : '') + `</div>`;
+  return `<div style="border:1px solid #E5E7EB;border-radius:10px;padding:10px;margin-bottom:10px">${head}<div style="max-height:30vh;overflow:auto;border:1px solid #F3F4F6;border-radius:8px">${names||'<div style="padding:10px;color:#6B7280;text-align:center">لا توجد أسماء</div>'}</div>${btns}</div>`;
+}
 
 async function colRender(){
   const box = G('colBody'); if(!box) return;
@@ -99,34 +99,35 @@ async function colRender(){
   box.innerHTML = '<div style="text-align:center;padding:20px;color:#6B7280">جاري التحميل...</div>';
   try{
     if(COL_LISTS.includes(_colTab)){
-      const g=_colTab, all = await colFetchPending(g), shown = all.slice(0, COLLECTION_SIZE);
-      let h = `<div style="font-size:13px;color:#374151;margin-bottom:8px">استمارة <b>${COL_GROUPS[g].name}</b> — غير المطبوعة: <b>${all.length}</b>. تحمل ${COLLECTION_SIZE} أسماء كحد أقصى${all.length>COLLECTION_SIZE?' (تُطبع الأقدم أولاً والباقي للاستمارة التالية)':''}، ويمكنك طباعتها قبل اكتمال العشرة.</div>`;
-      if(!shown.length) h += '<div style="text-align:center;padding:18px;color:#6B7280">لا توجد أسماء بانتظار الطباعة</div>';
-      else h += '<div style="max-height:44vh;overflow:auto;border:1px solid #E5E7EB;border-radius:8px">' + shown.map((x,i)=>`<div style="display:flex;gap:8px;padding:7px 10px;border-bottom:1px solid #F3F4F6;font-size:14px"><b style="width:22px">${i+1}</b><span style="flex:1">${esc(x.donors?.full_name||'')}</span><span style="color:#6B7280">${esc(x.bottle_type||'')} ${esc(x.bottle_number||'')}</span></div>`).join('') + '</div>';
-      h += `<button class="btn btn-p" ${shown.length?'':'disabled'} onclick="colPrintPending('${g}')" style="width:100%;justify-content:center;margin-top:12px">🖨️ طباعة الاستمارة (${shown.length} ${shown.length===1?'اسم':'أسماء'})</button>`;
-      h += `<button class="btn" onclick="colPrintBlank()" style="width:100%;justify-content:center;margin-top:8px">📄 طباعة استمارة فارغة (معاينة)</button>`;
+      const g=_colTab, forms=(await colForms([g],30)).filter(f=>f.status==='open' || (f.status==='closed' && !f.printed_at && !f.waiting_print_at));
+      const by=await colMembers(forms.map(f=>f.id));
+      let h = `<div style="font-size:13px;color:#374151;margin-bottom:8px">استمارة <b>${COL_GROUPS[g].name}</b>: تُفتح تلقائياً مع أول متبرع، وتُغلق عند اكتمال ${COLLECTION_SIZE} أسماء أو عند طباعتها. بعد الطباعة لا تُضاف لها أسماء.</div>`;
+      h += forms.length ? forms.map(f=>_colFormBlock(f,by[f.id]||[],'print')).join('') : '<div style="text-align:center;padding:18px;color:#6B7280">لا توجد استمارة مفتوحة — تُفتح عند تسجيل أول متبرع</div>';
+      h += `<button class="btn" onclick="colPrintBlank()" style="width:100%;justify-content:center;margin-top:4px">📄 طباعة استمارة فارغة (معاينة)</button>`;
       box.innerHTML = h;
     } else {
-      const { data, error } = await db.from('collection_forms').select('id,form_no,names_count,printed_at,form_group').gt('form_no', 0).order('form_no', { ascending:false }).limit(60);
-      if(error) throw error;
-      box.innerHTML = !(data||[]).length ? '<div style="text-align:center;padding:18px;color:#6B7280">لا توجد استمارات مطبوعة بعد</div>'
-        : '<div style="max-height:52vh;overflow:auto">' + data.map(f=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #F3F4F6;font-size:14px"><b>#${f.form_no}</b><span style="flex:1;color:#374151">${f.form_group&&COL_GROUPS[f.form_group]?COL_GROUPS[f.form_group].name+' — ':''}${f.names_count} أسماء — ${esc(new Date(f.printed_at).toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'}))}</span><button class="btn" onclick="colReprint('${f.id}',${f.form_no})">🖨️ إعادة طباعة</button></div>`).join('') + '</div>';
+      const forms = await colForms(['T','R','B','A'],80);
+      const waiting = forms.filter(f=>f.waiting_print_at && !f.printed_at), printed = forms.filter(f=>f.printed_at);
+      const by = await colMembers(waiting.map(f=>f.id));
+      const row = f=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #F3F4F6;font-size:14px"><b>#${f.form_no}</b><span style="flex:1;color:#374151">${esc((COL_GROUPS[f.form_group]||{}).name||'')} — ${f.names_count} أسماء — ${esc(_colDate(f.last_name_at||f.printed_at))}</span><button class="btn" onclick="colPrintForm('${f.id}',${f.form_no},'${_colDate(f.last_name_at||f.printed_at)}',${f.printed_at?'true':'false'})">🖨️ ${f.printed_at?'إعادة طباعة':'طباعة'}</button></div>`;
+      let h = '';
+      if(waiting.length) h += `<div style="font-weight:700;color:#B45309;margin-bottom:6px">⏳ بانتظار الطباعة (${waiting.length})</div><div style="border:1px solid #FDE68A;background:#FFFBEB;border-radius:10px;margin-bottom:12px">${waiting.map(row).join('')}</div>`;
+      h += printed.length ? `<div style="font-weight:700;margin-bottom:6px">المطبوعة</div><div style="max-height:46vh;overflow:auto;border:1px solid #E5E7EB;border-radius:10px">${printed.map(row).join('')}</div>` : (waiting.length?'':'<div style="text-align:center;padding:18px;color:#6B7280">لا توجد استمارات بالأرشيف بعد</div>');
+      box.innerHTML = h;
     }
-  }catch(e){ box.innerHTML = '<div style="color:#B91C1C;padding:14px;font-size:13px">تعذر التحميل: '+esc(e.message)+'</div>'; }
+  }catch(e){ box.innerHTML = '<div style="color:#B91C1C;padding:14px;font-size:13px">تعذر التحميل: '+esc(e.message||String(e))+'</div>'; }
 }
 
-// بعد كل حفظ ناجح للاستقبال: إذا اكتملت 10 غير مطبوعة تظهر نافذة الطباعة مباشرة
-async function colCheckAutoPopup(){
-  try{
-    if(!IS_ONLINE) return;
-    // نبدأ بقائمة المتبرع الذي حُفظ للتو، ثم الأخرى
-    const first = colGroupOf(typeof _lastDonation!=='undefined' && _lastDonation ? _lastDonation.bottle_type : ''), order=[first, ...COL_LISTS.filter(x=>x!==first)];
-    const all = await colFetchPending();
-    for(const g of order){
-      if(all.filter(x=>colGroupOf(x.bottle_type)===g).length >= COLLECTION_SIZE){
-        toast('✅ اكتملت 10 أسماء ('+COL_GROUPS[g].name+') — جاهزة لطباعة الاستمارة','success',4000);
-        await openCollectionModal(g); return;
-      }
-    }
-  }catch(e){ console.log('collection popup check failed', e); }
+// بعد اكتمال 10 أسماء: تظهر نافذة الطباعة بعد انتهاء طباعة بطاقة الاسم وملصقاته (إغلاق نافذة الطباعة) + 5 ثوانٍ.
+function colSchedulePopup(info, group){
+  if(!info || !info.closed) return;
+  clearTimeout(_colPopupTimer);
+  const tick = ()=>{
+    if(G('rcPrintModal') && G('rcPrintModal').classList.contains('on')){ _colPopupTimer = setTimeout(tick,1000); return; }
+    _colPopupTimer = setTimeout(()=>{
+      toast('✅ اكتملت 10 أسماء — استمارة #'+info.form_no+' جاهزة للطباعة','success',4000);
+      openCollectionModal(group||'B');
+    }, 5000);
+  };
+  tick();
 }

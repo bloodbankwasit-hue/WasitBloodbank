@@ -7,84 +7,62 @@ let _sepSelectedType = null, _sepLevel = 1;
 function _sepShowLevel(n){
   _sepLevel = n;
   const g1=G('sepTypeGrid'), g3=G('sepBoardList'), g4=G('sepStatsPane'), gb=G('sepStatsBtn');
-  if(g1) g1.style.display = n===1 ? '' : 'none';
-  if(g3) g3.style.display = n===2 ? '' : 'none';
+  if(g1) g1.style.display = 'none';
+  if(g3) g3.style.display = (n===1||n===2) ? '' : 'none';
   if(g4) g4.style.display = n===3 ? '' : 'none';
   if(gb) gb.style.display = n===1 ? '' : 'none';      // the statistics button lives on the first level only
   const g2=G('sepBulkBar'); if(g2 && n!==2) g2.style.display='none'; // bulk bar only relevant inside a type's list
 }
 
-// Level 1 — one tile per separable bottle type, with a live count
-async function loadSeparationBoard(){
-  _sepSelectedType=null;
-  load(true);
-  const separableTypes=Object.keys(COMPONENT_RULES);
-  // component_type='دم كامل' — same reasoning as loadSeparationList() below: a separated
-  // bottle's resulting components share the same bottle_type as their parent, and must not be
-  // counted here (they no longer belong in الفصل at all — this count has to match exactly
-  // what loadSeparationList() will actually show when the tile is tapped).
-  const{data}=await db.from('blood_donations')
-    .select('bottle_type')
-    .in('bottle_type', separableTypes).eq('component_type','دم كامل').eq('is_deleted',false)
-    .in('status',['pending_lab','pending_release','in_stock']);
-  load(false);
-  const cnt={};
-  (data||[]).forEach(r=>{ cnt[r.bottle_type]=(cnt[r.bottle_type]||0)+1; });
-  const typeIcons={'مفلتر':BAG,'ريفيوس':BAG,'رباعي':BAG,'رباعي SAG':BAG,'ثنائي':BAG};
-  G('sepTypeGrid').innerHTML=separableTypes.map(t=>`
-    <div class="comp-stock-card ${(cnt[t]||0)===0?'empty-bt':''}" onclick="loadSeparationList('${t}')" style="cursor:pointer">
-      <div class="comp-stock-icon">${typeIcons[t]||BAG}</div>
-      <div class="comp-stock-name">${t}</div>
-      <div class="comp-stock-count">${cnt[t]||0}</div>
-    </div>`).join('');
-  _sepShowLevel(1);
-}
-
-// Level 2 — the bottles of one selected type (previous flat-list logic, now filtered)
-async function loadSeparationList(bottleType){
-  _sepSelectedType=bottleType;
-  load(true);
-  // Only un-separated whole blood belongs here (tested or not — separation itself can happen
-  // before or after testing). Once a bottle is separated, its resulting components move on to
-  // المخزن المؤقت — they have nothing left to do in الفصل, so they no longer show up here at all
-  // (previously they lingered in this list with no action available, just cluttering it).
-  const{data}=await db.from('blood_donations')
-    .select('id,bottle_number,bottle_type,blood_type,component_type,status,draw_date,campaign_name,donors(full_name)')
-    .eq('bottle_type', bottleType).eq('component_type','دم كامل').eq('is_deleted',false)
-    .in('status',['pending_lab','pending_release','in_stock'])
-    .order('created_at',{ascending:true});
-  load(false);
-  const list=data||[];
-  const titleBar=`<div style="font-size:18px;font-weight:700;color:#BE123C;margin-bottom:10px">${bottleType} — ${list.length} قنينة</div>`;
-  if(!list.length){
-    G('sepBoardList').innerHTML=titleBar+'<div class="empty"><i class="ti ti-dna"></i><p>لا توجد قناني من هذا النوع بمرحلة ما بعد السحب حالياً</p></div>';
-    _sepShowLevel(2);
-    return;
-  }
-  G('sepBoardList').innerHTML=titleBar+selAllRow('sep-chk','updateSepBulkBar')+list.map(r=>{
-    const name=r.donors?.full_name?esc(r.donors.full_name):(r.campaign_name?'🚐 '+esc(r.campaign_name):'—');
-    const tested=r.status==='in_stock'||r.status==='pending_release';
-    return `<div class="flow-card">
+// الفصل الآن يعرض الاستمارات (راجع forms-view.js) بدل شبكة أنواع القناني؛ الإحصائيات تبقى بزرها
+const SEP_FV = {
+  unit:'sep', host:'sepBoardList', groups:['R','B'], chk:'sep-chk', onSel:'updateSepBulkBar', bigBottle:true,
+  // الفصل للدم الكامل فقط (ناتج الفصل لا يدخل هنا)
+  filter:m=> (m.component_type||'دم كامل')==='دم كامل' && !!COMPONENT_RULES[m.bottle_type] || m.status==='pending_draw' || m.exit_reason==='medical_reject',
+  stateOf(m){
+    const note=(m.bottle_note||'').replace(/^رفض طبي:\s*/,'');
+    if(m.exit_reason==='medical_reject') return {k:'excl',t:'⛔ مرفوض طبياً'+(note?': '+note:'')};
+    if(m.status==='pending_draw') return {k:'notready',t:'بانتظار السحب'};
+    if(m.status==='damaged') return {k:'excl',t:'⛔ تالف'+(note?': '+note:'')};
+    if(m.status==='rejected_positive') return {k:'excl',t:'🦠 إصابة: '+(m.serology_type||'')};
+    if(m.status==='pending_lab') return {k:'ready',t:'⏳ لم تُفحص لحد الآن'};
+    if(m.status==='pending_release'||m.status==='in_stock') return {k:'ready',t:'✅ سليمة — جاهزة للفصل'};
+    if(m.status==='separated') return {k:'done',t:'✓ تم الفصل'};
+    return {k:'done',t:'—'};
+  },
+  sub:m=>(m.bottle_type||'')+' | '+(m.blood_type||'—'),
+  bulkBar:()=>`<div id="sepBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
+    <span id="sepBulkCount">0 محدد</span>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn" style="background:#0369A1;color:#fff;border:none" onclick="sepBulkSeparate()"><i class="ti ti-git-fork"></i> فصل المحدد</button>
+      <button class="btn" style="background:#7F1D1D;color:#fff;border:none" onclick="sepBulkDamage()"><i class="ti ti-trash"></i> تلف المحدد</button>
+      <button class="btn" style="background:#374151;color:#fff;border:none" onclick="document.querySelectorAll('.sep-chk').forEach(c=>c.checked=false);updateSepBulkBar()">إلغاء التحديد</button>
+    </div></div>`,
+  actions(m,st){
+    if(st.k!=='ready') return '';
+    return `<button class="btn btn-p" style="font-size:15px;padding:8px 10px" onclick="openSeparateModalBulk(['${m.id}'],'${m.bottle_type}','${m.bottle_number}')"><i class="ti ti-git-fork"></i> فصل</button>
+      <button class="btn" style="font-size:15px;padding:8px 10px;border-color:#7F1D1D;color:#7F1D1D" onclick="openDamageModal(['${m.id}'])"><i class="ti ti-trash"></i> تلف</button>`;
+  },
+  async legacy(){
+    const{data}=await db.from('blood_donations')
+      .select('id,bottle_number,bottle_type,blood_type,status,campaign_name,donors(full_name)')
+      .in('bottle_type',Object.keys(COMPONENT_RULES)).eq('component_type','دم كامل').eq('is_deleted',false).is('collection_form_id',null)
+      .in('status',['pending_lab','pending_release','in_stock']).order('created_at',{ascending:true});
+    const rows=data||[]; if(!rows.length) return '';
+    const row=r=>`<div class="flow-card">
       <input type="checkbox" class="sep-chk" value="${r.id}" data-bt="${r.bottle_type}" onclick="updateSepBulkBar()" style="width:18px;height:18px;flex-shrink:0">
-      <div class="fc-av">${tested?'✅':'⏳'}</div>
-      <div style="flex:1">
-        <div class="fc-name fc-bn">${r.bottle_number||'—'}</div>
-        <div class="fc-sub fc-dn">${name} | ${r.bottle_type} | ${r.component_type||'دم كامل'} | ${r.blood_type||'—'} | ${fd(r.draw_date)}</div>
-        <div style="margin-top:4px">
-          ${tested
-            ? `<span class="pill pg">✅ سليمة — جاهزة للفصل</span>`
-            : `<span class="pill py">⏳ لم تُفحص لحد الآن</span>`}
-        </div>
-      </div>
-      <div class="fc-act" style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-p" style="font-size:15px;padding:8px 10px" onclick="openSeparateModalBulk(['${r.id}'],'${r.bottle_type}','${r.bottle_number}')"><i class="ti ti-git-fork"></i> فصل</button>
-        <button class="btn" style="font-size:15px;padding:8px 10px;border-color:#7F1D1D;color:#7F1D1D" onclick="openDamageModal(['${r.id}'])"><i class="ti ti-trash"></i> تلف</button>
-      </div>
-    </div>`;
-  }).join('');
-  updateSepBulkBar();
-  _sepShowLevel(2);
-}
+      <div class="fc-av">${BAG}</div>
+      <div style="flex:1"><div class="fc-name fc-bn">${r.bottle_number||'—'}</div><div class="fc-sub fc-dn">${esc(r.donors?.full_name||'—')} | ${r.bottle_type} | ${r.blood_type||'—'}</div></div>
+      <div class="fc-act"><button class="btn btn-p" onclick="openSeparateModalBulk(['${r.id}'],'${r.bottle_type}','${r.bottle_number}')"><i class="ti ti-git-fork"></i> فصل</button>
+      <button class="btn" style="border-color:#7F1D1D;color:#7F1D1D" onclick="openDamageModal(['${r.id}'])"><i class="ti ti-trash"></i> تلف</button></div></div>`;
+    const camp=rows.filter(r=>r.campaign_name&&!r.donors), old=rows.filter(r=>!(r.campaign_name&&!r.donors));
+    return FV.folders(camp,{chk:'sep-chk',onSel:'updateSepBulkBar',bulkFn:'sepBulkSeparate()',bulkLabel:'فصل المحدد',row})
+      + (old.length?'<div style="margin:14px 0 6px;font-weight:700;color:#6B7280">بدون استمارة (سجلات قديمة)</div>'+old.map(row).join(''):'');
+  }
+};
+async function loadSeparationBoard(){ _sepSelectedType=null; _sepShowLevel(1); await FV.show(SEP_FV); }
+// بعد فصل/إتلاف: تحديث العرض الحالي مع البقاء داخل نفس الاستمارة
+async function loadSeparationList(){ _sepShowLevel(1); await FV.refresh('sep'); }
 
 function sepBulkDamage(){
   const checked=[...document.querySelectorAll('.sep-chk:checked')].map(c=>c.value);

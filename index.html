@@ -1441,14 +1441,6 @@ tbody tr:hover td{background:#fafafa}
         <div class="sh" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><div class="sh-t"><i class="ti ti-dna"></i> الفصل — متابعة القناني بعد السحب</div>
           <button class="btn" id="sepStatsBtn" style="font-size:15px;padding:7px 12px;flex-shrink:0" onclick="sepStatsOpen()"><i class="ti ti-chart-bar"></i> إحصائيات</button></div>
         <div id="sepTypeGrid" class="comp-stock-grid" style="margin-bottom:16px"></div>
-        <div id="sepBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
-          <span id="sepBulkCount">0 محدد</span>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn" style="background:#0369A1;color:#fff;border:none" onclick="sepBulkSeparate()"><i class="ti ti-git-fork"></i> فصل المحدد</button>
-            <button class="btn" style="background:#7F1D1D;color:#fff;border:none" onclick="sepBulkDamage()"><i class="ti ti-trash"></i> تلف المحدد</button>
-            <button class="btn" style="background:#374151;color:#fff;border:none" onclick="document.querySelectorAll('.sep-chk').forEach(c=>c.checked=false);updateSepBulkBar()">إلغاء التحديد</button>
-          </div>
-        </div>
         <div id="sepBoardList"></div>
         <div id="sepStatsPane" style="display:none"></div>
       </div>
@@ -1912,12 +1904,12 @@ document.addEventListener('change',e=>{
 const SECTION_SCRIPTS = {
   backup: 'backup-auto.js',
   campaigns: 'campaigns.js',
-  separation: 'campaigns.js',
+  separation: ['forms-view.js', 'campaigns.js'],
   pending_release: 'campaigns.js',
-  draw: 'draw.js',
-  trima: ['draw.js', 'trima.js'],
-  virology: ['lab-shared.js', 'virology.js'],
-  classification: ['lab-shared.js', 'classification.js'],
+  draw: ['forms-view.js', 'draw.js'],
+  trima: ['forms-view.js', 'draw.js', 'trima.js'],
+  virology: ['forms-view.js', 'lab-shared.js', 'virology.js'],
+  classification: ['forms-view.js', 'lab-shared.js', 'classification.js'],
   dashboard: ['dashboard.js', 'home-stats.js'],
   donors: 'donors.js',
   globalsearch: ['donors.js', 'search.js'],
@@ -2695,13 +2687,14 @@ async function processQueuedOp(op){
       address:d.address,occupation:d.occupation,created_by:d.created_by
     }).select().single();
     if(de) throw de;
-    const{error:doe}=await db.from('blood_donations').insert({
+    const{data:newDon,error:doe}=await db.from('blood_donations').insert({
       donor_id:dn.id,bottle_type:d.bottle_type,bottle_number:d.bottle_number,donation_type:d.donation_type,
       patient_name:d.patient_name,hospital_name:d.hospital_name,
       donation_date:d.donation_date,donation_time:d.donation_time,
       status:'pending_draw',created_by:d.created_by
-    });
+    }).select('id').single();
     if(doe) throw doe;
+    if(newDon&&newDon.id) await bbAssignForm(newDon.id,d.bottle_type);
     if(d.pool_id){
       await db.from('bottle_number_pool').delete().eq('id', d.pool_id);
     } else if(d.seq_id){
@@ -3071,7 +3064,7 @@ async function showApp(){
 // The notifications tab itself is permission-gated — an account only sees it (badge included)
 // if explicitly granted the 'notifications' permission (or is admin).
 function setupNotifTabVisibility(){
-  const canSee = (UPROF?.role==='admin') || hasPermission('notifications') || (canAutoBackup() && bbNoticeList().length>0);
+  const canSee = (UPROF?.role==='admin') || hasPermission('notifications') || (canAutoBackup() && bbNoticeList().length>0) || ((window._WAIT_FORMS||[]).length>0);
   const btn=G('tab-notif-btn');
   if(btn) btn.style.display = canSee ? '' : 'none';
 }
@@ -3819,6 +3812,12 @@ async function refreshExpiryNotifications(){
       seqNew=seqList.filter(a=>seen[a.type]!==a.rung).length;
     }catch(e){ console.log('seq alerts:', e); }
   }
+  // collection forms this account moved to "waiting for print"
+  let waitForms=[];
+  if(isAdmin || hasPermission('reception')){
+    try{ const r=await db.rpc('my_waiting_forms'); if(!r.error) waitForms=r.data||[]; }catch(e){}
+  }
+  window._WAIT_FORMS=waitForms;
   window._EXPIRY_NOTIFS=expiryList;
   window._INFECTED_NOTIFS=infectedList;
   window._SEQ_NOTIFS=seqList;
@@ -3826,14 +3825,21 @@ async function refreshExpiryNotifications(){
   // Each distinct (blood type + content type + date) combination is its own expiry alert —
   // e.g. 5 B+ and 6 A+ expiring the same day are two separate alerts, not one merged alert.
   const groupKeys=new Set(expiryList.map(r=>(r.blood_type||'—')+'|'+(r.component_type||'دم كامل')+'|'+r.expiry_date));
-  const total = groupKeys.size + infectedList.length + seqNew + bbNoticeUnseen();
+  const total = groupKeys.size + infectedList.length + seqNew + bbNoticeUnseen() + waitForms.length;
   if(total){
     badge.textContent=total>99?'99+':total;
     badge.style.display='flex';
   } else {
     badge.style.display='none';
   }
+  try{ setupNotifTabVisibility(); }catch(e){}
 }
+async function bbOpenWaitingForms(){
+  G('notifModal').classList.remove('on');
+  try{ await loadSectionScript('reception'); }catch(e){ toast('تعذر تحميل القسم','error'); return; }
+  openCollectionModal('arc');
+}
+function bbNotifGo(fn){ G('notifModal').classList.remove('on'); try{ fn(); }catch(e){} }
 
 function openNotifPanel(){
   const badge=G('notifBadge'); if(badge) badge.style.display='none'; // seen — dismiss until next refresh
@@ -3856,7 +3862,7 @@ function openNotifPanel(){
 
   // Infected bottles — one row per bottle, always on top (more urgent than expiry warnings)
   const infRows=infList.map(r=>`
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid #FECACA;background:#FEF2F2;border-radius:10px;margin-bottom:8px">
+    <div onclick="bbNotifGo(()=>nav('infected',null))" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid #FECACA;background:#FEF2F2;border-radius:10px;margin-bottom:8px">
       <div>
         <div style="font-weight:700;font-size:16.5px;color:#7F1D1D">⛔ القنينة رقم ${r.bottle_number||'—'} مصابة</div>
         <div style="font-size:14.5px;color:#757575;margin-top:2px">${r.blood_type||'—'}${r.serology_type?' — '+esc(r.serology_type):''} — بانتظار الفرز بالمخزن المؤقت</div>
@@ -3876,7 +3882,7 @@ function openNotifPanel(){
     const expired=d<today;
     const days=Math.round((d-today)/86400000);
     const label=expired?'⛔ انتهت صلاحيتها':(days===0?'⚠️ تنتهي اليوم':'⏳ تنتهي بعد '+days+' يوم');
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid ${expired?'#FECACA':'#FDE68A'};background:${expired?'#FEF2F2':'#FFFBEB'};border-radius:10px;margin-bottom:8px">
+    return `<div onclick="bbNotifGo(()=>nav('supply',null))" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid ${expired?'#FECACA':'#FDE68A'};background:${expired?'#FEF2F2':'#FFFBEB'};border-radius:10px;margin-bottom:8px">
       <div>
         <div style="font-weight:700;font-size:16.5px">${g.n} قنينة — ${g.bt} — ${g.ct}</div>
         <div style="font-size:14.5px;color:#757575;margin-top:2px">${label} — ${fd(g.date)}</div>
@@ -3886,12 +3892,15 @@ function openNotifPanel(){
 
   const bkList=bbNoticeList().slice(0,12);
   const bkRows=bkList.map(n=>{ const ok=n.kind!=='err', d=new Date(n.t); const dt=d.toLocaleDateString('en-CA')+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-    return `<div style="padding:12px 14px;border:1px solid ${ok?'#BBF7D0':'#FECACA'};background:${ok?'#F0FDF4':'#FEF2F2'};border-radius:10px;margin-bottom:8px">
+    return `<div onclick="bbNotifGo(()=>openBackupAutoFromNav())" style="cursor:pointer;padding:12px 14px;border:1px solid ${ok?'#BBF7D0':'#FECACA'};background:${ok?'#F0FDF4':'#FEF2F2'};border-radius:10px;margin-bottom:8px">
       <div style="font-weight:700;font-size:16.5px;color:${ok?'#166534':'#7F1D1D'}">${ok?'✅':'⛔'} ${esc(n.title)}</div>
       <div style="font-size:14px;color:#757575;margin-top:2px;direction:ltr;text-align:right;word-break:break-all">${esc(n.sub||'')}</div>
       <div style="font-size:13px;color:#9e9e9e;margin-top:2px">${dt}</div></div>`; }).join('');
+  const waitRows=(window._WAIT_FORMS||[]).length ? `<div onclick="bbOpenWaitingForms()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid #FDE68A;background:#FFFBEB;border-radius:10px;margin-bottom:8px">
+      <div><div style="font-weight:700;font-size:16.5px;color:#92400E">⏳ عندك ${(window._WAIT_FORMS||[]).length} استمارة بانتظار الطباعة</div>
+      <div style="font-size:14.5px;color:#757575;margin-top:2px">${(window._WAIT_FORMS||[]).map(f=>'#'+f.form_no).join(' — ')} — اضغط لفتح الأرشيف وطباعتها</div></div></div>` : '';
   bbNoticeMarkSeen();
-  G('notifList').innerHTML = (bkRows+seqRows+infRows+expRows) || '<div class="empty"><i class="ti ti-bell-off"></i><p>لا توجد تنبيهات حالياً</p></div>';
+  G('notifList').innerHTML = (waitRows+bkRows+seqRows+infRows+expRows) || '<div class="empty"><i class="ti ti-bell-off"></i><p>لا توجد تنبيهات حالياً</p></div>';
   G('notifModal').classList.add('on');
 }
 setInterval(refreshExpiryNotifications, 5*60*1000);
@@ -4182,7 +4191,7 @@ async function confirmSeparate(){
     toast('✅ تم فصل '+ids.length+' قنينة إلى '+totalRows+' مكوّن بنجاح','success',4500);
     G('separateModal').classList.remove('on');
     if(G('s-separation')?.classList.contains('on'))
-      await withScrollPreserved(()=> (typeof _sepSelectedType!=='undefined' && _sepSelectedType) ? loadSeparationList(_sepSelectedType) : loadSeparationBoard());
+      await withScrollPreserved(()=> loadSeparationList());
     else if(G('s-pending_release')?.classList.contains('on'))
       await withScrollPreserved(loadPendingRelease);
     else
@@ -4219,7 +4228,7 @@ async function confirmDamage(){
     if(G('s-pending_release')?.classList.contains('on'))
       await withScrollPreserved(loadPendingRelease);
     else if(G('s-separation')?.classList.contains('on'))
-      await withScrollPreserved(()=> (typeof _sepSelectedType!=='undefined' && _sepSelectedType) ? loadSeparationList(_sepSelectedType) : loadSeparationBoard());
+      await withScrollPreserved(()=> loadSeparationList());
     else
       await withScrollPreserved(_supplyRefreshCurrentLevel);
   }catch(e){ toast('خطأ: '+e.message,'error'); }
@@ -4368,6 +4377,15 @@ async function openBackupAutoFromNav(){
 function bbAutoBackupInit(){
   if(!canAutoBackup()) return;
   loadSectionScript('backup').then(()=>{ if(typeof bbAutoStart==='function') bbAutoStart(); }).catch(()=>{});
+}
+// ── Collection forms: a new donation joins the open form of its group (T = Trima, R = Reveos, B = the rest) ──
+function bbFormGroup(bt){ bt=String(bt||'').trim(); return bt==='تريما'?'T':(bt==='ريفيوس'?'R':'B'); }
+async function bbAssignForm(donationId, bottleType){
+  try{
+    const r=await db.rpc('assign_donation_to_form',{p_donation:donationId,p_group:bbFormGroup(bottleType)});
+    if(r.error){ console.log('assign form failed:', r.error.message); return null; }
+    return r.data;
+  }catch(e){ console.log('assign form failed:', e); return null; }
 }
 // notices shown in the bell, kept per account on this computer
 function _bbNKey(){ return 'bb_backup_notices_'+(SES?.user?.id||'x'); }

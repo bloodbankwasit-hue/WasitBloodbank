@@ -3,44 +3,49 @@
 // ================================================================
 // Draw and Trima share the same confirm modal; refresh whichever screen opened it.
 async function reloadDrawView(){
-  if(G('s-trima')?.classList.contains('on') && typeof loadTrima==='function') await loadTrima();
+  if(G('s-trima')?.classList.contains('on') && typeof FV!=='undefined') await FV.refresh('trima');
+  else if(typeof FV!=='undefined') await FV.refresh('draw');
   else await loadDraw();
 }
-async function loadDraw(){
-  load(true);
-  const{data}=await db.from('blood_donations')
-    .select('id,donation_type,donation_date,donation_time,bottle_number,bottle_type,donors(full_name,birth_year,gender,mobile)')
-    .eq('status','pending_draw').eq('is_deleted',false).neq('bottle_type','تريما')
-    .order('created_at',{ascending:true});
-  load(false);
-  if(data&&data.length){
-    const bar=`<div id="drawBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
+// قائمة السحب: تعرض الاستمارات (ريفيوس + بقية الأنواع) بدل قائمة أسماء طويلة — راجع forms-view.js
+const DRAW_FV = {
+  unit:'draw', host:'drawList', groups:['R','B'], chk:'dr-chk', onSel:'updateDrawBulkBar', bigBottle:false,
+  stateOf(m){
+    const note=(m.bottle_note||'').replace(/^رفض طبي:\s*/,'');
+    if(m.exit_reason==='medical_reject') return {k:'excl',t:'⛔ مرفوض طبياً'+(note?': '+note:'')};
+    if(m.status==='damaged') return {k:'excl',t:'⛔ تالف أثناء السحب'+(note?': '+note:'')};
+    if(m.status==='pending_draw' && !m.is_deleted) return {k:'ready',t:''};
+    return {k:'done',t:'✓ تم السحب'+(m.draw_date?' — '+fd(m.draw_date):'')};
+  },
+  workDate:m=>m.draw_date,
+  sub:m=>'قنينة: '+(m.bottle_number||'—')+' ('+(m.bottle_type||'—')+') | '+(m.donation_type||''),
+  bulkBar:()=>`<div id="drawBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
       <span id="drawBulkCount">0 محدد</span>
       <div style="display:flex;gap:6px">
-        <button class="btn" style="background:#BE123C;color:#fff;border:none" onclick="openBulkDrawModal()"><i class="ti ti-check"></i> تأكيد السحب للكل</button>
+        <button class="btn" style="background:#BE123C;color:#fff;border:none" onclick="openBulkDrawModal()"><i class="ti ti-check"></i> تأكيد السحب للمحدد</button>
         <button class="btn" style="background:#374151;color:#fff;border:none" onclick="document.querySelectorAll('.dr-chk').forEach(c=>c.checked=false);updateDrawBulkBar()">إلغاء التحديد</button>
-      </div>
-    </div>`;
-    G('drawList').innerHTML=bar+selAllRow('dr-chk','updateDrawBulkBar',data.some(r=>r.bottle_type!=='تريما'))+data.map(r=>{
-      const isTrima=r.bottle_type==='تريما';
-      return `<div class="flow-card">
-      ${isTrima?'<span style="width:18px"></span>':`<input type="checkbox" class="dr-chk" value="${r.id}" onclick="updateDrawBulkBar()" style="width:18px;height:18px;flex-shrink:0">`}
-      <div class="fc-av">${BAG}</div>
-      <div style="flex:1">
-        <div class="fc-name">${esc(r.donors?.full_name||'—')}</div>
-        <div class="fc-sub">قنينة: ${r.bottle_number||'—'} (${r.bottle_type||'—'}) | ${r.donation_type}</div>
-      </div>
-      <div class="fc-act">
-        <button class="btn" onclick="openEditDonation('${r.id}')" title="تعديل البيانات"><i class="ti ti-edit"></i></button>
-        <button class="btn btn-p" onclick="openDrawModal('${r.id}','${sq(r.donors?.full_name)}','${r.donation_type}','${r.bottle_number||''}','${r.bottle_type||''}')">
-          <i class="ti ti-droplet"></i> سحب
-        </button>
-      </div>
-    </div>`;}).join('');
-  } else {
-    G('drawList').innerHTML='<div class="empty"><i class="ti ti-check"></i><p>لا يوجد متبرعون في الانتظار</p></div>';
+      </div></div>`,
+  actions(m,st,ctx){
+    if(st.k==='ready' && !ctx.archive) return `<button class="btn" onclick="openEditDonation('${m.id}')" title="تعديل البيانات"><i class="ti ti-edit"></i></button>
+        <button class="btn btn-p" onclick="openDrawModal('${m.id}','${sq(m.full_name)}','${m.donation_type}','${m.bottle_number||''}','${m.bottle_type||''}')"><i class="ti ti-droplet"></i> سحب</button>`;
+    if(ctx.canEdit) return `<button class="btn" onclick="openEditDonation('${m.id}')" title="تعديل (نفس يوم السحب فقط)"><i class="ti ti-edit"></i></button>`;
+    return '';
+  },
+  // سجلات قديمة بلا استمارة (قبل تفعيل الاستمارات) تبقى ظاهرة حتى لا يضيع أي اسم
+  async legacy(){
+    const{data}=await db.from('blood_donations')
+      .select('id,donation_type,bottle_number,bottle_type,donors(full_name)')
+      .eq('status','pending_draw').eq('is_deleted',false).is('collection_form_id',null).neq('bottle_type','تريما')
+      .order('created_at',{ascending:true});
+    if(!data||!data.length) return '';
+    return '<div style="margin:14px 0 6px;font-weight:700;color:#6B7280">بدون استمارة (سجلات قديمة)</div>'+data.map(r=>`<div class="flow-card">
+      <span style="width:18px"></span><div class="fc-av">${BAG}</div>
+      <div style="flex:1"><div class="fc-name">${esc(r.donors?.full_name||'—')}</div><div class="fc-sub">قنينة: ${r.bottle_number||'—'} (${r.bottle_type||'—'}) | ${r.donation_type}</div></div>
+      <div class="fc-act"><button class="btn" onclick="openEditDonation('${r.id}')"><i class="ti ti-edit"></i></button>
+      <button class="btn btn-p" onclick="openDrawModal('${r.id}','${sq(r.donors?.full_name)}','${r.donation_type}','${r.bottle_number||''}','${r.bottle_type||''}')"><i class="ti ti-droplet"></i> سحب</button></div></div>`).join('');
   }
-}
+};
+async function loadDraw(){ await FV.show(DRAW_FV); }
 
 function updateDrawBulkBar(){
   syncSelAll('dr-chk');
@@ -134,7 +139,7 @@ async function confirmDrawSuccess(){
     load(true);
     try{
       const{data:parent,error:pe}=await db.from('blood_donations')
-        .select('donor_id,bottle_number,bottle_type,donation_type,created_by')
+        .select('donor_id,bottle_number,bottle_type,donation_type,created_by,collection_form_id')
         .eq('id',id).single();
       if(pe) throw pe;
       const rows=[];
@@ -145,7 +150,7 @@ async function confirmDrawSuccess(){
           donor_id:parent.donor_id, bottle_number:parent.bottle_number, bottle_type:parent.bottle_type,
           donation_type:parent.donation_type, component_type:o.type, parent_donation_id:id,
           draw_date:draw, donation_date:draw, expiry_date:e.toISOString().split('T')[0],
-          status:'pending_lab', created_by:SES?.user?.id
+          status:'pending_lab', created_by:SES?.user?.id, collection_form_id:parent.collection_form_id||null
         });
       });
       const{error:ie}=await db.from('blood_donations').insert(rows);
@@ -244,6 +249,7 @@ async function confirmMedicalReject(){
     if(d?.bottle_number && d?.bottle_type){
       await releaseBottleNumber(d.bottle_type,d.bottle_number);
     }
+    try{ await db.from('blood_donations').update({bottle_note:'رفض طبي: '+reason}).eq('id',id); }catch(e){}
     const{error}=await markDonationExit(id,'medical_reject');
     if(error) throw error;
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'rejected_medical',reason,released_bottle:d?.bottle_number}});

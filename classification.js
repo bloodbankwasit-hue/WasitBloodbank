@@ -15,45 +15,56 @@ function openClassificationExport(){
   });
 }
 
-async function loadClassification(){
-  load(true);
-  const{data}=await db.from('blood_donations')
-    .select('id,bottle_number,bottle_type,donor_id,draw_date,donors(full_name)')
-    .eq('status','pending_lab').is('blood_type',null).eq('is_deleted',false)
-    .order('created_at',{ascending:true});
-  load(false);
-  const seen=new Set();
-  const dedup=(data||[]).filter(r=>{
-    const key=r.donor_id+'|'+r.bottle_number;
-    if(seen.has(key)) return false;
-    seen.add(key); return true;
-  });
-  if(!dedup.length){
-    G('classificationList').innerHTML='<div class="empty"><i class="ti ti-check"></i><p>لا توجد قناني بانتظار التصنيف</p></div>';
-    return;
-  }
-  const bar=`<div id="cmBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
+// عرض الاستمارات (راجع forms-view.js): أخضر = جاهز، إطار أحمر = بانتظار السحب، رمادي ✓ = أُنجز، أحمر مظلل = خرج
+const CLS_FV = {
+  unit:'classification', host:'classificationList', groups:['T','R','B'], chk:'cm-chk', onSel:'updateCmBulkBar', bigBottle:true,
+  // أصل التريما يُخفى (ناتجاه يظهران كقنينة واحدة) والفحص يتم مرة واحدة للسحبة
+  filter:m=>!(m.bottle_type==='تريما' && m.status==='separated' && !m.parent_donation_id),
+  dedup:m=>m.donor_id+'|'+m.bottle_number,
+  stateOf(m){
+    const done=!!m.blood_type;
+    const note=(m.bottle_note||'').replace(/^رفض طبي:\s*/,'');
+    if(m.exit_reason==='medical_reject') return {k:'excl',t:'⛔ مرفوض طبياً'+(note?': '+note:'')};
+    if(m.status==='damaged' && !done) return {k:'excl',t:'⛔ تالف'+(note?': '+note:'')};
+    if(m.status==='pending_draw') return {k:'notready',t:'بانتظار السحب'};
+    if(done) return {k:'done',t:'✓ صُنّفت: '+m.blood_type};
+    if(m.status==='pending_lab') return {k:'ready',t:''};
+    return {k:'done',t:'—'};
+  },
+  workDate:m=>m.blood_type_date,
+  sub:m=>m.bottle_type||'',
+  bulkBar:()=>`<div id="cmBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
     <span id="cmBulkCount">0 محدد</span>
     <div style="display:flex;gap:6px">
       <button class="btn" style="background:#0369A1;color:#fff;border:none" onclick="openBulkClassificationModal()"><i class="ti ti-check"></i> تصنيف جماعي</button>
       <button class="btn" style="background:#374151;color:#fff;border:none" onclick="document.querySelectorAll('.cm-chk').forEach(c=>c.checked=false);updateCmBulkBar()">إلغاء التحديد</button>
-    </div>
-  </div>`;
-  G('classificationList').innerHTML=bar+selAllRow('cm-chk','updateCmBulkBar')+dedup.map(r=>`<div class="flow-card">
-    <input type="checkbox" class="cm-chk" value="${r.id}" onclick="updateCmBulkBar()" style="width:18px;height:18px;flex-shrink:0">
-    <div class="fc-av">${BAG}</div>
-    <div style="flex:1">
-      <div class="fc-name fc-bn">${r.bottle_number||'—'}</div>
-      <div class="fc-sub fc-dn">${esc(r.donors?.full_name||'—')} | ${r.bottle_type}</div>
-    </div>
-    <div class="fc-act">
-      <button class="btn btn-p" onclick="openClassificationModal('${r.id}','${sq(r.donors?.full_name)}','${r.bottle_number||''}','${r.draw_date||''}')">
-        <i class="ti ti-droplet"></i> تصنيف
-      </button>
-    </div>
-  </div>`).join('');
-  updateCmBulkBar();
-}
+    </div></div>`,
+  actions(m,st,ctx){
+    if(st.k==='ready') return `<button class="btn btn-p" onclick="openClassificationModal('${m.id}','${sq(m.full_name)}','${m.bottle_number||''}','${m.draw_date||''}')"><i class="ti ti-droplet"></i> تصنيف</button>`;
+    // الأرشيف: تعديل في نفس يوم العمل فقط وقبل تثبيتها في المخزن
+    if(ctx.canEdit && m.status==='pending_release') return `<button class="btn" onclick="openClassificationModal('${m.id}','${sq(m.full_name)}','${m.bottle_number||''}','${m.draw_date||''}')" title="تعديل (نفس يوم العمل فقط)"><i class="ti ti-edit"></i></button>`;
+    return '';
+  },
+  // سجلات بلا استمارة: قديمة (بأسماء) + قناني الحملات (مجلدات باسم الحملة)
+  async legacy(){
+    const{data}=await db.from('blood_donations')
+      .select('id,bottle_number,bottle_type,donor_id,draw_date,campaign_name,donors(full_name)')
+      .eq('status','pending_lab').is('blood_type',null).eq('is_deleted',false).is('collection_form_id',null)
+      .order('created_at',{ascending:true});
+    const seen=new Set(), rows=(data||[]).filter(r=>{ const k=(r.donor_id||r.campaign_name)+'|'+r.bottle_number; if(seen.has(k)) return false; seen.add(k); return true; });
+    if(!rows.length) return '';
+    const row=r=>`<div class="flow-card">
+      <input type="checkbox" class="cm-chk" value="${r.id}" onclick="updateCmBulkBar()" style="width:18px;height:18px;flex-shrink:0">
+      <div class="fc-av">${BAG}</div>
+      <div style="flex:1"><div class="fc-name fc-bn">${r.bottle_number||'—'}</div><div class="fc-sub fc-dn">${esc(r.donors?.full_name||'—')} | ${r.bottle_type}</div></div>
+      <div class="fc-act"><button class="btn btn-p" onclick="openClassificationModal('${r.id}','${sq(r.donors?.full_name)}','${r.bottle_number||''}','${r.draw_date||''}')"><i class="ti ti-droplet"></i> تصنيف</button></div></div>`;
+    const camp=rows.filter(r=>!r.donor_id), old=rows.filter(r=>r.donor_id);
+    return '<div id="cmBulkBar-l" style="display:none"></div>'
+      + FV.folders(camp,{chk:'cm-chk',onSel:'updateCmBulkBar',bulkFn:'openBulkClassificationModal()',bulkLabel:'تصنيف جماعي للمحدد',row})
+      + (old.length?'<div style="margin:14px 0 6px;font-weight:700;color:#6B7280">بدون استمارة (سجلات قديمة)</div>'+old.map(row).join(''):'');
+  }
+};
+async function loadClassification(){ await FV.show(CLS_FV); }
 
 function updateCmBulkBar(){
   syncSelAll('cm-chk');
@@ -85,7 +96,7 @@ async function confirmBulkClassification(){
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:ids[0],new_values:{bulk_classification_count:ids.length,blood_type:bt}});
     toast('✅ تم تصنيف '+ids.length+' قنينة بفصيلة '+bt,'success',4000);
     G('bulkCmModal').classList.remove('on');
-    await loadClassification();
+    await FV.refresh('classification');
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }
 }
@@ -183,7 +194,7 @@ async function saveClassification(){
       updateOfflineBar('offline', q.length+' عملية معلّقة');
       toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً عند عودة الإنترنت','warning',5000);
       G('cmModal').classList.remove('on');
-      await loadClassification();
+      await FV.refresh('classification');
       load(false);
       return;
     }
@@ -197,7 +208,7 @@ async function saveClassification(){
     }
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{blood_type:bt}});
     G('cmModal').classList.remove('on');
-    await loadClassification();
+    await FV.refresh('classification');
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }
 }

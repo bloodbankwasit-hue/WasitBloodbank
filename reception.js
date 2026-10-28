@@ -427,6 +427,8 @@ async function saveReception(){
         status:'pending_draw', created_by:payload.created_by
       }).select().single();
       if(doe) throw doe;
+      // the donation joins the open collection form of its group (a new form opens automatically after 10 names)
+      const formInfo = await bbAssignForm(don.id, btype);
       await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'INSERT',table_name:'blood_donations',record_id:don.id,new_values:{donor:nm,status:'pending_draw',bottle:bnum}});
       // Consume the bottle number: from the reuse pool if that's where it came from,
       // otherwise advance the main sequence.
@@ -478,7 +480,7 @@ async function saveReception(){
       resetReception();
       G('rcSaveBtn').style.display='flex';
       toast('✅ تم الحفظ — رقم القنينة: '+bnum,'success',4000);
-      if(typeof colCheckAutoPopup==='function') colCheckAutoPopup();
+      if(formInfo && typeof colSchedulePopup==='function') colSchedulePopup(formInfo, bbFormGroup(btype));
     }
   }catch(e){toast('خطأ: '+e.message,'error');}
   finally{load(false);}

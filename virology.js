@@ -15,48 +15,57 @@ function openVirologyExport(){
   });
 }
 
-async function loadVirology(){
-  load(true);
-  const{data}=await db.from('blood_donations')
-    .select('id,bottle_number,bottle_type,donor_id,draw_date,donors(full_name)')
-    .eq('status','pending_lab').is('serology_result',null).eq('is_deleted',false)
-    .order('created_at',{ascending:true});
-  load(false);
-  // A single draw can produce more than one row sharing the same donor + bottle number
-  // (trima's two outputs, or a component separated before testing) — the test is done once
-  // for the whole draw, so only one card is shown; testing it resolves every sibling too.
-  const seen=new Set();
-  const dedup=(data||[]).filter(r=>{
-    const key=r.donor_id+'|'+r.bottle_number;
-    if(seen.has(key)) return false;
-    seen.add(key); return true;
-  });
-  if(!dedup.length){
-    G('virologyList').innerHTML='<div class="empty"><i class="ti ti-check"></i><p>لا توجد عينات بانتظار الفحص</p></div>';
-    return;
-  }
-  const bar=`<div id="vmBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
+// عرض الاستمارات (راجع forms-view.js): أخضر = جاهز، إطار أحمر = بانتظار السحب، رمادي ✓ = أُنجز، أحمر مظلل = خرج
+const VIR_FV = {
+  unit:'virology', host:'virologyList', groups:['T','R','B'], chk:'vm-chk', onSel:'updateVmBulkBar', bigBottle:true,
+  // أصل التريما يُخفى (ناتجاه يظهران كقنينة واحدة) والفحص يتم مرة واحدة للسحبة
+  filter:m=>!(m.bottle_type==='تريما' && m.status==='separated' && !m.parent_donation_id),
+  dedup:m=>m.donor_id+'|'+m.bottle_number,
+  stateOf(m){
+    const done=!!m.serology_result;
+    const note=(m.bottle_note||'').replace(/^رفض طبي:\s*/,'');
+    if(m.exit_reason==='medical_reject') return {k:'excl',t:'⛔ مرفوض طبياً'+(note?': '+note:'')};
+    if(m.status==='damaged' && !done) return {k:'excl',t:'⛔ تالف'+(note?': '+note:'')};
+    if(m.status==='pending_draw') return {k:'notready',t:'بانتظار السحب'};
+    if(m.serology_result==='Positive') return {k:'excl',t:'🦠 إصابة: '+(m.serology_type||'')};
+    if(done) return {k:'done',t:'✓ فُحصت: '+(m.serology_result==='Negative'?'سالبة':'موجبة')};
+    if(m.status==='pending_lab') return {k:'ready',t:''};
+    return {k:'done',t:'—'};
+  },
+  workDate:m=>m.serology_date,
+  sub:m=>m.bottle_type||'',
+  bulkBar:()=>`<div id="vmBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
     <span id="vmBulkCount">0 محدد</span>
     <div style="display:flex;gap:6px">
       <button class="btn" style="background:#166534;color:#fff;border:none" onclick="openBulkVirologyModal()"><i class="ti ti-check"></i> فحص جماعي (All-Negative)</button>
       <button class="btn" style="background:#374151;color:#fff;border:none" onclick="document.querySelectorAll('.vm-chk').forEach(c=>c.checked=false);updateVmBulkBar()">إلغاء التحديد</button>
-    </div>
-  </div>`;
-  G('virologyList').innerHTML=bar+selAllRow('vm-chk','updateVmBulkBar')+dedup.map(r=>`<div class="flow-card">
-    <input type="checkbox" class="vm-chk" value="${r.id}" onclick="updateVmBulkBar()" style="width:18px;height:18px;flex-shrink:0">
-    <div class="fc-av">${BAG}</div>
-    <div style="flex:1">
-      <div class="fc-name fc-bn">${r.bottle_number||'—'}</div>
-      <div class="fc-sub fc-dn">${esc(r.donors?.full_name||'—')} | ${r.bottle_type}</div>
-    </div>
-    <div class="fc-act">
-      <button class="btn btn-p" onclick="openVirologyModal('${r.id}','${sq(r.donors?.full_name)}','${r.bottle_number||''}','${r.draw_date||''}')">
-        <i class="ti ti-microscope"></i> فحص
-      </button>
-    </div>
-  </div>`).join('');
-  updateVmBulkBar();
-}
+    </div></div>`,
+  actions(m,st,ctx){
+    if(st.k==='ready') return `<button class="btn btn-p" onclick="openVirologyModal('${m.id}','${sq(m.full_name)}','${m.bottle_number||''}','${m.draw_date||''}')"><i class="ti ti-microscope"></i> فحص</button>`;
+    // الأرشيف: تعديل في نفس يوم العمل فقط وقبل تثبيتها في المخزن
+    if(ctx.canEdit && m.status==='pending_release') return `<button class="btn" onclick="openVirologyModal('${m.id}','${sq(m.full_name)}','${m.bottle_number||''}','${m.draw_date||''}')" title="تعديل (نفس يوم العمل فقط)"><i class="ti ti-edit"></i></button>`;
+    return '';
+  },
+  // سجلات بلا استمارة: قديمة (بأسماء) + قناني الحملات (مجلدات باسم الحملة)
+  async legacy(){
+    const{data}=await db.from('blood_donations')
+      .select('id,bottle_number,bottle_type,donor_id,draw_date,campaign_name,donors(full_name)')
+      .eq('status','pending_lab').is('serology_result',null).eq('is_deleted',false).is('collection_form_id',null)
+      .order('created_at',{ascending:true});
+    const seen=new Set(), rows=(data||[]).filter(r=>{ const k=(r.donor_id||r.campaign_name)+'|'+r.bottle_number; if(seen.has(k)) return false; seen.add(k); return true; });
+    if(!rows.length) return '';
+    const row=r=>`<div class="flow-card">
+      <input type="checkbox" class="vm-chk" value="${r.id}" onclick="updateVmBulkBar()" style="width:18px;height:18px;flex-shrink:0">
+      <div class="fc-av">${BAG}</div>
+      <div style="flex:1"><div class="fc-name fc-bn">${r.bottle_number||'—'}</div><div class="fc-sub fc-dn">${esc(r.donors?.full_name||'—')} | ${r.bottle_type}</div></div>
+      <div class="fc-act"><button class="btn btn-p" onclick="openVirologyModal('${r.id}','${sq(r.donors?.full_name)}','${r.bottle_number||''}','${r.draw_date||''}')"><i class="ti ti-microscope"></i> فحص</button></div></div>`;
+    const camp=rows.filter(r=>!r.donor_id), old=rows.filter(r=>r.donor_id);
+    return '<div id="vmBulkBar-l" style="display:none"></div>'
+      + FV.folders(camp,{chk:'vm-chk',onSel:'updateVmBulkBar',bulkFn:'openBulkVirologyModal()',bulkLabel:'فحص جماعي (All-Negative) للمحدد',row})
+      + (old.length?'<div style="margin:14px 0 6px;font-weight:700;color:#6B7280">بدون استمارة (سجلات قديمة)</div>'+old.map(row).join(''):'');
+  }
+};
+async function loadVirology(){ await FV.show(VIR_FV); }
 
 function updateVmBulkBar(){
   syncSelAll('vm-chk');
@@ -89,7 +98,7 @@ async function confirmBulkVirology(){
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:ids[0],new_values:{bulk_virology_count:ids.length,all_negative:true}});
     toast('✅ تم فحص '+ids.length+' قنينة (All-Negative)','success',4000);
     G('bulkVmModal').classList.remove('on');
-    await loadVirology();
+    await FV.refresh('virology');
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }
 }
@@ -153,7 +162,7 @@ async function saveVirology(){
       updateOfflineBar('offline', q.length+' عملية معلّقة');
       toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً عند عودة الإنترنت (بما فيها إضافة المرفوضين لو موجبة)','warning',6000);
       G('vmModal').classList.remove('on');
-      await loadVirology();
+      await FV.refresh('virology');
       load(false);
       return;
     }
@@ -167,7 +176,7 @@ async function saveVirology(){
     }
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:fieldUpdates});
     G('vmModal').classList.remove('on');
-    await loadVirology();
+    await FV.refresh('virology');
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }
 }
