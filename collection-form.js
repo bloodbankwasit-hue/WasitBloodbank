@@ -58,6 +58,27 @@ async function colPrintForm(formId, formNo, dateStr, alreadyPrinted){
   }catch(e){ load(false); toast('خطأ: '+(e.message||e),'error',6000); }
   finally{ _colBusy = false; }
 }
+// معاينة الاستمارة قبل الطباعة (لا تغيّر حالتها)
+async function colPreviewForm(formId, formNo, dateStr, printed){
+  try{
+    load(true);
+    const by = await colMembers([formId]);
+    const items = (by[formId]||[]).filter(m=>m.exit_reason!=='medical_reject');
+    await loadOneScript('collection-template.js');
+    load(false);
+    if(!items.length){ toast('لا توجد أسماء بهذه الاستمارة','info'); return; }
+    const rows = items.map(_colRow), meta = _colMetaFor(rows, formNo, dateStr);
+    const html = buildCollectionHtml(rows, meta);
+    let ov = document.getElementById('colPrevOv'); if(ov) ov.remove();
+    ov = document.createElement('div'); ov.id='colPrevOv';
+    ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.75);display:flex;flex-direction:column;padding:10px;gap:8px';
+    ov.innerHTML='<div style="display:flex;gap:8px"><button class="btn btn-p" id="colPrevPrint" style="flex:1;justify-content:center">🖨️ طباعة</button><button class="btn" id="colPrevClose" style="flex:1;justify-content:center">إغلاق</button></div><iframe id="colPrevFrame" style="flex:1;width:100%;border:0;background:#fff;border-radius:8px"></iframe>';
+    document.body.appendChild(ov);
+    document.getElementById('colPrevFrame').srcdoc = html;
+    document.getElementById('colPrevClose').onclick=()=>ov.remove();
+    document.getElementById('colPrevPrint').onclick=()=>{ ov.remove(); colPrintForm(formId, formNo, dateStr, !!printed); };
+  }catch(e){ load(false); toast('خطأ: '+(e.message||e),'error',5000); }
+}
 async function colMoveWaiting(formId){
   try{
     await _colRpc('form_set_state',{p_form:formId,p_action:'waiting'});
@@ -88,7 +109,7 @@ function _colFormBlock(f, members, mode){
   const dt = _colDate(f.last_name_at);
   const head = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px"><b style="font-size:15px">استمارة #${f.form_no} — ${esc((COL_GROUPS[f.form_group]||{}).name||'')}</b><span style="font-size:12.5px;color:#6B7280">${esc(dt)} — ${members.length} أسماء${f.status==='open'?' (مفتوحة)':''}</span></div>`;
   const args = `'${f.id}',${f.form_no},'${dt}',${f.printed_at?'true':'false'}`;
-  const btns = `<div style="display:flex;gap:6px;margin-top:8px"><button class="btn btn-p" style="flex:1;justify-content:center" ${act.length?'':'disabled'} onclick="colPrintForm(${args})">🖨️ طباعة (${act.length})</button>`
+  const btns = `<div style="display:flex;gap:6px;margin-top:8px"><button class="btn" style="flex:1;justify-content:center" ${act.length?'':'disabled'} onclick="colPreviewForm('${f.id}',${f.form_no},'${dt}',${f.printed_at?'true':'false'})">👁 معاينة</button><button class="btn btn-p" style="flex:1;justify-content:center" ${act.length?'':'disabled'} onclick="colPrintForm(${args})">🖨️ طباعة (${act.length})</button>`
     + (mode==='print' && !f.printed_at && !f.waiting_print_at ? `<button class="btn" style="flex:1;justify-content:center" onclick="colMoveWaiting('${f.id}')">⏳ نقل للانتظار</button>` : '') + `</div>`;
   return `<div style="border:1px solid #E5E7EB;border-radius:10px;padding:10px;margin-bottom:10px">${head}<div style="max-height:30vh;overflow:auto;border:1px solid #F3F4F6;border-radius:8px">${names||'<div style="padding:10px;color:#6B7280;text-align:center">لا توجد أسماء</div>'}</div>${btns}</div>`;
 }
