@@ -68,7 +68,7 @@ async function colPreviewForm(formId, formNo, dateStr, printed){
     load(false);
     if(!items.length){ toast('لا توجد أسماء بهذه الاستمارة','info'); return; }
     const rows = items.map(_colRow), meta = _colMetaFor(rows, formNo, dateStr);
-    const html = buildCollectionHtml(rows, meta);
+    const html = buildCollectionHtml(rows, meta).replace('setTimeout(printCollectionForm,350)','void 0'); // معاينة فقط: بدون طباعة تلقائية
     let ov = document.getElementById('colPrevOv'); if(ov) ov.remove();
     ov = document.createElement('div'); ov.id='colPrevOv';
     ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.75);display:flex;flex-direction:column;padding:10px;gap:8px';
