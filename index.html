@@ -1959,6 +1959,14 @@ function enableEnterAsTab(containerSelector){
       try{ e.target.dataset.enterOpened = '1'; e.target.showPicker(); return; }catch(err){ delete e.target.dataset.enterOpened; }
     }
     if(e.target.tagName === 'SELECT') delete e.target.dataset.enterOpened;
+    // Empty field warning: a required one (label marked *) stops here; an optional one warns and moves on.
+    const t = e.target;
+    if((t.tagName==='INPUT' || t.tagName==='SELECT') && !t.readOnly && t.type!=='checkbox' && t.type!=='radio' && String(t.value||'').trim()===''){
+      const lb = t.parentElement && t.parentElement.querySelector('label');
+      const lt = lb ? lb.textContent.replace(/\*/g,'').trim() : '';
+      if(lb && lb.textContent.indexOf('*')>-1){ toast('⚠️ الخانة فارغة: '+lt+' (مطلوبة)','error',2500); try{ t.focus(); }catch(x){} return; }
+      toast('⚠️ الخانة فارغة'+(lt?': '+lt:''),'warning',1800);
+    }
     const focusable = Array.from(container.querySelectorAll('input, select, textarea'))
       .filter(el => !el.disabled && !el.readOnly && el.offsetParent !== null);
     const idx = focusable.indexOf(e.target);
