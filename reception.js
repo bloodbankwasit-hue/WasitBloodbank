@@ -329,6 +329,7 @@ async function saveReception(){
   }
   const nm=G('rc-name').value.trim(), by=parseInt(G('rc-by').value);
   if(!nm||!by){ toast('يرجى تعبئة الاسم وسنة التولد','error'); return; }
+  { const _e=bbIdLenError(G('rc-mob'))||bbIdLenError(G('rc-nid')); if(_e){ toast('⚠️ '+_e,'error',3500); return; } }
   const _mobVal=G('rc-mob')?.value.trim()||'';
   if(_mobVal && !/^07[0-9]{9}$/.test(_mobVal)){ toast('رقم الموبايل يجب أن يكون 11 رقم ويبدأ بـ 07','error'); return; }
   const _nidVal=G('rc-nid')?.value.trim()||'';

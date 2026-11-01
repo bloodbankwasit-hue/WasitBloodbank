@@ -45,6 +45,7 @@ async function saveNewSeq(){
   const notes=G('sq-notes').value.trim();
   if(!type||!from||!to||from>=to){toast('تحقق من البيانات','error');return;}
   load(true);
+  { const _m=await bbRangeClash(from,to); if(_m){ load(false); toast('⛔ '+_m+'. غيّر الأرقام','error',9000); return; } }
   const{error}=await db.from('bottle_sequences').insert({
     bottle_type:type,start_number:from,end_number:to,current_number:from,
     is_active:true,notes:notes||null
@@ -91,6 +92,7 @@ async function saveEditSeq(){
   load(true);
   // If the current number is moved BELOW the original start (refilling with older numbers), the start
   // follows it, otherwise the card's progress percentage would be meaningless.
+  { const _m=await bbRangeClash(current,to,{skipSeq:id}); if(_m){ load(false); toast('⛔ '+_m+'. غيّر الأرقام','error',9000); return; } }
   const oldStart=parseInt(G('esq-start').value);
   const upd={current_number:current,end_number:to};
   if(oldStart && current<oldStart) upd.start_number=current;

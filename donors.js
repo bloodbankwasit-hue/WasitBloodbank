@@ -188,7 +188,7 @@ async function loadDonors(page=1){
           <td style="white-space:nowrap">
             ${r.status==='pending_draw' ? `<button class="ibtn" onclick="withdrawDonation('${r.id}','${sq(r.donors?.full_name)}')" title="انسحب / لم يكمل التبرع" style="color:#757575"><i class="ti ti-door-exit"></i></button>` : ''}
             <button class="ibtn" onclick="printDonorFromList(storeDonorForPrint({id:'${r.id}',donor_name:'${sq(r.donors?.full_name)}',bottle_number:${r.bottle_number||0},bottle_type:'${r.bottle_type||''}',donation_date:'${r.donation_date||''}',donation_type:'${r.donation_type||''}',birth_year:${r.donors?.birth_year||0},gender:'${r.donors?.gender||''}',mobile:'${sq(r.donors?.mobile)}',national_id:'${sq(r.donors?.national_id)}',address:'${sq(r.donors?.address)}',expiry_date:'${r.expiry_date||''}',blood_type:'${r.blood_type||''}' }))" title="طباعة" style="color:#BE123C"><i class="ti ti-printer"></i></button>
-            <button class="ibtn" onclick="editDonorRow('${r.id}')" title="تعديل" style="color:#2563EB"><i class="ti ti-edit"></i></button>
+            <button class="ibtn" onclick="editDonorRow('${r.id}')" title="معاينة" style="color:#2563EB"><i class="ti ti-eye"></i></button>
             <button class="ibtn" onclick="deleteDonorRow('${r.id}','${sq(r.donors?.full_name)}')" title="حذف هذا التبرع" style="color:#DC2626"><i class="ti ti-trash"></i></button>
           </td>
         </tr>`;}).join('')}</tbody></table></div>`;
@@ -208,7 +208,8 @@ async function loadDonors(page=1){
   finally{load(false);}
 }
 
-async function editDonorRow(id){
+async function editDonorRow(id,opts){
+  opts=opts||{};
   load(true);
   try{
     const{data:r,error}=await db.from('blood_donations')
@@ -248,10 +249,27 @@ async function editDonorRow(id){
     G('ed-ser').value=r.serology_result||'';   // '' = not tested yet (never default to Negative)
     G('ed-sert').value=r.serology_type||'HIV';
     toggleEdSer();
-    G('editDonorModal').classList.add('on');
+    const md=G('editDonorModal'); md.dataset.status=r.status||''; md.dataset.origType=r.bottle_type||''; md.dataset.noEdit=opts.noEdit?'1':'';
+    edSetMode(!!opts.edit && !opts.noEdit);
+    md.classList.add('on');
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }
 }
+
+// View mode = every field locked + «تعديل الاستمارة» button; edit mode = unlocked. Bottle type can change only before the draw.
+function edSetMode(editable){
+  const md=G('editDonorModal'); if(!md) return;
+  md.classList.toggle('view',!editable);
+  md.querySelectorAll('.modal-body input,.modal-body select,.modal-body textarea').forEach(el=>{ if(el.type!=='hidden') el.disabled=!editable; });
+  const bt=G('ed-btyp');
+  if(editable && md.dataset.status!=='pending_draw'){ bt.disabled=true; bt.title='لا يمكن تغيير نوع القنينة بعد السحب'; } else bt.title='';
+  G('edTitleTx').textContent = editable ? 'تعديل بيانات المتبرع' : 'معاينة بيانات المتبرع';
+  G('edTitleIc').className = 'ti ' + (editable ? 'ti-edit' : 'ti-eye');
+  G('edGoEdit').style.display = (!editable && !md.dataset.noEdit) ? '' : 'none';
+  G('edBtnPrint').style.display = G('edBtnSave').style.display = editable ? '' : 'none';
+  G('edBtnCancel').innerHTML = editable ? '<i class="ti ti-x"></i> إلغاء' : '<i class="ti ti-x"></i> إغلاق';
+}
+function edUnlock(){ edSetMode(true); }
 
 function toggleEdSer(){ G('edSerTypGrp').style.display=G('ed-ser').value==='Positive'?'flex':'none'; }
 
@@ -265,8 +283,18 @@ async function saveDonorEdit(printAfter){
   } else if(!dd){
     toast('يرجى تعبئة تاريخ التبرع','error'); return;
   }
+  { const _e=bbIdLenError(G('ed-mob'))||bbIdLenError(G('ed-nid')); if(_e){ toast('⚠️ '+_e,'error',3500); return; } }
   load(true);
   try{
+    // Bottle type changed before the draw: one atomic RPC returns the old number to the pool and takes a new one
+    // from the new type (pool first, then its sequence) — nothing is lost if it fails.
+    const md=G('editDonorModal'), newType=G('ed-btyp').value;
+    if(md.dataset.status==='pending_draw' && newType && newType!==md.dataset.origType){
+      const{data:cr,error:ce}=await db.rpc('change_bottle_type',{p_donation:donId,p_new_type:newType});
+      if(ce) throw new Error(ce.message||'تعذر تغيير نوع القنينة');
+      G('ed-bnum').value=cr.bottle_number; md.dataset.origType=newType;
+      toast('🔁 تغيّر النوع إلى «'+newType+'» — رقم القنينة الجديد: '+cr.bottle_number+' (الرقم القديم '+cr.old_number+' رجع للمخزن). أعد طباعة الملصق إن كان مطبوعاً.','info',9000);
+    }
     if(donorId){
       const nm=G('ed-name').value.trim();
       const{error:de}=await db.from('donors').update({
@@ -280,7 +308,7 @@ async function saveDonorEdit(printAfter){
 
     const ser=G('ed-ser').value||null;   // untested stays untested (null)
     const{error:doe}=await db.from('blood_donations').update({
-      bottle_type:G('ed-btyp').value, donation_type:G('ed-dtyp').value,
+      donation_type:G('ed-dtyp').value,
       patient_name:G('ed-pat').value.trim()||null, hospital_name:G('ed-hosp').value.trim()||null,
       donation_date:dd, donation_time:G('ed-dtime').value||null,
       draw_date:G('ed-draw').value||null, expiry_date:G('ed-exp').value||null,

@@ -14,11 +14,11 @@ const TRIMA_FV = {
     if(m.status==='pending_draw' && !m.is_deleted) return {k:'ready',t:''};
     return {k:'done',t:'✓ تم السحب'+(m.draw_date?' — '+fd(m.draw_date):'')};
   },
-  workDate:m=>m.draw_date,
+  workDate:m=>m.draw_date, nameClick:m=>"openEditDonation('"+m.id+"'"+(m.status==='pending_draw'&&!m.is_deleted?'':',{noEdit:true}')+")",
   sub:m=>'قنينة: '+(m.bottle_number||'—')+' | '+(m.donation_type||''),
   actions(m,st){
-    if(st.k!=='ready') return '';
-    return `<button class="btn" onclick="openEditDonation('${m.id}')" title="تعديل البيانات"><i class="ti ti-edit"></i></button>
+    if(st.k!=='ready') return `<button class="btn" onclick="openEditDonation('${m.id}',{noEdit:true})" title="معاينة"><i class="ti ti-eye"></i></button>`;
+    return `<button class="btn" onclick="openEditDonation('${m.id}')" title="معاينة البيانات"><i class="ti ti-eye"></i></button>
       <button class="btn btn-p" onclick="openDrawModal('${m.id}','${sq(m.full_name)}','${sq(m.donation_type||'')}','${m.bottle_number||''}','تريما')"><i class="ti ti-droplet"></i> سحب تريما</button>`;
   },
   async legacy(){

@@ -356,6 +356,11 @@ async function saveCampaign(){
   const groups=campExpandRanges(rows);
   load(true);
   try{
+    // لا يُقبل أي تعارض: الأرقام يجب أن تكون حرّة تماماً (غير مسجلة، غير محجوزة، وخارج تسلسل الاستقبال)
+    for(const r of rows){
+      const msg=await bbRangeClash(Math.min(r.from,r.to),Math.max(r.from,r.to));
+      if(msg){ load(false); toast('⛔ السطر '+r.n+': '+msg+'. غيّر الرقم ولا يمكن المتابعة','error',10000); return; }
+    }
     const{data:camp,error:ce}=await db.from('campaigns').insert({
       name, campaign_date:date, location:location||null, created_by:SES?.user?.id
     }).select().single();
@@ -455,6 +460,7 @@ async function resolveCampSlots(slotIds, outcome){
   load(true);
   try{
     const{data:campaign}=await db.from('campaigns').select('name,campaign_date,location').eq('id',_currentCampaignId).single();
+    const failed=[];
     for(const id of slotIds){
       const{data:slot}=await db.from('campaign_slots').select('*').eq('id',id).single();
       if(!slot || slot.status!=='reserved') continue;
@@ -468,14 +474,18 @@ async function resolveCampSlots(slotIds, outcome){
           donation_date:campaign.campaign_date, expiry_date:e.toISOString().split('T')[0],
           status:'pending_lab', created_by:SES?.user?.id
         }).select().single();
-        if(de) throw de;
+        if(de){
+          if(/duplicate key|bottle_number/i.test(de.message||'')){ failed.push(slot.bottle_number); continue; }
+          throw de;
+        }
         await db.from('campaign_slots').update({status:'drawn', donation_id:don.id}).eq('id',id);
       } else if(outcome==='damaged'){
         await db.from('campaign_slots').update({status:'damaged'}).eq('id',id);
       }
     }
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'campaign_slots',record_id:slotIds[0],new_values:{outcome,count:slotIds.length}});
-    toast('✅ تم تحديث '+slotIds.length+' رقم','success',3500);
+    if(failed.length) toast('⛔ لم تُسجَّل '+failed.length+' قنينة لأن رقمها مستخدم مسبقاً بقنينة أخرى ('+failed.slice(0,6).join('، ')+'). عدّل تسلسل الحملة','error',9000);
+    else toast('✅ تم تحديث '+slotIds.length+' رقم','success',3500);
     await refreshCampaignSlots();
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }

@@ -17,7 +17,7 @@ const DRAW_FV = {
     if(m.status==='pending_draw' && !m.is_deleted) return {k:'ready',t:''};
     return {k:'done',t:'✓ تم السحب'+(m.draw_date?' — '+fd(m.draw_date):'')};
   },
-  workDate:m=>m.draw_date,
+  workDate:m=>m.draw_date, nameClick:m=>"openEditDonation('"+m.id+"'"+(m.status==='pending_draw'&&!m.is_deleted?'':',{noEdit:true}')+")",
   sub:m=>'قنينة: '+(m.bottle_number||'—')+' ('+(m.bottle_type||'—')+') | '+(m.donation_type||''),
   bulkBar:()=>`<div id="drawBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
       <span id="drawBulkCount">0 محدد</span>
@@ -26,10 +26,10 @@ const DRAW_FV = {
         <button class="btn" style="background:#374151;color:#fff;border:none" onclick="document.querySelectorAll('.dr-chk').forEach(c=>c.checked=false);updateDrawBulkBar()">إلغاء التحديد</button>
       </div></div>`,
   actions(m,st,ctx){
-    if(st.k==='ready' && !ctx.archive) return `<button class="btn" onclick="openEditDonation('${m.id}')" title="تعديل البيانات"><i class="ti ti-edit"></i></button>
+    const eye=`<button class="btn" onclick="openEditDonation('${m.id}'${(st.k==='ready'||ctx.canEdit)?'':',{noEdit:true}'})" title="معاينة البيانات"><i class="ti ti-eye"></i></button>`;
+    if(st.k==='ready' && !ctx.archive) return eye+`
         <button class="btn btn-p" onclick="openDrawModal('${m.id}','${sq(m.full_name)}','${m.donation_type}','${m.bottle_number||''}','${m.bottle_type||''}')"><i class="ti ti-droplet"></i> سحب</button>`;
-    if(ctx.canEdit) return `<button class="btn" onclick="openEditDonation('${m.id}')" title="تعديل (نفس يوم السحب فقط)"><i class="ti ti-edit"></i></button>`;
-    return '';
+    return eye;
   },
   // سجلات قديمة بلا استمارة (قبل تفعيل الاستمارات) تبقى ظاهرة حتى لا يضيع أي اسم
   async legacy(){
@@ -41,7 +41,7 @@ const DRAW_FV = {
     return '<div style="margin:14px 0 6px;font-weight:700;color:#6B7280">بدون استمارة (سجلات قديمة)</div>'+data.map(r=>`<div class="flow-card">
       <span style="width:18px"></span><div class="fc-av">${BAG}</div>
       <div style="flex:1"><div class="fc-name">${esc(r.donors?.full_name||'—')}</div><div class="fc-sub">قنينة: ${r.bottle_number||'—'} (${r.bottle_type||'—'}) | ${r.donation_type}</div></div>
-      <div class="fc-act"><button class="btn" onclick="openEditDonation('${r.id}')"><i class="ti ti-edit"></i></button>
+      <div class="fc-act"><button class="btn" onclick="openEditDonation('${r.id}')" title="معاينة"><i class="ti ti-eye"></i></button>
       <button class="btn btn-p" onclick="openDrawModal('${r.id}','${sq(r.donors?.full_name)}','${r.donation_type}','${r.bottle_number||''}','${r.bottle_type||''}')"><i class="ti ti-droplet"></i> سحب</button></div></div>`).join('');
   }
 };

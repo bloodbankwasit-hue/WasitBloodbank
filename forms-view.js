@@ -88,7 +88,8 @@ const FV = (function(){
       : `<div class="fc-name">${name}</div><div class="fc-sub">${esc2(cfg.sub(m))}</div>`;
     const tag = st.t ? `<div class="fv-st ${k}">${esc2(st.t)}</div>` : '';
     const act = cfg.actions ? cfg.actions(m,st,ctx) : '';
-    return `<div class="flow-card fv-m fv-${k}">${chk}<div class="fc-av">${typeof BAG!=='undefined'?BAG:''}</div><div style="flex:1;min-width:0">${lines}${tag}</div><div class="fc-act">${act}</div></div>`;
+    const nc = cfg.nameClick ? ` onclick="${cfg.nameClick(m)}" style="flex:1;min-width:0;cursor:pointer"` : ` style="flex:1;min-width:0"`;
+    return `<div class="flow-card fv-m fv-${k}">${chk}<div class="fc-av">${typeof BAG!=='undefined'?BAG:''}</div><div${nc}>${lines}${tag}</div><div class="fc-act">${act}</div></div>`;
   }
 
   async function render(unit){

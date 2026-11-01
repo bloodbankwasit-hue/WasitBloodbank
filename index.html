@@ -864,6 +864,23 @@ tbody tr:hover td{background:#fafafa}
 .hs-l{font-size:13.5px;color:#757575}
 .hs-g{margin-top:4px;font-size:14.5px}.hs-gt{color:#757575;font-weight:700}
 .hs-names{margin-top:6px;font-size:14px}.hs-names summary{cursor:pointer;font-weight:700;color:#BE123C}
+/* edit/preview donor modal: all fields visible at once (3 columns) on wide screens */
+#editDonorModal.view .fgrp input:disabled,#editDonorModal.view .fgrp select:disabled{color:#111;opacity:1;background:#fff;-webkit-text-fill-color:#111;border-color:#eee}
+@media(min-width:900px){
+  #editDonorModal .modal{width:min(1240px,97vw);max-height:97vh;padding:12px 18px;overflow-y:auto}
+  #editDonorModal .modal-title{margin-bottom:8px}
+  #editDonorModal .modal-body{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:start}
+  #editDonorModal .fsec{margin-bottom:0;padding:10px}
+  #editDonorModal .fst{margin-bottom:6px;font-size:15px}
+  #editDonorModal .fgrid{grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:5px 8px}
+  #editDonorModal .s2{grid-column:span 2 !important}
+  #editDonorModal .fgrp{gap:2px;min-width:0}
+  #editDonorModal .fsec{min-width:0}
+  #editDonorModal .fgrp input,#editDonorModal .fgrp select{width:100%;min-width:0;box-sizing:border-box}
+  #editDonorModal .fgrp label{font-size:13px}
+  #editDonorModal .fgrp input,#editDonorModal .fgrp select{padding:5px 8px;font-size:14.5px}
+  #editDonorModal .modal-foot{margin-top:8px}
+}
 </style>
 </head>
 <body>
@@ -1772,7 +1789,7 @@ tbody tr:hover td{background:#fafafa}
       <button class="btn" onclick="printChoice(3)" style="width:100%;justify-content:center;border-color:#0F766E;color:#0F766E">📄🏷️ طباعة كارت التبرع وملصق القنينة</button>
       <button class="btn" onclick="printChoice(4)" style="width:100%;justify-content:center;border-color:#6B7280;color:#374151">🏷️ طباعة ملصق القنينة بدون نفاذ</button>
     </div>
-    <button class="btn" id="rcEditBtn" onclick="G('rcPrintModal').classList.remove('on');openEditDonation(_lastDonation&&_lastDonation.id)" style="width:100%;justify-content:center;margin-top:10px;border-color:#2563EB;color:#2563EB">
+    <button class="btn" id="rcEditBtn" onclick="G('rcPrintModal').classList.remove('on');openEditDonation(_lastDonation&&_lastDonation.id,{edit:true})" style="width:100%;justify-content:center;margin-top:10px;border-color:#2563EB;color:#2563EB">
       ✏️ تعديل البيانات
     </button>
     <button class="btn" onclick="newDonor()" style="width:100%;justify-content:center;margin-top:10px">
@@ -1944,10 +1961,46 @@ function loadSectionScript(key){
 
 // Pressing Enter moves focus to the next field, same as Tab (skips hidden/readonly/disabled
 // fields). Applied to the donor-entry forms and the donor-edit modal.
+// Phone = exactly 11 digits starting 07; national ID card = exactly 12 digits (other ID types are not length-checked).
+function bbIdLenError(el){
+  if(!el) return '';
+  const v=String(el.value||'').trim(); if(!v) return '';
+  if(el.id==='rc-mob'||el.id==='ed-mob'){
+    const d=v.replace(/\D/g,'');
+    if(d.length<11) return 'رقم الموبايل ناقص ('+d.length+' من 11 رقم)';
+    if(d.length>11) return 'رقم الموبايل أكثر من 11 رقم';
+    if(!/^07/.test(d)) return 'رقم الموبايل يجب أن يبدأ بـ 07';
+  }
+  if(el.id==='rc-nid'||el.id==='ed-nid'){
+    const ty=document.getElementById('rc-idtype');
+    if(el.id==='rc-nid' && ty && ty.value!=='') return '';
+    if(el.id==='ed-nid' && /[A-Za-z]/.test(v)) return ''; // foreign document numbers are not length-checked
+    const d=v.replace(/\D/g,'');
+    if(d.length<12) return 'رقم البطاقة الوطنية ناقص ('+d.length+' من 12 رقم)';
+    if(d.length>12) return 'رقم البطاقة الوطنية أكثر من 12 رقم';
+  }
+  return '';
+}
+// Bottle numbers are unique across the whole system. Returns an Arabic message if [from..to] collides with an issued
+// bottle, a campaign reservation or an active sequence's unissued numbers; '' when free. opt.skipSeq: sequence id being edited.
+async function bbRangeClash(from,to,opt){
+  opt=opt||{};
+  const m=[];
+  const d=await db.from('blood_donations').select('bottle_number').gte('bottle_number',from).lte('bottle_number',to).eq('component_type','دم كامل').limit(4);
+  if(d.data&&d.data.length) m.push('قناني مسجّلة مسبقاً (مثل '+d.data.map(r=>r.bottle_number).join('، ')+')');
+  const c=await db.from('campaign_slots').select('bottle_number').gte('bottle_number',from).lte('bottle_number',to).limit(4);
+  if(c.data&&c.data.length) m.push('أرقام محجوزة لحملة (مثل '+c.data.map(r=>r.bottle_number).join('، ')+')');
+  let q=db.from('bottle_sequences').select('id,bottle_type,current_number,end_number').eq('is_active',true).lte('current_number',to).gte('end_number',from);
+  if(opt.skipSeq) q=q.neq('id',opt.skipSeq);
+  const sq2=await q.limit(3);
+  if(sq2.data&&sq2.data.length) m.push('تتداخل مع تسلسل «'+sq2.data.map(r=>r.bottle_type+' '+r.current_number+'–'+r.end_number).join('، ')+'»');
+  return m.length ? ('الأرقام '+from+'–'+to+' متعارضة: '+m.join(' + ')) : '';
+}
 function enableEnterAsTab(containerSelector){
   const container = document.querySelector(containerSelector);
   if(!container) return;
   container.addEventListener('focusin', function(e){ if(e.target.tagName === 'SELECT') delete e.target.dataset.enterOpened; });
+  container.addEventListener('focusout', function(e){ const _le=bbIdLenError(e.target); if(_le) toast('⚠️ '+_le,'error',3000); });
   container.addEventListener('keydown', function(e){
     if(e.key !== 'Enter') return;
     if(e.target.tagName === 'TEXTAREA') return;
@@ -1959,6 +2012,7 @@ function enableEnterAsTab(containerSelector){
       try{ e.target.dataset.enterOpened = '1'; e.target.showPicker(); return; }catch(err){ delete e.target.dataset.enterOpened; }
     }
     if(e.target.tagName === 'SELECT') delete e.target.dataset.enterOpened;
+    { const _le=bbIdLenError(e.target); if(_le){ toast('⚠️ '+_le,'error',3000); return; } }
     // Empty field warning: a required one (label marked *) stops here; an optional one warns and moves on.
     const t = e.target;
     if((t.tagName==='INPUT' || t.tagName==='SELECT') && !t.readOnly && t.type!=='checkbox' && t.type!=='radio' && String(t.value||'').trim()===''){
@@ -2021,10 +2075,12 @@ function load(v){ G('loader').classList.toggle('on',v); }
 // (not counted as a visitor) from a medical rejection (counted). If the exit_reason column has not
 // been created yet the update is retried without it, so the draw screen never breaks.
 // Opens the donation editor from any screen (donors.js is loaded on demand).
-async function openEditDonation(id){
+// Opens the donor/donation record READ-ONLY first (👁); the «تعديل الاستمارة» button inside unlocks it.
+// opts: {edit:true} opens unlocked straight away; {noEdit:true} hides the unlock button (viewing only).
+async function openEditDonation(id,opts){
   if(!id){ toast('لا يمكن التعديل: السجل غير محفوظ بعد (بدون اتصال)','error'); return; }
   try{ await loadOneScript('donors.js'); }catch(e){ toast('تعذر تحميل شاشة التعديل','error'); return; }
-  await editDonorRow(id);
+  await editDonorRow(id,opts);
 }
 async function markDonationExit(ids, reason){
   ids=[].concat(ids);
@@ -5021,7 +5077,7 @@ if('serviceWorker' in navigator){
 <!-- EDIT DONOR MODAL -->
 <div class="overlay" id="editDonorModal">
   <div class="modal">
-    <div class="modal-title"><i class="ti ti-edit"></i> تعديل بيانات المتبرع</div>
+    <div class="modal-title"><i class="ti ti-edit" id="edTitleIc"></i> <span id="edTitleTx">تعديل بيانات المتبرع</span><button class="btn btn-p" id="edGoEdit" style="display:none;margin-right:auto" onclick="edUnlock()"><i class="ti ti-pencil"></i> تعديل الاستمارة</button></div>
     <div class="modal-body">
       <input type="hidden" id="ed-donorid">
       <input type="hidden" id="ed-donid">
@@ -5043,7 +5099,7 @@ if('serviceWorker' in navigator){
         <div class="fgrid">
           <div class="fgrp"><label>نوع التبرع *</label><select id="ed-dtyp"><option value="تعويضي">تعويضي</option><option value="طوعي">طوعي</option></select></div>
           <div class="fgrp"><label>نوع القنينة *</label><select id="ed-btyp"><option>مفلتر</option><option>رباعي</option><option>ريفيوس</option><option>ثنائي</option><option>أحادي</option><option>تريما</option><option>حملة تبرع رباعي</option><option>حملة تبرع مفلتر</option><option>رباعي SAG</option></select></div>
-          <div class="fgrp"><label>رقم القنينة (لا يُعدَّل — للتصحيح: انسحب ثم سجّل من جديد)</label><input type="text" id="ed-bnum" class="ro" readonly></div>
+          <div class="fgrp"><label>رقم القنينة (تلقائي)</label><input type="text" id="ed-bnum" class="ro" readonly></div>
           <div class="fgrp"><label>اسم المريض</label><input type="text" id="ed-pat" placeholder="(للتبرع التعويضي فقط)"></div>
           <div class="fgrp"><label>اسم المستشفى</label><input type="text" id="ed-hosp" placeholder="مستشفى..."></div>
           <div class="fgrp"><label>تاريخ التبرع *</label><input type="date" id="ed-ddate"></div>
@@ -5067,9 +5123,9 @@ if('serviceWorker' in navigator){
       </div>
     </div>
     <div class="modal-foot">
-      <button class="btn" onclick="G('editDonorModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
-      <button class="btn" style="border-color:#BE123C;color:#BE123C" onclick="saveDonorEdit(true)"><i class="ti ti-printer"></i> حفظ وطباعة</button>
-      <button class="btn btn-p" onclick="saveDonorEdit()"><i class="ti ti-device-floppy"></i> حفظ التعديلات</button>
+      <button class="btn" id="edBtnCancel" onclick="G('editDonorModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
+      <button class="btn" id="edBtnPrint" style="border-color:#BE123C;color:#BE123C" onclick="saveDonorEdit(true)"><i class="ti ti-printer"></i> حفظ وطباعة</button>
+      <button class="btn btn-p" id="edBtnSave" onclick="saveDonorEdit()"><i class="ti ti-device-floppy"></i> حفظ التعديلات</button>
     </div>
   </div>
 </div>
