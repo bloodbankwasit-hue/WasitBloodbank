@@ -1703,6 +1703,11 @@ tbody tr:hover td{background:#fafafa}
             <button id="viewDamagedBtn" class="btn" style="border-color:#7F1D1D;color:#7F1D1D;font-size:15px;padding:7px 12px" onclick="nav('damaged_store')">🗑️ القناني التالفة (0)</button>
           </div>
         </div>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:nowrap">
+          <button class="btn" style="background:#DCFCE7;color:#166534;border:1.5px solid #86EFAC;font-weight:800;font-size:16px;padding:10px 16px;white-space:nowrap" onclick="openSupplyHand()"><i class="ti ti-hand-grab"></i> تجهيز by hand</button>
+          <button class="btn" style="background:#DCFCE7;color:#166534;border:1.5px solid #86EFAC;font-weight:800;font-size:16px;padding:10px 16px;white-space:nowrap" onclick="toast('تجهيز المستشفيات — قيد التصميم، نكمله بعد by hand','info',4000)"><i class="ti ti-building-hospital"></i> تجهيز مستشفيات</button>
+          <button class="btn" style="background:#FEE2E2;color:#991B1B;border:1.5px solid #FCA5A5;font-weight:800;font-size:16px;padding:10px 16px;margin-right:auto;white-space:nowrap" onclick="toast('الإتلاف — قيد التصميم','info',4000)"><i class="ti ti-trash"></i> إتلاف</button>
+        </div>
         <div id="supplyTypeGrid" class="comp-stock-grid" style="margin-bottom:16px"></div>
         <div id="supplyGrid"></div>
         <div id="supplyList"></div>
@@ -2077,6 +2082,10 @@ function load(v){ G('loader').classList.toggle('on',v); }
 // Opens the donation editor from any screen (donors.js is loaded on demand).
 // Opens the donor/donation record READ-ONLY first (👁); the «تعديل الاستمارة» button inside unlocks it.
 // opts: {edit:true} opens unlocked straight away; {noEdit:true} hides the unlock button (viewing only).
+async function openSupplyHand(){
+  try{ await loadOneScript('supply-hand.js'); }catch(e){ toast('تعذر تحميل شاشة التجهيز','error'); return; }
+  shOpen();
+}
 async function openEditDonation(id,opts){
   if(!id){ toast('لا يمكن التعديل: السجل غير محفوظ بعد (بدون اتصال)','error'); return; }
   try{ await loadOneScript('donors.js'); }catch(e){ toast('تعذر تحميل شاشة التعديل','error'); return; }
@@ -3999,12 +4008,12 @@ function openSupplyExport(){
   openAdvExport({
     title:'تصدير — التجهيز والخزين', filename:'التجهيز',
     table:'blood_donations',
-    select:'bottle_number,bottle_type,blood_type,component_type,status,draw_date,expiry_date,dispatch_date,hospital_name,donors(full_name)',
+    select:'bottle_number,bottle_type,blood_type,component_type,status,draw_date,expiry_date,dispatch_date,hospital_name,dispatch_hospital,donors(full_name)',
     dateField:'draw_date', nameField:'donors.full_name', orderBy:'bottle_number',
     filters:['dateRange','bottleType','bloodType','bottleRange','specificBottles','name'],
     headers:['رقم القنينة','اسم المتبرع','نوع القنينة','الفصيلة','المكوّن','الحالة','تاريخ السحب','تاريخ الانتهاء','تاريخ الصرف','الجهة المستلمة'],
     rowMap:r=>[r.bottle_number, r.donors?.full_name||'—', r.bottle_type, r.blood_type||'—', r.component_type||'دم كامل',
-      AUDIT_STATUS_LABELS[r.status]||r.status, fd(r.draw_date), fd(r.expiry_date), r.dispatch_date?fd(r.dispatch_date):'—', r.hospital_name||'—']
+      AUDIT_STATUS_LABELS[r.status]||r.status, fd(r.draw_date), fd(r.expiry_date), r.dispatch_date?fd(r.dispatch_date):'—', (r.dispatch_hospital||r.hospital_name)||'—']
   });
 }
 
