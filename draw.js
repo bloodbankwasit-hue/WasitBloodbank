@@ -68,14 +68,18 @@ async function confirmBulkDraw(){
   if(!draw){ toast('يرجى تحديد التاريخ','error'); return; }
   load(true);
   try{
+    let okN=0; const bad=[];
     for(const id of ids){
-      const{data:row}=await db.from('blood_donations').select('bottle_type').eq('id',id).single();
+      const{data:row,error:re}=await db.from('blood_donations').select('bottle_type,bottle_number').eq('id',id).single();
+      if(re){ bad.push(id); continue; }
       const days=WHOLE_BLOOD_DAYS[row?.bottle_type] ?? 45;
       const e=new Date(draw); e.setDate(e.getDate()+days);
-      await db.from('blood_donations').update({draw_date:draw,expiry_date:e.toISOString().split('T')[0],status:'pending_lab'}).eq('id',id);
+      const{error:ue}=await db.from('blood_donations').update({draw_date:draw,expiry_date:e.toISOString().split('T')[0],status:'pending_lab'}).eq('id',id).eq('status','pending_draw');
+      if(ue) bad.push(row?.bottle_number||id); else okN++;
     }
-    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:ids[0],new_values:{status:'pending_lab',bulk_count:ids.length}});
-    toast('✅ تم تأكيد السحب لـ'+ids.length+' متبرع','success',4000);
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:ids[0],new_values:{status:'pending_lab',bulk_count:okN}});
+    if(bad.length) toast('⛔ لم يُسحب '+bad.length+' من '+ids.length+' ('+bad.slice(0,6).join('، ')+') — راجعها وأعد المحاولة. تم تأكيد '+okN+' فقط','error',10000);
+    else toast('✅ تم تأكيد السحب لـ'+okN+' متبرع','success',4000);
     G('bulkDrawModal').classList.remove('on');
     await reloadDrawView();
   }catch(e){ toast('خطأ: '+e.message,'error'); }
@@ -245,13 +249,14 @@ async function confirmMedicalReject(){
       console.error('rejected_donors insert failed:', rejErr);
       toast('⚠️ فشلت إضافة '+donorName+' لقائمة المرفوضين تلقائياً — أضفه يدوياً حالاً!','error',10000);
     }
-    // Release the already-reserved bottle number back into the reuse pool
+    { const{error:ne}=await db.from('blood_donations').update({bottle_note:'رفض طبي: '+reason}).eq('id',id);
+      if(ne) toast('⚠️ لم يُحفظ سبب الرفض على القنينة: '+ne.message,'error',7000); }
+    const{error}=await markDonationExit(id,'medical_reject');
+    if(error) throw error;
+    // release the number only AFTER the exit really succeeded (never leave a number in the pool and on a live record)
     if(d?.bottle_number && d?.bottle_type){
       await releaseBottleNumber(d.bottle_type,d.bottle_number);
     }
-    try{ await db.from('blood_donations').update({bottle_note:'رفض طبي: '+reason}).eq('id',id); }catch(e){}
-    const{error}=await markDonationExit(id,'medical_reject');
-    if(error) throw error;
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'rejected_medical',reason,released_bottle:d?.bottle_number}});
     await cacheRejectedDonors();
     toast('⛔ تم رفض المتبرع مؤقتاً — رقم القنينة '+(d?.bottle_number||'')+' أُعيد لإعادة الاستخدام','warning',5500);

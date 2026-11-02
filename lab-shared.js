@@ -44,8 +44,9 @@ async function applyLabUpdate(id, fieldUpdates){
   // (e.g. trima's two outputs, or a component separated before testing) — this unit's part of
   // the result applies to every sibling still awaiting it, linked by donor + bottle number.
   if(cur?.donor_id && cur?.bottle_number){
-    await db.from('blood_donations').update(payload)
+    const{error:sibErr}=await db.from('blood_donations').update(payload)
       .eq('donor_id',cur.donor_id).eq('bottle_number',cur.bottle_number).eq('status','pending_lab').neq('id',id);
+    if(sibErr) throw new Error('حُفظت نتيجة القنينة لكن تعذّر تطبيقها على المكوّنات المرتبطة بنفس الرقم: '+sibErr.message);
   }
 
   if(complete && effSer==='Positive' && cur?.donors?.full_name){

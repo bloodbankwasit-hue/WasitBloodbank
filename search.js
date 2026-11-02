@@ -4,8 +4,11 @@
 async function doSearch(){
   load(true);
   try{
+    const nm=G('sr-nm').value.trim(), mob=G('sr-mob').value.trim(), mom=G('sr-mom').value.trim();
+    // name / mobile / mother filters run on the SERVER (inner join) — filtering after a 300-row cut used to hide real matches
+    const joinKind=(nm||mob||mom)?'donors!inner':'donors';
     let q=db.from('blood_donations')
-      .select('bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,patient_name,hospital_name,donors(donor_number,full_name,birth_year,mobile,mother_name)')
+      .select('bottle_number,bottle_type,donation_type,donation_date,expiry_date,blood_type,serology_result,patient_name,hospital_name,'+joinKind+'(donor_number,full_name,birth_year,mobile,mother_name)')
       .eq('is_deleted',false).order('donation_date',{ascending:false}).limit(300);
     const bn=G('sr-bn').value.trim();
     if(bn) q=q.eq('bottle_number',parseInt(bn));
@@ -17,15 +20,14 @@ async function doSearch(){
     if(G('sr-df').value) q=q.gte('donation_date',G('sr-df').value);
     if(G('sr-dt2').value) q=q.lte('donation_date',G('sr-dt2').value);
     if(G('sr-ser').value) q=q.eq('serology_result',G('sr-ser').value);
+    if(nm) q=q.ilike('donors.full_name','%'+nm+'%');
+    if(mob) q=q.ilike('donors.mobile','%'+mob+'%');
+    if(mom) q=q.ilike('donors.mother_name','%'+mom+'%');
     const {data,error}=await q; if(error) throw error;
-    const nm=G('sr-nm').value.trim(), mob=G('sr-mob').value.trim(), mom=G('sr-mom').value.trim();
-    SRDATA=(data||[]).filter(r=>
-      (!nm||r.donors?.full_name?.includes(nm))&&
-      (!mob||r.donors?.mobile?.includes(mob))&&
-      (!mom||r.donors?.mother_name?.includes(mom))
-    );
+    SRDATA=data||[];
+    const _cut=SRDATA.length>=300;
     if(SRDATA.length){
-      G('srRes').innerHTML=`<div style="margin-bottom:8px;font-size:15px;color:#757575">عدد النتائج: <strong>${SRDATA.length}</strong></div>
+      G('srRes').innerHTML=`<div style="margin-bottom:8px;font-size:15px;color:#757575">عدد النتائج: <strong>${SRDATA.length}${_cut?'+':''}</strong>${_cut?' <span style="color:#B45309;font-weight:700">⚠️ أُظهر أول 300 فقط — ضيّق البحث لرؤية الباقي</span>':''}</div>
       <div class="tw"><table><thead><tr>
         <th>رقم المتبرع</th><th>الاسم</th><th>الفصيلة</th><th>نوع القنينة</th><th>رقم القنينة</th>
         <th>نوع التبرع</th><th>تاريخ التبرع</th><th>تاريخ النفاد</th><th>الفحوصات</th><th></th>

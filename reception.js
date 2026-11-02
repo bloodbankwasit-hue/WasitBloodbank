@@ -448,7 +448,7 @@ async function saveReception(){
       } else if(payload.seq_id){
         await db.from('bottle_sequences')
           .update({current_number: bnum+1})
-          .eq('id', payload.seq_id);
+          .eq('id', payload.seq_id).lt('current_number', bnum+1);
       }
       // donor_number ("رقم الاستمارة") — the insert above returns it for a brand-new donor;
       // for an existing donor picked via autocomplete, dn only has {id}, so fetch it.

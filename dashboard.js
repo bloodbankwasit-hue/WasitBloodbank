@@ -32,12 +32,16 @@ async function loadDash(){
     // matching the same pattern already used in التجهيز.
     // Accounts flagged "hide stock" see only the statistics cards above: the stock section is hidden
     // and its query is not even run.
-    const hideStock=stockHidden();
+    // Home screen follows the account's sections: donor cards for reception/admin, stock for supply/admin.
+    const _isAdm=UPROF?.role==='admin';
+    const _cards=G('dashCards'); if(_cards) _cards.style.display=(_isAdm||hasPermission('reception'))?'':'none';
+    const hideStock=!(_isAdm||hasPermission('supply')||hasPermission('pending_release'));
+    if(typeof loadRoleHome==='function') loadRoleHome();
     const _sh=G('dashStockHead'), _bg=G('btGrid');
     if(_sh) _sh.style.display=hideStock?'none':'';
     if(_bg) _bg.style.display=hideStock?'none':'';
     if(!hideStock){
-    const{data:stockRows}=await db.from('blood_donations').select('component_type').eq('status','in_stock').eq('is_deleted',false);
+    let stockRows=[]; try{ stockRows=await bbFetchAll(()=>db.from('blood_donations').select('id,component_type').eq('status','in_stock').eq('is_deleted',false)); }catch(e){ toast('تعذر تحميل الرصيد: '+e.message,'error'); }
     const compCnt={'دم كامل':0,'دم مضغوط':0,'بلازما':0,'صفائح دموية':0,'بروتين بارد':0};
     (stockRows||[]).forEach(r=>{ const ct=r.component_type||'دم كامل'; compCnt[ct]=(compCnt[ct]||0)+1; });
     const compIcons={'دم كامل':BAG,'دم مضغوط':BAG,'بلازما':'💛','صفائح دموية':'🟡','بروتين بارد':'🧊'};
@@ -65,12 +69,11 @@ async function openDashDrill(title, from, to, extraEq){
   G('ddList').innerHTML='';
   G('dashDrillModal').classList.add('on');
 
-  let q=db.from('blood_donations')
-    .select('bottle_number,bottle_type,donation_type,donation_time,blood_type,serology_result,donors(donor_number,full_name,gender)')
+  const mkQ=()=>{ let q=db.from('blood_donations')
+    .select('id,created_at,bottle_number,bottle_type,donation_type,donation_time,blood_type,serology_result,donors(donor_number,full_name,gender)')
     .gte('donation_date',from).lte('donation_date',to).eq('component_type','دم كامل').eq('is_deleted',false);
-  if(extraEq) Object.entries(extraEq).forEach(([k,v])=>{ q=q.eq(k,v); });
-  const{data}=await q.order('created_at',{ascending:false}).limit(300);
-  const list=data||[];
+    if(extraEq) Object.entries(extraEq).forEach(([k,v])=>{ q=q.eq(k,v); }); return q; };
+  let list=[]; try{ list=await bbFetchAll(mkQ); list.sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))); }catch(e){ toast('تعذر التحميل: '+e.message,'error'); }
 
   if(!list.length){
     G('ddStats').innerHTML='';
@@ -136,8 +139,7 @@ async function openStockByComponent(componentType){
   G('ddList').innerHTML='<div class="empty"><i class="ti ti-loader"></i><p>جاري التحميل...</p></div>';
   G('dashDrillModal').classList.add('on');
 
-  const{data}=await db.from('blood_donations').select('blood_type')
-    .eq('component_type',componentType).eq('status','in_stock').eq('is_deleted',false);
+  let data=[]; try{ data=await bbFetchAll(()=>db.from('blood_donations').select('id,blood_type').eq('component_type',componentType).eq('status','in_stock').eq('is_deleted',false)); }catch(e){ toast('تعذر التحميل: '+e.message,'error'); }
   const cnt={};
   (data||[]).forEach(r=>{ if(r.blood_type) cnt[r.blood_type]=(cnt[r.blood_type]||0)+1; });
   const bts=['A+','A-','B+','B-','O+','O-','AB+','AB-'];
@@ -155,11 +157,10 @@ async function openStockDrill(componentType, bt){
   G('ddList').innerHTML='';
   G('dashDrillModal').classList.add('on');
 
-  const{data}=await db.from('blood_donations')
-    .select('bottle_number,bottle_type,expiry_date,donors(full_name)')
-    .eq('blood_type',bt).eq('component_type',componentType).eq('status','in_stock').eq('is_deleted',false)
-    .order('expiry_date',{ascending:true}).limit(300);
-  const list=data||[];
+  let list=[]; try{ list=await bbFetchAll(()=>db.from('blood_donations')
+    .select('id,bottle_number,bottle_type,expiry_date,donors(full_name)')
+    .eq('blood_type',bt).eq('component_type',componentType).eq('status','in_stock').eq('is_deleted',false));
+    list.sort((a,b)=>String(a.expiry_date||'').localeCompare(String(b.expiry_date||''))); }catch(e){ toast('تعذر التحميل: '+e.message,'error'); }
 
   if(!list.length){
     G('ddStats').innerHTML='';

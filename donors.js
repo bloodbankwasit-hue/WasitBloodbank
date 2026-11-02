@@ -352,11 +352,12 @@ async function deleteDonorRow(id,name){
   try{
     // Still waiting for the draw → no blood was taken, so release the bottle number for reuse (same as «انسحب»).
     const{data:cur}=await db.from('blood_donations').select('status,bottle_number,bottle_type').eq('id',id).single();
+    const{error}=await markDonationExit(id,'deleted');
+    if(error) throw error;
+    // release only AFTER the delete really succeeded
     if(cur?.status==='pending_draw' && cur.bottle_number && cur.bottle_type){
       await releaseBottleNumber(cur.bottle_type,cur.bottle_number);
     }
-    const{error}=await markDonationExit(id,'deleted');
-    if(error) throw error;
     await db.from('audit_log').insert({
       user_id:SES?.user?.id, user_name:UPROF?.full_name,
       action:'DELETE', table_name:'blood_donations',

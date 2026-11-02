@@ -114,15 +114,15 @@ async function loadPendingRelease(){
   const nonSeparableTypes=Object.keys(WHOLE_BLOOD_DAYS).filter(t=>!COMPONENT_RULES[t]);
   const sel='id,bottle_number,bottle_type,blood_type,component_type,status,draw_date,serology_result,serology_type,bottle_note,donors(full_name)';
   // (1) fully complete — either outcome, any type/component
-  const{data:d1}=await db.from('blood_donations').select(sel)
-    .in('status',['pending_release','rejected_positive']).eq('is_deleted',false);
+  const d1=await bbFetchAll(()=>db.from('blood_donations').select('id,'+sel)
+    .in('status',['pending_release','rejected_positive']).eq('is_deleted',false));
   // (2) non-separable whole blood, still mid-lab — visible from the moment of draw
-  const{data:d2}=await db.from('blood_donations').select(sel)
-    .eq('status','pending_lab').in('bottle_type',nonSeparableTypes).eq('is_deleted',false);
+  const d2=await bbFetchAll(()=>db.from('blood_donations').select('id,'+sel)
+    .eq('status','pending_lab').in('bottle_type',nonSeparableTypes).eq('is_deleted',false));
   // (3) already-separated components, still mid-lab — visible from the moment of separation
   // (a separable type's un-separated دم كامل row stays out of here; it's tracked in شاشة الفصل)
-  const{data:d3}=await db.from('blood_donations').select(sel)
-    .eq('status','pending_lab').neq('component_type','دم كامل').eq('is_deleted',false);
+  const d3=await bbFetchAll(()=>db.from('blood_donations').select('id,'+sel)
+    .eq('status','pending_lab').neq('component_type','دم كامل').eq('is_deleted',false));
   load(false);
   _prAllRows=[...(d1||[]),...(d2||[]),...(d3||[])].sort((a,b)=>(a.bottle_number||0)-(b.bottle_number||0));
 
@@ -478,9 +478,10 @@ async function resolveCampSlots(slotIds, outcome){
           if(/duplicate key|bottle_number/i.test(de.message||'')){ failed.push(slot.bottle_number); continue; }
           throw de;
         }
-        await db.from('campaign_slots').update({status:'drawn', donation_id:don.id}).eq('id',id);
+        { const{error:se2}=await db.from('campaign_slots').update({status:'drawn', donation_id:don.id}).eq('id',id);
+          if(se2) throw new Error('سُجّلت القنينة '+slot.bottle_number+' لكن تعذّر تحديث حالة الرقم المحجوز: '+se2.message); }
       } else if(outcome==='damaged'){
-        await db.from('campaign_slots').update({status:'damaged'}).eq('id',id);
+        { const{error:se3}=await db.from('campaign_slots').update({status:'damaged'}).eq('id',id); if(se3) throw se3; }
       }
     }
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'campaign_slots',record_id:slotIds[0],new_values:{outcome,count:slotIds.length}});

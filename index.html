@@ -1373,6 +1373,7 @@ tbody tr:hover td{background:#fafafa}
         <!-- BOTTLE SEQUENCES MANAGEMENT -->
         <div class="sh"><div class="sh-t">💉 تسلسلات القناني</div></div>
         <button class="seq-add-btn" onclick="openAddSeqModal()">➕ إضافة تسلسل جديد</button>
+        <button class="seq-add-btn" style="margin-top:8px;background:#ECFDF5;color:#166534;border:1.5px solid #86EFAC" onclick="runIntegrityCheck()">🛡️ فحص سلامة الأرقام والتسلسلات</button>
         <div class="seq-grid" id="seqGrid">
           <div class="empty"><p>جاري التحميل...</p></div>
         </div>
@@ -2109,13 +2110,26 @@ async function markDonationExit(ids, reason){
   const y=new Date().getFullYear(); for(let i=y;i>=y-6;i--){ const o=document.createElement('option'); o.value=i; o.textContent=i; s.appendChild(o); } })();
 function stPickYear(y){ if(!y) return; G('stFrom').value=y+'-01-01'; G('stTo').value=y+'-12-31'; }
 
+// Supabase returns at most 1000 rows per request — a plain select would SILENTLY cut a longer list (wrong counts).
+// bbFetchAll pages through everything. build() must return a fresh query each call.
+async function bbFetchAll(build,size){
+  size=size||1000; let all=[];
+  for(let p=0;;p+=size){
+    const{data,error}=await build().order('id',{ascending:true}).range(p,p+size-1);
+    if(error) throw error;
+    all=all.concat(data||[]);
+    if(!data||data.length<size) break;
+  }
+  return all;
+}
 // Return a bottle number to the reuse pool — never twice (a double click / retry used to add the same
 // number again, and the pool then offered it to two donors).
 async function releaseBottleNumber(type,num){
   if(!type||num==null) return;
   const{data:ex}=await db.from('bottle_number_pool').select('id').eq('bottle_type',type).eq('bottle_number',num).limit(1);
   if(ex&&ex.length) return;
-  await db.from('bottle_number_pool').insert({bottle_type:type,bottle_number:num,created_by:SES?.user?.id});
+  const{error}=await db.from('bottle_number_pool').insert({bottle_type:type,bottle_number:num,created_by:SES?.user?.id});
+  if(error && !/duplicate|unique/i.test(error.message||'')) throw new Error('تعذر إرجاع رقم القنينة '+num+' للمخزن: '+error.message);
 }
 
 async function withdrawDonation(id, donorName){
@@ -2123,11 +2137,13 @@ async function withdrawDonation(id, donorName){
   load(true);
   try{
     const{data:d}=await db.from('blood_donations').select('bottle_number,bottle_type').eq('id',id).single();
+    // delete FIRST, release the number only after the delete really succeeded (the opposite order could leave a number
+    // both in the pool and on a live record = a duplicate later)
+    const{error}=await markDonationExit(id,'withdrawn');
+    if(error) throw error;
     if(d?.bottle_number && d?.bottle_type){
       await releaseBottleNumber(d.bottle_type,d.bottle_number);
     }
-    const{error}=await markDonationExit(id,'withdrawn');
-    if(error) throw error;
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'withdrawn',released_bottle:d?.bottle_number}});
     toast('↩️ تم تسجيل الانسحاب — رقم القنينة '+(d?.bottle_number||'')+' أُعيد لإعادة الاستخدام','warning',5000);
     // Refresh whichever screen this was called from.
@@ -2760,19 +2776,17 @@ async function processQueuedOp(op){
       address:d.address,occupation:d.occupation,created_by:d.created_by
     }).select().single();
     if(de) throw de;
+    // The number saved offline was only a preview: claim a real one from the server now (never rewinds the counter).
+    const{data:cl,error:cle}=await db.rpc('claim_bottle_number',{p_type:d.bottle_type});
+    if(cle||!cl||!cl.number) throw new Error('تعذر حجز رقم قنينة: '+((cle&&cle.message)||''));
     const{data:newDon,error:doe}=await db.from('blood_donations').insert({
-      donor_id:dn.id,bottle_type:d.bottle_type,bottle_number:d.bottle_number,donation_type:d.donation_type,
+      donor_id:dn.id,bottle_type:d.bottle_type,bottle_number:cl.number,donation_type:d.donation_type,
       patient_name:d.patient_name,hospital_name:d.hospital_name,
       donation_date:d.donation_date,donation_time:d.donation_time,
       status:'pending_draw',created_by:d.created_by
     }).select('id').single();
-    if(doe) throw doe;
+    if(doe){ try{ await releaseBottleNumber(d.bottle_type,cl.number); }catch(x){} throw doe; }
     if(newDon&&newDon.id) await bbAssignForm(newDon.id,d.bottle_type);
-    if(d.pool_id){
-      await db.from('bottle_number_pool').delete().eq('id', d.pool_id);
-    } else if(d.seq_id){
-      await db.from('bottle_sequences').update({current_number:d.bottle_number+1}).eq('id', d.seq_id);
-    }
   } else if(op.type==='draw'){
     const{error}=await db.from('blood_donations').update({
       draw_date:d.draw_date, expiry_date:d.expiry_date, status:'pending_lab'
@@ -4030,7 +4044,7 @@ async function loadSupply(){
 // Level 1 — component types with live counts, each clickable
 async function loadSupplyComponentGrid(){
   _supplySelectedComponent=null;
-  const{data:counts}=await db.from('blood_donations').select('component_type').eq('status','in_stock').eq('is_deleted',false);
+  let counts; try{ counts=await bbFetchAll(()=>db.from('blood_donations').select('id,component_type').eq('status','in_stock').eq('is_deleted',false)); }catch(e){ toast('تعذر تحميل أعداد الرصيد: '+e.message,'error'); counts=[]; }
   const compCnt={'دم كامل':0,'دم مضغوط':0,'بلازما':0,'صفائح دموية':0,'بروتين بارد':0};
   (counts||[]).forEach(r=>{ const ct=r.component_type||'دم كامل'; compCnt[ct]=(compCnt[ct]||0)+1; });
   const compIcons={'دم كامل':BAG,'دم مضغوط':BAG,'بلازما':'💛','صفائح دموية':'🟡','بروتين بارد':'🧊'};
@@ -4047,8 +4061,7 @@ async function loadSupplyComponentGrid(){
 async function loadSupplyByComponent(componentType){
   _supplySelectedComponent=componentType;
   const bts=['A+','A-','B+','B-','O+','O-','AB+','AB-'];
-  const{data:counts}=await db.from('blood_donations').select('blood_type')
-    .eq('status','in_stock').eq('is_deleted',false).eq('component_type',componentType);
+  let counts; try{ counts=await bbFetchAll(()=>db.from('blood_donations').select('id,blood_type').eq('status','in_stock').eq('is_deleted',false).eq('component_type',componentType)); }catch(e){ toast('تعذر تحميل أعداد الرصيد: '+e.message,'error'); counts=[]; }
   const cnt={};
   (counts||[]).forEach(r=>{ cnt[r.blood_type]=(cnt[r.blood_type]||0)+1; });
   G('supplyGrid').innerHTML=`
@@ -4067,7 +4080,8 @@ async function autoMarkExpiredDamaged(){
   const{data}=await db.from('blood_donations').select('id').eq('status','in_stock').eq('is_deleted',false).lt('expiry_date',today);
   if(data && data.length){
     const ids=data.map(r=>r.id);
-    await db.from('blood_donations').update({status:'damaged',damage_reason:'انتهاء الصلاحية',damaged_date:today}).in('id',ids);
+    const{error:ee}=await db.from('blood_donations').update({status:'damaged',damage_reason:'انتهاء الصلاحية',damaged_date:today}).in('id',ids);
+    if(ee) toast('⚠️ تعذر نقل القناني المنتهية للتالفة: '+ee.message,'error',6000);
   }
 }
 
@@ -4138,10 +4152,7 @@ function bloodBagCard(r, onclickJs){
 async function loadSupplyList(bt){
   _supplySelectedBT = bt;
   const ct=_supplySelectedComponent||'دم كامل';
-  const{data}=await db.from('blood_donations')
-    .select('id,bottle_number,bottle_type,blood_type,component_type,draw_date,expiry_date,donors(full_name)')
-    .eq('status','in_stock').eq('blood_type',bt).eq('component_type',ct).eq('is_deleted',false)
-    .order('expiry_date',{ascending:true});
+  let data=[]; try{ data=await bbFetchAll(()=>db.from('blood_donations').select('id,bottle_number,bottle_type,blood_type,component_type,draw_date,expiry_date,donors(full_name)').eq('status','in_stock').eq('blood_type',bt).eq('component_type',ct).eq('is_deleted',false)); data.sort((a,b)=>String(a.expiry_date||'').localeCompare(String(b.expiry_date||''))); }catch(e){ toast('تعذر تحميل القائمة: '+e.message,'error'); }
   const titleBar=`<div style="font-size:18px;font-weight:700;color:#BE123C;margin-bottom:10px">${ct} — فصيلة ${bt} — ${(data||[]).length} قنينة</div>`;
   if(data&&data.length){
     const bar=`<div id="supplyBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">

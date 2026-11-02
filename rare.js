@@ -6,10 +6,7 @@ async function loadRareGrid(){
 
   // 1. Load inventory stats (in_stock bottles with rare blood types) — this stays bounded to
   // CURRENT stock regardless of how large the historical donor/donation tables ever get.
-  const{data:inv}=await db.from('blood_donations')
-    .select('blood_type')
-    .in('blood_type', RARE)
-    .eq('status','in_stock');
+  let inv=[]; try{ inv=await bbFetchAll(()=>db.from('blood_donations').select('id,blood_type').in('blood_type', RARE).eq('status','in_stock').eq('is_deleted',false)); }catch(e){ toast('تعذر تحميل رصيد الفصائل النادرة: '+e.message,'error'); }
 
   const invCounts = {};
   RARE.forEach(t=>invCounts[t]=0);

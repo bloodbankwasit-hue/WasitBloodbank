@@ -104,3 +104,19 @@ async function saveEditSeq(){
   await loadSeqGrid();
   refreshExpiryNotifications();
 }
+
+
+// فحص سلامة النظام: يطلب تقريراً من قاعدة البيانات (تكرار أرقام، عدّاد متأخر، تسلسلات متداخلة، حجوزات متعارضة...)
+async function runIntegrityCheck(){
+  load(true);
+  let rep=null, err=null;
+  try{ const r=await db.rpc('integrity_report'); if(r.error) err=r.error.message; else rep=r.data; }catch(e){ err=e.message; }
+  load(false);
+  let ov=G('integrityModal'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.className='overlay on'; ov.id='integrityModal';
+  const rows = err ? '<div style="color:#B91C1C;font-weight:700">تعذّر الفحص: '+esc(err)+'<br><small>تأكد من تشغيل SQL سلامة النظام</small></div>'
+    : (rep.ok ? '<div style="color:#166534;font-weight:800;font-size:18px">✅ لا توجد مشاكل — الأرقام والتسلسلات سليمة</div>'
+      : rep.issues.map(i=>'<div style="padding:8px 10px;margin-bottom:6px;border-radius:8px;font-weight:600;background:'+(i.level==='error'?'#FEE2E2;color:#991B1B':'#FEF3C7;color:#92400E')+'">'+(i.level==='error'?'⛔ ':'⚠️ ')+esc(i.msg)+'</div>').join(''));
+  ov.innerHTML='<div class="modal" style="width:min(640px,96vw)"><div class="modal-title"><i class="ti ti-shield-check"></i> فحص سلامة النظام</div><div class="modal-body">'+rows+'</div><div class="modal-foot"><button class="btn btn-p" onclick="G(\'integrityModal\').remove()">إغلاق</button></div></div>';
+  document.body.appendChild(ov);
+}
