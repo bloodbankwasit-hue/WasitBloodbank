@@ -100,6 +100,7 @@ async function openDrawModal(id,name,dtype,bn,btyp){
   if(G('dm-note')) G('dm-note').value='';
   G('dm-med-other-grp').style.display='none';
   toggleDmMedSection(false);
+  toggleDmDamaged(false);
   const isTrima = btyp==='تريما';
   const trimaSec=G('dm-trima-section'); if(trimaSec) trimaSec.style.display=isTrima?'block':'none';
   const expGrp=G('dm-exp-grp'); if(expGrp) expGrp.style.display=isTrima?'none':'block';
@@ -113,6 +114,11 @@ function toggleDmMedSection(show){
   G('dm-med-section').style.display = show?'block':'none';
   G('dm-normal-actions').style.display = show?'none':'flex';
   G('dm-med-actions').style.display = show?'flex':'none';
+}
+
+function toggleDmDamaged(show){
+  G('dm-normal-actions').style.display = show?'none':'flex';
+  G('dm-dmg-actions').style.display = show?'flex':'none';
 }
 
 function calcDmExpiry(){
@@ -203,15 +209,17 @@ async function confirmDrawSuccess(){
 // at reception and stays consumed (a real, physically-labeled bottle was spoiled — it's never
 // reused). The donor is not penalized with the full 77-day wait — checkDonationInterval()
 // grants a 14-day window instead whenever the donor's most recent donation has status 'damaged'.
-async function confirmDamagedBottle(){
+async function confirmDamagedBottle(reason){
   const id=G('dm-id').value, draw=G('dm-draw').value;
   if(!draw){ toast('يرجى تحديد تاريخ السحب','error'); return; }
-  if(!confirm('تأكيد: القنينة تالفة؟ يُسمح لهذا المتبرع بالتبرع مجدداً بعد أسبوعين بدل 77 يوماً.')) return;
+  if(reason!=='وزن قليل' && reason!=='وزن عالي'){ toast('يرجى اختيار سبب التلف','error'); return; }
+  if(!confirm('تأكيد: القنينة تالفة ('+reason+')؟ يُسمح لهذا المتبرع بالتبرع مجدداً بعد أسبوعين بدل 77 يوماً.')) return;
   load(true);
   try{
     const upd={draw_date:draw, status:'damaged'};
-    const note=(G('dm-note')?.value||'').trim();
-    if(note) upd.bottle_note=note;     // only sent when written
+    const userNote=(G('dm-note')?.value||'').trim();
+    const note='سبب التلف: '+reason+(userNote?' — '+userNote:'');
+    upd.bottle_note=note;
     const{error}=await db.from('blood_donations').update(upd).eq('id',id);
     if(error) throw error;
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'damaged',bottle_note:note||null}});

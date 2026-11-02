@@ -2133,7 +2133,7 @@ async function releaseBottleNumber(type,num){
 }
 
 async function withdrawDonation(id, donorName){
-  if(!confirm('تأكيد: "'+donorName+'" انسحب ولم يُسحب منه دم؟ سيُحذف سجل الاستمارة ويُعاد رقم القنينة للاستخدام.')) return;
+  if(!confirm('تأكيد: "'+donorName+'" لم يتم السحب منه؟ سيُحذف سجل الاستمارة ويُعاد رقم القنينة للتسلسل ليُستخدم لمتبرع آخر.')) return;
   load(true);
   try{
     const{data:d}=await db.from('blood_donations').select('bottle_number,bottle_type').eq('id',id).single();
@@ -2145,7 +2145,7 @@ async function withdrawDonation(id, donorName){
       await releaseBottleNumber(d.bottle_type,d.bottle_number);
     }
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'withdrawn',released_bottle:d?.bottle_number}});
-    toast('↩️ تم تسجيل الانسحاب — رقم القنينة '+(d?.bottle_number||'')+' أُعيد لإعادة الاستخدام','warning',5000);
+    toast('↩️ تم تسجيل «لم يتم السحب» — رقم القنينة '+(d?.bottle_number||'')+' أُعيد للتسلسل ويمكن استخدامه لمتبرع آخر','warning',5000);
     // Refresh whichever screen this was called from.
     if(G('s-draw')?.classList.contains('on')||G('s-trima')?.classList.contains('on')){ G('drawModal')?.classList.remove('on'); await reloadDrawView(); }
     else if(typeof loadDonors==='function') await loadDonors(DPAGE);
@@ -5232,9 +5232,15 @@ if('serviceWorker' in navigator){
       <div id="dm-normal-actions" style="display:flex;gap:7px;width:100%;flex-wrap:wrap">
         <button class="btn" onclick="G('drawModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
         <button class="btn" style="border-color:#DC2626;color:#DC2626" onclick="toggleDmMedSection(true)"><i class="ti ti-ban"></i> غير مؤهل طبياً</button>
-        <button class="btn" style="border-color:#757575;color:#757575" onclick="withdrawDonation(G('dm-id').value, G('dm-donor-name').textContent)"><i class="ti ti-door-exit"></i> انسحب / لم يكمل</button>
-        <button class="btn" style="border-color:#D97706;color:#D97706" onclick="confirmDamagedBottle()"><i class="ti ti-alert-triangle"></i> قنينة تالفة</button>
+        <button class="btn" style="border-color:#757575;color:#757575" onclick="withdrawDonation(G('dm-id').value, G('dm-donor-name').textContent)"><i class="ti ti-door-exit"></i> لم يتم السحب</button>
+        <button class="btn" style="border-color:#D97706;color:#D97706" onclick="toggleDmDamaged(true)"><i class="ti ti-alert-triangle"></i> قنينة تالفة</button>
         <button class="btn btn-p" style="margin-right:auto" onclick="confirmDrawSuccess()"><i class="ti ti-check"></i> تأكيد السحب</button>
+      </div>
+      <div id="dm-dmg-actions" style="display:none;gap:7px;width:100%;flex-wrap:wrap;align-items:center">
+        <span style="font-size:12px;font-weight:700;width:100%;color:#D97706">سبب تلف القنينة:</span>
+        <button class="btn" onclick="toggleDmDamaged(false)"><i class="ti ti-arrow-right"></i> رجوع</button>
+        <button class="btn" style="border-color:#D97706;color:#D97706" onclick="confirmDamagedBottle('وزن قليل')"><i class="ti ti-arrow-down"></i> وزن قليل</button>
+        <button class="btn" style="border-color:#D97706;color:#D97706" onclick="confirmDamagedBottle('وزن عالي')"><i class="ti ti-arrow-up"></i> وزن عالي</button>
       </div>
       <div id="dm-med-actions" style="display:none;gap:7px;width:100%">
         <button class="btn" onclick="toggleDmMedSection(false)"><i class="ti ti-arrow-right"></i> رجوع</button>
