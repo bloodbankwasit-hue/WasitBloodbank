@@ -344,7 +344,7 @@ async function saveReception(){
   if(_intervalBlock){ load(false); showIntervalBlockModal(_intervalBlock.message); return; }
   try{
     const btype = G('rc-btype')?.value;
-    const bnum  = parseInt(G('rc-bnum')?.value)||null;
+    let bnum  = parseInt(G('rc-bnum')?.value)||null;
     const seqId = G('rc-bnum')?.dataset?.seqId;
     const poolId = G('rc-bnum')?.dataset?.poolId;
     if(!btype){ toast('يرجى اختيار نوع القنينة','error'); load(false); return; }
@@ -416,6 +416,15 @@ async function saveReception(){
         if(de) throw de;
         dn = nd;
       }
+      // The number on screen is only a preview: claim the real one atomically on the server right now (two PCs can
+      // show the same number; the server hands each save a different one and skips numbers already in use).
+      let claimed=false;
+      { const shown=bnum;
+        const{data:cl,error:cle}=await db.rpc('claim_bottle_number',{p_type:btype});
+        if(!cle && cl && cl.number){ bnum=cl.number; claimed=true;
+          if(bnum!==shown) toast('ℹ️ رقم القنينة صار '+bnum+' (الرقم '+shown+' كان مستخدماً)','info',6000); }
+        else if(cle && !/claim_bottle_number|function|PGRST202/i.test(cle.message||'')) throw new Error(cle.message);
+      }
       const{data:don,error:doe}=await db.from('blood_donations').insert({
         donor_id:dn.id, bottle_type:btype, bottle_number:bnum, donation_type:payload.donation_type,
         patient_name:payload.patient_name, hospital_name:payload.hospital_name,
@@ -427,13 +436,14 @@ async function saveReception(){
         hemoglobin:parseFloat(G('rc-hgb').value)||null,
         status:'pending_draw', created_by:payload.created_by
       }).select().single();
-      if(doe) throw doe;
+      if(doe){ if(claimed){ try{ await releaseBottleNumber(btype,bnum); }catch(x){} } throw doe; }
       // the donation joins the open collection form of its group (a new form opens automatically after 10 names)
       const formInfo = await bbAssignForm(don.id, btype);
       await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'INSERT',table_name:'blood_donations',record_id:don.id,new_values:{donor:nm,status:'pending_draw',bottle:bnum}});
       // Consume the bottle number: from the reuse pool if that's where it came from,
       // otherwise advance the main sequence.
-      if(payload.pool_id){
+      if(claimed){ /* already consumed on the server */ }
+      else if(payload.pool_id){
         await db.from('bottle_number_pool').delete().eq('id', payload.pool_id);
       } else if(payload.seq_id){
         await db.from('bottle_sequences')
