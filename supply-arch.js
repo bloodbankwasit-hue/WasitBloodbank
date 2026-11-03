@@ -6,10 +6,12 @@ const SA_BT = ['A+','A-','B+','B-','O+','O-','AB+','AB-'];
 const SA_CT = ['دم كامل','دم مضغوط','صفائح دموية','بلازما','بروتين بارد'];
 const SA_CL = {'دم كامل':'دم','دم مضغوط':'دم مضغوط','صفائح دموية':'صفيحات دموية','بلازما':'بلازما','بروتين بارد':'بروتين بارد'};
 const SA_KIND = {hand:'باي هاند', hospital:'مستشفيات'};
-let _saTab='hospital', _saData=[], _saStats=null, _saOpen=new Set(), _saBusy=false;
+let _saTab='hospital', _saData=[], _saStats=null, _saBooksRaw=[], _saOpen=new Set(), _saBusy=false, _saHosp=null;
 const saEsc = s => (typeof esc==='function' ? esc(s) : String(s==null?'':s));
 const saD = v => v ? fd(v) : '—';
 const saLbl = c => SA_CL[c]||c;
+// فصائل الدم (O+ ، A-) تُعرض اتجاهاً يسارياً حتى لا ينقلب الرمز داخل الجداول العربية
+const saX = v => /^(AB|A|B|O)[+-]$/.test(String(v)) ? '<bdi dir="ltr">'+saEsc(v)+'</bdi>' : saEsc(v);
 
 function saEnsure(){
   if(G('supplyArchModal')) return;
@@ -63,12 +65,13 @@ function saEnsure(){
 
 function saOpen(tab){ saEnsure(); G('supplyArchModal').classList.add('on'); saTab(tab||'hospital'); }
 function saClear(){ ['sa-from','sa-to','sa-q'].forEach(i=>G(i).value=''); saLoad(); }
-let _saQt=null; function saQ(){ clearTimeout(_saQt); _saQt=setTimeout(()=>{ if(_saTab!=='stats') saLoad(); },350); }
+let _saQt=null; function saQ(){ clearTimeout(_saQt); _saQt=setTimeout(()=>{ if(_saTab==='stats') saRenderStats(); else saLoad(); },350); }
 function saTab(t){
-  _saTab=t; _saOpen.clear();
+  _saTab=t; _saOpen.clear(); _saHosp=null;
   ['hospital','hand','stats'].forEach(k=>G('sat-'+k).classList.toggle('on',k===t));
-  G('sa-qwrap').style.display = t==='stats' ? 'none' : '';
-  G('sa-qlbl').textContent = t==='hospital' ? 'بحث: مستشفى / رقم كتاب / رقم قنينة' : 'بحث: مريض / مستشفى / رقم قنينة';
+  G('sa-qwrap').style.display = '';
+  G('sa-q').value='';
+  G('sa-qlbl').textContent = t==='hospital' ? 'بحث: مستشفى / رقم كتاب / رقم قنينة' : t==='stats' ? 'بحث برقم الكتاب أو المستشفى (يظهر بجدول الكتب)' : 'بحث: مريض / مستشفى / رقم قنينة';
   saLoad();
 }
 async function saLoad(){
@@ -78,7 +81,9 @@ async function saLoad(){
   try{
     if(_saTab==='stats'){
       const{data,error}=await db.rpc('dispatch_stats',{p_from:from,p_to:to}); if(error) throw error;
-      _saStats=data; saRenderStats();
+      _saStats=data;
+      const ar=await db.rpc('dispatch_archive',{p_kind:'hospital',p_from:from,p_to:to,p_q:null}); _saBooksRaw=ar.error?[]:(ar.data||[]);
+      saRenderStats();
     } else {
       const{data,error}=await db.rpc('dispatch_archive',{p_kind:_saTab,p_from:from,p_to:to,p_q:G('sa-q').value.trim()||null}); if(error) throw error;
       _saData=data||[]; saRenderList();
@@ -88,27 +93,114 @@ async function saLoad(){
 
 // ---------- الأرشيف ----------
 function saBottlesTxt(b){ return (b.bottles||[]).map(x=>x.num+' ('+(x.bt||'—')+' · '+saLbl(x.ct)+')').join('، '); }
+// كتاب واحد = (المستشفى + رقم الكتاب + تاريخه) وقد يضم عدة عمليات تجهيز (مكوّنات مختلفة جُهّزت كل واحدة على حدة)
+function saBooks(batches){
+  const m=new Map();
+  batches.filter(b=>b.kind==='hospital').forEach(b=>{
+    const k=[(b.hospital||'').trim(),(b.book_no||'').trim(),b.book_date||''].join('\u0001');
+    if(!m.has(k)) m.set(k,{key:k,hospital:b.hospital||'—',book_no:b.book_no||'—',book_date:b.book_date||'',batches:[],bottles:[],count:0});
+    const g=m.get(k); g.batches.push(b); g.count+=b.count; (b.bottles||[]).forEach(x=>g.bottles.push({...x,batch:b.batch,date:b.date}));
+  });
+  return [...m.values()].sort((a,b)=>(b.book_date||'').localeCompare(a.book_date||'')||String(b.book_no).localeCompare(String(a.book_no),'en',{numeric:true}));
+}
+function saCompCount(bottles){ const c={}; bottles.forEach(x=>{ c[x.ct]=(c[x.ct]||0)+1; }); return SA_CT.filter(k=>c[k]).map(k=>({ct:k,n:c[k]})); }
+function saBookDetailsTxt(g){
+  return SA_CT.map(ct=>{ const bs=g.bottles.filter(x=>x.ct===ct); if(!bs.length) return null;
+    const bt={}; bs.forEach(x=>{ bt[x.bt||'—']=(bt[x.bt||'—']||0)+1; });
+    return saLbl(ct)+': '+bs.length+' ('+Object.entries(bt).map(([k,n])=>k+' '+n).join('، ')+') — '+bs.map(x=>x.num).join('، '); }).filter(Boolean).join(' | ');
+}
 function saRenderList(){
-  const body=G('sa-body'), list=_saData, h=_saTab==='hospital';
+  const body=G('sa-body');
+  if(_saTab==='hand') return saRenderHand();
+  const books=saBooks(_saData);
+  if(!books.length){ body.innerHTML='<div class="empty"><i class="ti ti-archive"></i><p>لا توجد كتب تجهيز'+(G('sa-q').value||G('sa-from').value||G('sa-to').value?' مطابقة للفلتر':' محفوظة')+'</p></div>'; return; }
+  if(!_saHosp || !books.some(b=>b.hospital===_saHosp)){
+    _saHosp=null;
+    const hs=new Map(); books.forEach(b=>{ if(!hs.has(b.hospital)) hs.set(b.hospital,[]); hs.get(b.hospital).push(b); });
+    const arr=[...hs.entries()].sort((a,b)=>a[0].localeCompare(b[0],'ar'));
+    body.innerHTML=`<div style="font-weight:700;margin-bottom:8px">${arr.length} مستشفى — ${books.length} كتاب — ${books.reduce((s,b)=>s+b.count,0)} قنينة</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px">`+arr.map(([h,bs],i)=>{
+      const all=bs.flatMap(b=>b.bottles);
+      return `<div class="sa-card" style="cursor:pointer;text-align:right" onclick="saPickHosp(${i})"><div style="font-weight:800;font-size:16px;margin-bottom:4px">🏥 ${saEsc(h)}</div>
+        <div style="color:#6B7280;font-size:13.5px">${bs.length} كتاب · <b style="display:inline;font-size:inherit;color:#BE123C">${all.length}</b> قنينة</div>
+        <div style="font-size:13px;margin-top:4px">${saCompCount(all).map(c=>saEsc(saLbl(c.ct))+' '+c.n).join(' · ')}</div></div>`; }).join('')+'</div>';
+    window._saHospList=arr.map(a=>a[0]); return;
+  }
+  const mine=books.filter(b=>b.hospital===_saHosp), tot=mine.reduce((s,b)=>s+b.count,0);
+  body.innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap"><button class="btn" onclick="saPickHosp(-1)"><i class="ti ti-arrow-right"></i> كل المستشفيات</button>
+      <b style="font-size:17px;color:#BE123C">🏥 ${saEsc(_saHosp)}</b><span style="color:#6B7280">${mine.length} كتاب — ${tot} قنينة</span></div>`+mine.map((g,i)=>{
+    const open=_saOpen.has(g.key), cc=saCompCount(g.bottles);
+    return `<div class="sa-item"><div class="sa-sum" onclick="saToggleBook(${i})">
+        <div><div style="font-weight:800;font-size:15.5px">📅 ${saD(g.book_date)}</div><div style="color:#374151">كتاب رقم <b>${saEsc(g.book_no)}</b></div></div>
+        <span class="sa-pill">${g.count} قنينة</span><span style="font-size:13.5px;color:#374151">${cc.map(c=>saEsc(saLbl(c.ct))+' '+c.n).join(' · ')}</span>
+        <span style="margin-right:auto;display:flex;gap:6px" onclick="event.stopPropagation()">
+          <button class="btn" onclick="saEditBook(${i})"><i class="ti ti-edit"></i> تعديل الكتاب</button>
+          <button class="btn" style="color:#B91C1C" onclick="saCancelBook(${i})"><i class="ti ti-arrow-back-up"></i> إلغاء الكتاب</button></span></div>
+      ${open?saBookDetail(g):''}</div>`;
+  }).join('');
+  window._saBookList=mine;
+}
+function saBookDetail(g){
+  const m=saMatrix(g.bottles.map(x=>({ct:x.ct,bt:x.bt||'—',n:1})),()=>true);
+  return `<div class="sa-det"><div class="sa-sc">${saTable({headers:m.heads,rows:m.rows})}</div>
+    ${g.batches.map(b=>`<div style="margin-top:10px;font-weight:800">عملية تجهيز بتاريخ ${saD(b.date)} — ${b.count} قنينة
+      <button class="btn" style="color:#B91C1C;padding:2px 8px;margin-right:8px" onclick="saCancel('${b.batch}')"><i class="ti ti-arrow-back-up"></i> إلغاء هذه العملية</button></div>
+      <table class="sa-t" style="margin-top:4px"><thead><tr><th>رقم القنينة</th><th>الفصيلة</th><th>نوع القنينة</th><th>المكوّن</th><th></th></tr></thead><tbody>${(b.bottles||[]).map(x=>`<tr><td><b>${x.num}</b></td><td>${saX(x.bt||'—')}</td><td>${saEsc(x.btype||'—')}</td><td>${saEsc(saLbl(x.ct))}</td><td><button class="btn" style="color:#B91C1C;padding:2px 8px" onclick="saRemove('${x.id}','${b.batch}',${x.num})" title="إرجاع هذه القنينة للرصيد"><i class="ti ti-arrow-back-up"></i> إرجاع</button></td></tr>`).join('')}</tbody></table>`).join('')}</div>`;
+}
+function saPickHosp(i){ _saHosp = i<0 ? null : (window._saHospList||[])[i]; _saOpen.clear(); saRenderList(); }
+function saToggleBook(i){ const g=(window._saBookList||[])[i]; if(!g) return; _saOpen.has(g.key)?_saOpen.delete(g.key):_saOpen.add(g.key); saRenderList(); }
+
+async function saCancelBook(i){
+  if(_saBusy) return; const g=(window._saBookList||[])[i]; if(!g) return;
+  if(!confirm('إلغاء الكتاب رقم '+g.book_no+' ('+g.hospital+') بكل عملياته؟\nترجع '+g.count+' قنينة إلى الرصيد.')) return;
+  _saBusy=true; load(true);
+  try{ const{error}=await db.rpc('dispatch_cancel_book',{p_oh:g.hospital,p_ob:g.book_no,p_od:g.book_date||null}); if(error) throw error;
+    await saAudit('cancel_book',{count:g.count,hospital:g.hospital,book_no:g.book_no,book_date:g.book_date,bottles:g.bottles.map(x=>x.num)},g.bottles[0]?.id);
+    toast('✅ أُلغي الكتاب ورجعت '+g.count+' قنينة للرصيد','success'); await saRefreshAll();
+  }catch(e){ toast('⛔ '+(e.message||e),'error',7000); } finally{ _saBusy=false; load(false); }
+}
+function saEditBook(i){
+  const g=(window._saBookList||[])[i]; if(!g) return;
+  let m=G('supplyArchEdit'); if(m) m.remove();
+  m=document.createElement('div'); m.className='overlay'; m.id='supplyArchEdit'; m.style.zIndex=9100;
+  window._saEditBook=g;
+  m.innerHTML=`<div class="modal" style="width:min(520px,96vw)"><div class="modal-title"><i class="ti ti-edit"></i> تعديل الكتاب (${g.count} قنينة)</div><div class="modal-body">
+    <div class="fgrp"><label>اسم المستشفى *</label><input type="text" id="sae-hosp" list="sa-hosp-dl" value="${saEsc(g.hospital)}"></div>
+    <div class="fgrp"><label>رقم الكتاب *</label><input type="text" id="sae-book" value="${saEsc(g.book_no)}"></div>
+    <div class="fgrp"><label>تاريخ الكتاب *</label><input type="date" id="sae-bdate" value="${g.book_date||''}"></div>
+    <div style="font-size:13px;color:#6B7280">يتغير على كل عمليات هذا الكتاب. لتبديل القناني: أرجع القنينة ثم جهّز من جديد.</div>
+  </div><div class="modal-foot"><button class="btn" onclick="G('supplyArchEdit').remove()">إلغاء</button><button class="btn btn-p" onclick="saEditBookSave()"><i class="ti ti-check"></i> حفظ</button></div></div>`;
+  document.body.appendChild(m); m.classList.add('on');
+}
+async function saEditBookSave(){
+  if(_saBusy) return; const g=window._saEditBook; if(!g) return;
+  const h=G('sae-hosp').value.trim(), b=G('sae-book').value.trim(), d=G('sae-bdate').value;
+  if(!h||!b||!d){ toast('المستشفى ورقم الكتاب وتاريخه مطلوبة','error'); return; }
+  _saBusy=true; load(true);
+  try{ const{error}=await db.rpc('dispatch_update_book',{p_oh:g.hospital,p_ob:g.book_no,p_od:g.book_date||null,p_h:h,p_b:b,p_d:d}); if(error) throw error;
+    await saAudit('edit_book',{before:{hospital:g.hospital,book_no:g.book_no,book_date:g.book_date},after:{hospital:h,book_no:b,book_date:d}},g.bottles[0]?.id);
+    G('supplyArchEdit').remove(); _saHosp=h; toast('✅ تم حفظ التعديل','success'); await saLoad();
+  }catch(e){ toast('⛔ '+(e.message||e),'error',7000); } finally{ _saBusy=false; load(false); }
+}
+
+// أرشيف الباي هاند: سطر لكل عملية (مريض + تاريخ تجهيز)
+function saRenderHand(){
+  const body=G('sa-body'), list=_saData;
   if(!list.length){ body.innerHTML='<div class="empty"><i class="ti ti-archive"></i><p>لا توجد عمليات تجهيز'+(G('sa-q').value||G('sa-from').value||G('sa-to').value?' مطابقة للفلتر':' محفوظة')+'</p></div>'; return; }
   const tot=list.reduce((s,b)=>s+b.count,0);
   body.innerHTML=`<div style="font-weight:700;margin-bottom:8px">${list.length} عملية — ${tot} قنينة${list.length>=500?' <span style="color:#B45309">(معروض أحدث 500)</span>':''}</div>`+list.map(b=>{
-    const open=_saOpen.has(b.batch);
-    const title = h ? `<b>${saEsc(b.hospital||'—')}</b><span>كتاب رقم <b>${saEsc(b.book_no||'—')}</b> بتاريخ ${saD(b.book_date)}</span>`
-                    : `<b>${saEsc(b.patient||'—')}</b><span>${saEsc(b.hospital||'—')}</span><span>${saEsc(b.comp||'')}${b.note?': '+saEsc(b.note):''}</span>`;
-    const cts=[...new Set((b.bottles||[]).map(x=>saLbl(x.ct)))].join('، ');
+    const open=_saOpen.has(b.batch), cts=[...new Set((b.bottles||[]).map(x=>saLbl(x.ct)))].join('، ');
     return `<div class="sa-item"><div class="sa-sum" onclick="saToggle('${b.batch}')">
-        <span style="color:#6B7280">📅 ${h?'التجهيز: ':''}${saD(b.date)}</span>${title}
+        <span style="color:#6B7280">📅 ${saD(b.date)}</span><b>${saEsc(b.patient||'—')}</b><span>${saEsc(b.hospital||'—')}</span><span>${saEsc(b.comp||'')}${b.note?': '+saEsc(b.note):''}</span>
         <span class="sa-pill">${b.count} قنينة${cts?' · '+saEsc(cts):''}</span>
         <span style="margin-right:auto;display:flex;gap:6px" onclick="event.stopPropagation()">
           <button class="btn" onclick="saEdit('${b.batch}')"><i class="ti ti-edit"></i> تعديل</button>
-          <button class="btn" style="color:#B91C1C" onclick="saCancel('${b.batch}')"><i class="ti ti-arrow-back-up"></i> إلغاء التجهيز</button>
-        </span></div>
-      ${open?`<div class="sa-det"><table class="sa-t"><thead><tr><th>رقم القنينة</th><th>الفصيلة</th><th>نوع القنينة</th><th>المكوّن</th><th></th></tr></thead><tbody>${(b.bottles||[]).map(x=>`<tr><td><b>${x.num}</b></td><td>${saEsc(x.bt||'—')}</td><td>${saEsc(x.btype||'—')}</td><td>${saEsc(saLbl(x.ct))}</td><td><button class="btn" style="color:#B91C1C;padding:2px 8px" onclick="saRemove('${x.id}','${b.batch}',${x.num})" title="إرجاع هذه القنينة للرصيد"><i class="ti ti-arrow-back-up"></i> إرجاع</button></td></tr>`).join('')}</tbody></table></div>`:''}
+          <button class="btn" style="color:#B91C1C" onclick="saCancel('${b.batch}')"><i class="ti ti-arrow-back-up"></i> إلغاء التجهيز</button></span></div>
+      ${open?`<div class="sa-det"><table class="sa-t"><thead><tr><th>رقم القنينة</th><th>الفصيلة</th><th>نوع القنينة</th><th>المكوّن</th><th></th></tr></thead><tbody>${(b.bottles||[]).map(x=>`<tr><td><b>${x.num}</b></td><td>${saX(x.bt||'—')}</td><td>${saEsc(x.btype||'—')}</td><td>${saEsc(saLbl(x.ct))}</td><td><button class="btn" style="color:#B91C1C;padding:2px 8px" onclick="saRemove('${x.id}','${b.batch}',${x.num})" title="إرجاع هذه القنينة للرصيد"><i class="ti ti-arrow-back-up"></i> إرجاع</button></td></tr>`).join('')}</tbody></table></div>`:''}
     </div>`;
   }).join('');
 }
-function saToggle(id){ _saOpen.has(id)?_saOpen.delete(id):_saOpen.add(id); saRenderList(); }
+function saToggle(id){ _saOpen.has(id)?_saOpen.delete(id):_saOpen.add(id); saRenderHand(); }
 
 async function saAudit(act,vals,id){ try{ await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id||null,new_values:{dispatch_action:act,...vals}}); }catch(e){} }
 async function saRefreshAll(){ await saLoad(); if(typeof _supplyRefreshCurrentLevel==='function'){ try{ await _supplyRefreshCurrentLevel(); }catch(e){} } }
@@ -201,13 +293,19 @@ function saBuildStats(){
       const m=saMatrix(R,r=>r.hospital===h&&r.kind===k); if(m.rows.length) out.sections.push({title:h+' — '+l,headers:m.heads,rows:m.rows,detail:true});
     });
   });
+  // 3.5) كتب المستشفيات (تظهر كلها، وعند البحث برقم الكتاب أو المستشفى تُفلتر)
+  const q=(G('sa-q')?.value||'').trim().toLowerCase();
+  let books=saBooks(_saBooksRaw); if(q) books=books.filter(g=>String(g.book_no).toLowerCase().includes(q)||String(g.hospital).toLowerCase().includes(q));
+  const bs={title:q?'نتيجة البحث: '+q+' ('+books.length+' كتاب)':'كتب المستشفيات (حسب تاريخ الكتاب)',headers:['المستشفى','رقم الكتاب','تاريخ الكتاب','عدد القناني','تفاصيل التجهيز (المكوّن: العدد (الفصائل) — الأرقام)'],
+    rows:books.map(g=>[g.hospital,g.book_no,saD(g.book_date),g.count,saBookDetailsTxt(g)]),books:true};
+  if(q) out.sections.unshift(bs); else out.sections.push(bs);
   // 4) شهري
   const months=[...new Set(R.map(r=>r.month))].sort().reverse();
   out.sections.push({title:'التجهيز حسب الشهر',headers:['الشهر','مستشفيات (قنينة)','باي هاند (قنينة)','المجموع'],
     rows:months.map(mo=>{ const a=sum(R,r=>r.month===mo&&r.kind==='hospital'), d=sum(R,r=>r.month===mo&&r.kind==='hand'); const [y,m]=mo.split('-'); return [m+'/'+y,a,d,a+d]; })});
   return out;
 }
-function saTable(s){ return `<div class="sa-sc"><table class="sa-t"><thead><tr>${s.headers.map(h=>`<th>${saEsc(h)}</th>`).join('')}</tr></thead><tbody>${s.rows.map((r,i)=>`<tr${i===s.rows.length-1&&/^المجموع/.test(r[0])?' style="font-weight:800;background:#FFF1F2"':''}>${r.map((c,j)=>`<td${j===0?' style="font-weight:700"':''}>${saEsc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`; }
+function saTable(s){ if(s.books&&!s.rows.length) return '<div class="empty"><p>لا توجد كتب مطابقة</p></div>'; return `<div class="sa-sc"><table class="sa-t"><thead><tr>${s.headers.map(h=>`<th>${saX(h)}</th>`).join('')}</tr></thead><tbody>${s.rows.map((r,i)=>`<tr${i===s.rows.length-1&&/^المجموع/.test(r[0])?' style="font-weight:800;background:#FFF1F2"':''}>${r.map((c,j)=>`<td${j===0?' style="font-weight:700"':''}>${saX(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`; }
 function saRenderStats(){
   const st=saBuildStats();
   if(!_saStats || !_saStats.rows.length){ G('sa-body').innerHTML='<div class="empty"><i class="ti ti-chart-bar"></i><p>لا توجد عمليات تجهيز ضمن هذه الفترة</p></div>'; return; }
@@ -221,12 +319,14 @@ function saRenderStats(){
 function saPeriod(){ const f=G('sa-from').value,t=G('sa-to').value; return f||t ? 'الفترة: '+(f?bbDmy(f):'البداية')+' ← '+(t?bbDmy(t):'اليوم') : 'كل الفترات'; }
 function saSections(){
   if(_saTab==='stats'){ const st=saBuildStats(); return {title:'إحصائيات التجهيز', cards:st.cards, sections:st.sections}; }
-  const h=_saTab==='hospital';
-  return {title:h?'أرشيف تجهيز المستشفيات':'أرشيف التجهيز (باي هاند)', cards:[['عدد العمليات',_saData.length],['عدد القناني',_saData.reduce((s,b)=>s+b.count,0)]],
-    sections:[{title:'',headers:h?['#','تاريخ التجهيز','المستشفى','رقم الكتاب','تاريخ الكتاب','عدد القناني','أرقام القناني (الفصيلة · المكوّن)']
-                               :['#','تاريخ التجهيز','اسم المريض','المستشفى','نوع التعويض','عدد القناني','أرقام القناني (الفصيلة · المكوّن)'],
-      rows:_saData.map((b,i)=>h?[i+1,saD(b.date),b.hospital||'—',b.book_no||'—',saD(b.book_date),b.count,saBottlesTxt(b)]
-                              :[i+1,saD(b.date),b.patient||'—',b.hospital||'—',(b.comp||'')+(b.note?': '+b.note:''),b.count,saBottlesTxt(b)])}]};
+  if(_saTab==='hospital'){
+    let books=saBooks(_saData); if(_saHosp) books=books.filter(g=>g.hospital===_saHosp);
+    return {title:'أرشيف تجهيز المستشفيات'+(_saHosp?' — '+_saHosp:''), cards:[['عدد الكتب',books.length],['عدد القناني',books.reduce((s,g)=>s+g.count,0)]],
+      sections:[{title:'',headers:['#','المستشفى','تاريخ الكتاب','رقم الكتاب','عدد القناني','التفاصيل (المكوّن: العدد (الفصائل) — الأرقام)'],rows:books.map((g,i)=>[i+1,g.hospital,saD(g.book_date),g.book_no,g.count,saBookDetailsTxt(g)])}]};
+  }
+  return {title:'أرشيف التجهيز (باي هاند)', cards:[['عدد العمليات',_saData.length],['عدد القناني',_saData.reduce((s,b)=>s+b.count,0)]],
+    sections:[{title:'',headers:['#','تاريخ التجهيز','اسم المريض','المستشفى','نوع التعويض','عدد القناني','أرقام القناني (الفصيلة · المكوّن)'],
+      rows:_saData.map((b,i)=>[i+1,saD(b.date),b.patient||'—',b.hospital||'—',(b.comp||'')+(b.note?': '+b.note:''),b.count,saBottlesTxt(b)])}]};
 }
 function saExport(fmt){
   if(_saTab==='stats' ? !(_saStats&&_saStats.rows.length) : !_saData.length){ toast('لا توجد بيانات للتصدير','error'); return; }
@@ -238,7 +338,7 @@ function saExport(fmt){
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['﻿'+html],{type:'application/vnd.ms-excel;charset=utf-8'}));
     a.download=d.title.replace(/[\\/:*?"<>|]/g,'')+'_'+new Date().toISOString().split('T')[0]+'.xls'; a.click(); toast('✅ تم تصدير Excel','success',3000); return;
   }
-  const tbl=s=>`${s.title?`<h3>${saEsc(s.title)}</h3>`:''}<table><thead><tr>${s.headers.map(h=>`<th>${saEsc(h)}</th>`).join('')}</tr></thead><tbody>${s.rows.map((r,i)=>`<tr${/^المجموع/.test(r[0]||'')?' class="tot"':''}>${r.map((c,j)=>`<td${j===r.length-1&&_saTab!=='stats'?' class="bl"':''}>${saEsc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  const tbl=s=>`${s.title?`<h3>${saEsc(s.title)}</h3>`:''}<table><thead><tr>${s.headers.map(h=>`<th>${saX(h)}</th>`).join('')}</tr></thead><tbody>${s.rows.map((r,i)=>`<tr${/^المجموع/.test(r[0]||'')?' class="tot"':''}>${r.map((c,j)=>`<td${j===r.length-1&&_saTab!=='stats'?' class="bl"':''}>${saX(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
   printHtmlDocument(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><title>${saEsc(d.title)}</title><style>
     @page{size:A4 ${_saTab==='stats'?'portrait':'landscape'};margin:12mm}
     *{box-sizing:border-box} body{font-family:Arial,Tahoma,sans-serif;color:#111;margin:0;font-size:12px}
