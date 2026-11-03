@@ -29,7 +29,7 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden}
 #loginPage ~ .bottom-nav, #loginPage:not([style*="none"]) ~ * .bottom-nav{display:none !important}
-body{font-family:'Segoe UI','Segoe UI Emoji','Apple Color Emoji',Tahoma,Arial,'Noto Color Emoji',sans-serif;font-size:18px;direction:rtl;background:#F1F5F9;color:#1E293B;-webkit-tap-highlight-color:transparent}
+body{font-family:'Segoe UI',Tahoma,Arial,'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif;font-size:18px;direction:rtl;background:#F1F5F9;color:#1E293B;-webkit-tap-highlight-color:transparent}
 html{-webkit-text-size-adjust:100%}
 
 /* ===== TOAST ===== */
@@ -4253,10 +4253,30 @@ function openSupplyExport(){
   });
 }
 
-// البلازما تُعرض وتُجمَّع بالفصيلة فقط (A, B, AB, O) بدون موجب/سالب — بقية المكونات تبقى بإشارتها.
+// البلازما وCryo (بروتين بارد) تُعرض وتُجمَّع بالفصيلة فقط (A, B, AB, O) بدون موجب/سالب — بقية المكونات تبقى بإشارتها.
 // البيانات المخزنة (blood_type على السجل) لا تتغير؛ هذا للعرض والتجميع.
 const PLASMA_ABO=['A','B','AB','O'];
-function bbBt(bt,ct){ return (ct==='بلازما' && bt) ? String(bt).replace(/[+\-−]/g,'') : bt; }
+const ABO_ONLY_CT=['بلازما','بروتين بارد'];
+function bbNoSign(ct){ return ABO_ONLY_CT.includes(ct); }
+function bbBt(bt,ct){ return (bbNoSign(ct) && bt) ? String(bt).replace(/[+\-−]/g,'') : bt; }
+// الاسم المعروض لـ«بروتين بارد» هو Cryo (القيمة المخزنة بالقاعدة لا تتغير)
+function bbComp(c){ return c==='بروتين بارد' ? 'Cryo' : c; }
+(function(){
+  const RX=/بروتين بارد/g;
+  function fix(n){
+    if(n.nodeType===3){ if(n.nodeValue.indexOf('بروتين بارد')>-1) n.nodeValue=n.nodeValue.replace(RX,'Cryo'); return; }
+    if(n.nodeType!==1 || /^(SCRIPT|STYLE|TEXTAREA)$/.test(n.tagName)) return;
+    const w=document.createTreeWalker(n,NodeFilter.SHOW_TEXT); let t; const arr=[]; while((t=w.nextNode())) if(t.nodeValue.indexOf('بروتين بارد')>-1) arr.push(t);
+    arr.forEach(x=>{ x.nodeValue=x.nodeValue.replace(RX,'Cryo'); });
+  }
+  function start(){ fix(document.body);
+    new MutationObserver(ms=>{ ms.forEach(m=>{ if(m.type==='characterData') fix(m.target); else m.addedNodes.forEach(fix); }); }).observe(document.body,{childList:true,subtree:true,characterData:true}); }
+  if(document.body) start(); else document.addEventListener('DOMContentLoaded',start);
+  // الطباعة والتصدير (HTML / Excel / CSV) — لا نمسّ ملف النسخ الاحتياطي JSON
+  const OB=window.Blob;
+  window.Blob=function(parts,opt){ const ty=(opt&&opt.type)||''; if(/html|excel|csv/i.test(ty)&&Array.isArray(parts)) parts=parts.map(p=>typeof p==='string'?p.replace(RX,'Cryo'):p); return new OB(parts,opt); };
+  window.Blob.prototype=OB.prototype;
+})();
 async function loadSupply(){
   await autoMarkExpiredDamaged();
   const{count:dmgCount}=await db.from('blood_donations').select('id',{count:'exact',head:true}).eq('status','damaged').eq('is_deleted',false).is('destruction_report_id',null);
@@ -4286,7 +4306,7 @@ async function loadSupplyComponentGrid(){
 // Level 2 — blood types, counted WITHIN the selected component type only
 async function loadSupplyByComponent(componentType){
   _supplySelectedComponent=componentType;
-  const bts=componentType==='بلازما' ? PLASMA_ABO : ['A+','A-','B+','B-','O+','O-','AB+','AB-'];
+  const bts=bbNoSign(componentType) ? PLASMA_ABO : ['A+','A-','B+','B-','O+','O-','AB+','AB-'];
   let counts; try{ counts=await bbFetchAll(()=>db.from('blood_donations').select('id,blood_type').eq('status','in_stock').eq('is_deleted',false).eq('component_type',componentType)); }catch(e){ toast('تعذر تحميل أعداد الرصيد: '+e.message,'error'); counts=[]; }
   const cnt={};
   (counts||[]).forEach(r=>{ const k=bbBt(r.blood_type,componentType); cnt[k]=(cnt[k]||0)+1; });
@@ -4378,7 +4398,7 @@ function bloodBagCard(r, onclickJs){
 async function loadSupplyList(bt){
   _supplySelectedBT = bt;
   const ct=_supplySelectedComponent||'دم كامل';
-  let data=[]; try{ data=await bbFetchAll(()=>db.from('blood_donations').select('id,bottle_number,bottle_type,blood_type,component_type,draw_date,expiry_date,donors(full_name)').eq('status','in_stock').in('blood_type',ct==='بلازما'?[bt,bt+'+',bt+'-']:[bt]).eq('component_type',ct).eq('is_deleted',false)); data.sort((a,b)=>String(a.expiry_date||'').localeCompare(String(b.expiry_date||''))); }catch(e){ toast('تعذر تحميل القائمة: '+e.message,'error'); }
+  let data=[]; try{ data=await bbFetchAll(()=>db.from('blood_donations').select('id,bottle_number,bottle_type,blood_type,component_type,draw_date,expiry_date,donors(full_name)').eq('status','in_stock').in('blood_type',bbNoSign(ct)?[bt,bt+'+',bt+'-']:[bt]).eq('component_type',ct).eq('is_deleted',false)); data.sort((a,b)=>String(a.expiry_date||'').localeCompare(String(b.expiry_date||''))); }catch(e){ toast('تعذر تحميل القائمة: '+e.message,'error'); }
   const titleBar=`<div style="font-size:18px;font-weight:700;color:#BE123C;margin-bottom:10px">${ct} — فصيلة ${bt} — ${(data||[]).length} قنينة</div>`;
   if(data&&data.length){
     const bar=`<div id="supplyBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">

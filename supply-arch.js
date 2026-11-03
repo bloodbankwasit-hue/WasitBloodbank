@@ -4,7 +4,7 @@
 // ================================================================
 const SA_BT = ['A+','A-','B+','B-','O+','O-','AB+','AB-'];
 const SA_CT = ['دم كامل','دم مضغوط','صفائح دموية','بلازما','بروتين بارد'];
-const SA_CL = {'دم كامل':'دم','دم مضغوط':'دم مضغوط','صفائح دموية':'صفيحات دموية','بلازما':'بلازما','بروتين بارد':'بروتين بارد'};
+const SA_CL = {'دم كامل':'دم','دم مضغوط':'دم مضغوط','صفائح دموية':'صفيحات دموية','بلازما':'بلازما','بروتين بارد':'Cryo'};
 const SA_KIND = {hand:'باي هاند', hospital:'مستشفيات'};
 let _saTab='hospital', _saData=[], _saStats=null, _saBooksRaw=[], _saOpen=new Set(), _saBusy=false, _saHosp=null;
 const saEsc = s => (typeof esc==='function' ? esc(s) : String(s==null?'':s));
@@ -266,10 +266,10 @@ function saAgg(rows,filter){
 }
 function saMatrix(rows,filter){
   const a=saAgg(rows,filter); const cts=SA_CT.filter(c=>a.map[c]);
-  const hasPl=!!a.map['بلازما'];
-  const heads=['المكوّن',...SA_BT,...(hasPl?PLASMA_ABO.map(x=>'بلازما '+x):[]),'المجموع'];
-  const trs=cts.map(c=>{ const m=a.map[c], pl=c==='بلازما';
-    return [saLbl(c),...SA_BT.map(b=>pl?0:(m[b]||0)),...(hasPl?PLASMA_ABO.map(b=>pl?(m[b]||0):0):[]),Object.values(m).reduce((s,x)=>s+x,0)]; });
+  const hasAbo=cts.some(c=>bbNoSign(c));
+  const heads=['المكوّن',...SA_BT,...(hasAbo?PLASMA_ABO.map(x=>x+' (بلا إشارة)'):[]),'المجموع'];
+  const trs=cts.map(c=>{ const m=a.map[c], ns=bbNoSign(c);
+    return [saLbl(c),...SA_BT.map(b=>ns?0:(m[b]||0)),...(hasAbo?PLASMA_ABO.map(b=>ns?(m[b]||0):0):[]),Object.values(m).reduce((s,x)=>s+x,0)]; });
   if(trs.length){ const w=heads.length-2; trs.push(['المجموع',...Array.from({length:w},(_,i)=>trs.reduce((s,r)=>s+r[i+1],0)),a.total]); }
   const extra=[...new Set(Object.values(a.map).flatMap(m=>Object.keys(m)))].filter(x=>!SA_BT.includes(x)&&!PLASMA_ABO.includes(x));
   return {heads,rows:trs,total:a.total,extra};

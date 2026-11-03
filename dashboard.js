@@ -142,7 +142,7 @@ async function openStockByComponent(componentType){
   let data=[]; try{ data=await bbFetchAll(()=>db.from('blood_donations').select('id,blood_type').eq('component_type',componentType).eq('status','in_stock').eq('is_deleted',false)); }catch(e){ toast('تعذر التحميل: '+e.message,'error'); }
   const cnt={};
   (data||[]).forEach(r=>{ const k=bbBt(r.blood_type,componentType); if(k) cnt[k]=(cnt[k]||0)+1; });
-  const bts=componentType==='بلازما' ? PLASMA_ABO : ['A+','A-','B+','B-','O+','O-','AB+','AB-'];
+  const bts=bbNoSign(componentType) ? PLASMA_ABO : ['A+','A-','B+','B-','O+','O-','AB+','AB-'];
   const rare=['O-','AB-','A-','B-'];
   G('ddList').innerHTML=`<div class="btg">${bts.map(bt=>`<div class="btc ${rare.includes(bt)?'warn':''} ${!cnt[bt]?'empty-bt':''}" style="cursor:pointer" onclick="openStockDrill('${componentType}','${bt}')">
     <div class="btc-t">${bt}</div>
@@ -159,7 +159,7 @@ async function openStockDrill(componentType, bt){
 
   let list=[]; try{ list=await bbFetchAll(()=>db.from('blood_donations')
     .select('id,bottle_number,bottle_type,expiry_date,donors(full_name)')
-    .in('blood_type',componentType==='بلازما'?[bt,bt+'+',bt+'-']:[bt]).eq('component_type',componentType).eq('status','in_stock').eq('is_deleted',false));
+    .in('blood_type',bbNoSign(componentType)?[bt,bt+'+',bt+'-']:[bt]).eq('component_type',componentType).eq('status','in_stock').eq('is_deleted',false));
     list.sort((a,b)=>String(a.expiry_date||'').localeCompare(String(b.expiry_date||''))); }catch(e){ toast('تعذر التحميل: '+e.message,'error'); }
 
   if(!list.length){

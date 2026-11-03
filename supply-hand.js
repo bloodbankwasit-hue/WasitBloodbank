@@ -3,7 +3,7 @@
 // اسم المريض والمستشفى ونوع التعويض مرة واحدة؛ كل صف = رقم قنينة + مكوّن موجود فعلاً بالرصيد.
 // التجهيز يتم بعملية واحدة (RPC dispatch_bottles): إما تُجهَّز كل القناني أو لا شيء.
 // ================================================================
-const SH_LABEL = { 'دم كامل':'دم', 'دم مضغوط':'دم مضغوط', 'بلازما':'بلازما', 'صفائح دموية':'صفيحات دموية', 'بروتين بارد':'بروتين بارد' };
+const SH_LABEL = { 'دم كامل':'دم', 'دم مضغوط':'دم مضغوط', 'بلازما':'بلازما', 'صفائح دموية':'صفيحات دموية', 'بروتين بارد':'Cryo' };
 const SH_ORDER = ['دم كامل','دم مضغوط','صفائح دموية','بلازما','بروتين بارد'];
 let _shRows = [], _shSeq = 0, _shBusy = false;
 const shEsc = s => (typeof esc==='function' ? esc(s) : String(s==null?'':s));
@@ -87,7 +87,7 @@ async function shLookup(id,enter){
   }
   ready.sort((a,b)=>SH_ORDER.indexOf(a.component_type||'دم كامل')-SH_ORDER.indexOf(b.component_type||'دم كامل'));
   r.opts=ready;
-  info.textContent=(ready[0].bottle_type||'—')+' — '+(bbBt(ready[0].blood_type,ready.every(x=>x.component_type==='بلازما')?'بلازما':'')||'—');
+  info.textContent=(ready[0].bottle_type||'—')+' — '+(bbBt(ready[0].blood_type,ready.every(x=>bbNoSign(x.component_type))?'بلازما':'')||'—');
   sel.innerHTML='<option value="">— اختر —</option>'+ready.map(x=>`<option value="${x.id}">${shEsc(SH_LABEL[x.component_type||'دم كامل']||x.component_type)}</option>`).join('');
   sel.disabled=false;
   shRefreshOptions();
