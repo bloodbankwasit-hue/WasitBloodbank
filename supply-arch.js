@@ -3,8 +3,8 @@
 // البيانات من RPC: dispatch_archive / dispatch_stats / dispatch_update / dispatch_remove_bottle / dispatch_cancel
 // ================================================================
 const SA_BT = ['A+','A-','B+','B-','O+','O-','AB+','AB-'];
-const SA_CT = ['دم كامل','دم مضغوط','صفائح دموية','بلازما','بروتين بارد'];
-const SA_CL = {'دم كامل':'دم','دم مضغوط':'دم مضغوط','صفائح دموية':'صفيحات دموية','بلازما':'بلازما','بروتين بارد':'Cryo'};
+const SA_CT = ['دم كامل','دم مضغوط','دم مفلتر','صفائح دموية','بلازما','بروتين بارد'];
+const SA_CL = {'دم كامل':'دم','دم مضغوط':'دم مضغوط','دم مفلتر':'دم مفلتر','صفائح دموية':'صفيحات دموية','بلازما':'بلازما','بروتين بارد':'Cryo'};
 const SA_KIND = {hand:'باي هاند', hospital:'مستشفيات'};
 let _saTab='hospital', _saData=[], _saStats=null, _saBooksRaw=[], _saOpen=new Set(), _saBusy=false, _saHosp=null;
 const saEsc = s => (typeof esc==='function' ? esc(s) : String(s==null?'':s));

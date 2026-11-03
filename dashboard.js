@@ -42,9 +42,9 @@ async function loadDash(){
     if(_bg) _bg.style.display=hideStock?'none':'';
     if(!hideStock){
     let stockRows=[]; try{ stockRows=await bbFetchAll(()=>db.from('blood_donations').select('id,component_type').eq('status','in_stock').eq('is_deleted',false)); }catch(e){ toast('تعذر تحميل الرصيد: '+e.message,'error'); }
-    const compCnt={'دم كامل':0,'دم مضغوط':0,'بلازما':0,'صفائح دموية':0,'بروتين بارد':0};
+    const compCnt={'دم كامل':0,'دم مضغوط':0,'دم مفلتر':0,'بلازما':0,'صفائح دموية':0,'بروتين بارد':0};
     (stockRows||[]).forEach(r=>{ const ct=r.component_type||'دم كامل'; compCnt[ct]=(compCnt[ct]||0)+1; });
-    const compIcons={'دم كامل':BAG,'دم مضغوط':BAG,'بلازما':'💛','صفائح دموية':'🟡','بروتين بارد':'🧊'};
+    const compIcons={'دم كامل':BAG,'دم مضغوط':BAG,'دم مفلتر':BAG,'بلازما':'💛','صفائح دموية':'🟡','بروتين بارد':'🧊'};
     G('btGrid').innerHTML=Object.entries(compCnt).map(([name,n])=>`
       <div class="comp-stock-card ${n===0?'empty-bt':''}" style="cursor:pointer" onclick="openStockByComponent('${name}')">
         <div class="comp-stock-icon">${compIcons[name]}</div>

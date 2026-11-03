@@ -106,7 +106,7 @@ function sepBulkSeparate(){
 // infected bottles also surface here (already auto-flagged 'rejected_positive' and added to the
 // rejected list for donor-safety) so staff can formally mark them 'تالفة'.
 // ================================================================
-const PR_CATEGORIES=['دم كامل','دم مضغوط','بلازما','صفائح دموية','بروتين بارد'];
+const PR_CATEGORIES=['دم كامل','دم مضغوط','دم مفلتر','بلازما','صفائح دموية','بروتين بارد'];
 let _prAllRows=[], _prSelectedCat=null, _prLevel=1;
 
 function _prShowLevel(n){
@@ -145,7 +145,7 @@ async function loadPendingRelease(){
     const ct=r.component_type||'دم كامل';
     counts[ct]=(counts[ct]||0)+1;
   });
-  const catIcons={'دم كامل':BAG,'دم مضغوط':BAG,'بلازما':'💛','صفائح دموية':'🟡','بروتين بارد':'🧊'};
+  const catIcons={'دم كامل':BAG,'دم مضغوط':BAG,'دم مفلتر':BAG,'بلازما':'💛','صفائح دموية':'🟡','بروتين بارد':'🧊'};
   const tiles = PR_CATEGORIES.map(c=>`
     <div class="comp-stock-card ${counts[c]===0?'empty-bt':''}" onclick="loadPendingReleaseList('${c}')" style="cursor:pointer">
       <div class="comp-stock-icon">${catIcons[c]}</div>
