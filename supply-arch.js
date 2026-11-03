@@ -92,7 +92,7 @@ async function saLoad(){
 }
 
 // ---------- الأرشيف ----------
-function saBottlesTxt(b){ return (b.bottles||[]).map(x=>x.num+' ('+(x.bt||'—')+' · '+saLbl(x.ct)+')').join('، '); }
+function saBottlesTxt(b){ return (b.bottles||[]).map(x=>x.num+' ('+(bbBt(x.bt,x.ct)||'—')+' · '+saLbl(x.ct)+')').join('، '); }
 // كتاب واحد = (المستشفى + رقم الكتاب + تاريخه) وقد يضم عدة عمليات تجهيز (مكوّنات مختلفة جُهّزت كل واحدة على حدة)
 function saBooks(batches){
   const m=new Map();
@@ -106,7 +106,7 @@ function saBooks(batches){
 function saCompCount(bottles){ const c={}; bottles.forEach(x=>{ c[x.ct]=(c[x.ct]||0)+1; }); return SA_CT.filter(k=>c[k]).map(k=>({ct:k,n:c[k]})); }
 function saBookDetailsTxt(g){
   return SA_CT.map(ct=>{ const bs=g.bottles.filter(x=>x.ct===ct); if(!bs.length) return null;
-    const bt={}; bs.forEach(x=>{ bt[x.bt||'—']=(bt[x.bt||'—']||0)+1; });
+    const bt={}; bs.forEach(x=>{ const k=bbBt(x.bt,x.ct)||'—'; bt[k]=(bt[k]||0)+1; });
     return saLbl(ct)+': '+bs.length+' ('+Object.entries(bt).map(([k,n])=>k+' '+n).join('، ')+') — '+bs.map(x=>x.num).join('، '); }).filter(Boolean).join(' | ');
 }
 function saRenderList(){
@@ -145,7 +145,7 @@ function saBookDetail(g){
   return `<div class="sa-det"><div class="sa-sc">${saTable({headers:m.heads,rows:m.rows})}</div>
     ${g.batches.map(b=>`<div style="margin-top:10px;font-weight:800">عملية تجهيز بتاريخ ${saD(b.date)} — ${b.count} قنينة
       <button class="btn" style="color:#B91C1C;padding:2px 8px;margin-right:8px" onclick="saCancel('${b.batch}')"><i class="ti ti-arrow-back-up"></i> إلغاء هذه العملية</button></div>
-      <table class="sa-t" style="margin-top:4px"><thead><tr><th>رقم القنينة</th><th>الفصيلة</th><th>نوع القنينة</th><th>المكوّن</th><th></th></tr></thead><tbody>${(b.bottles||[]).map(x=>`<tr><td><b>${x.num}</b></td><td>${saX(x.bt||'—')}</td><td>${saEsc(x.btype||'—')}</td><td>${saEsc(saLbl(x.ct))}</td><td><button class="btn" style="color:#B91C1C;padding:2px 8px" onclick="saRemove('${x.id}','${b.batch}',${x.num})" title="إرجاع هذه القنينة للرصيد"><i class="ti ti-arrow-back-up"></i> إرجاع</button></td></tr>`).join('')}</tbody></table>`).join('')}</div>`;
+      <table class="sa-t" style="margin-top:4px"><thead><tr><th>رقم القنينة</th><th>الفصيلة</th><th>نوع القنينة</th><th>المكوّن</th><th></th></tr></thead><tbody>${(b.bottles||[]).map(x=>`<tr><td><b>${x.num}</b></td><td>${saX(bbBt(x.bt,x.ct)||'—')}</td><td>${saEsc(x.btype||'—')}</td><td>${saEsc(saLbl(x.ct))}</td><td><button class="btn" style="color:#B91C1C;padding:2px 8px" onclick="saRemove('${x.id}','${b.batch}',${x.num})" title="إرجاع هذه القنينة للرصيد"><i class="ti ti-arrow-back-up"></i> إرجاع</button></td></tr>`).join('')}</tbody></table>`).join('')}</div>`;
 }
 function saPickHosp(i){ _saHosp = i<0 ? null : (window._saHospList||[])[i]; _saOpen.clear(); saRenderList(); }
 function saToggleBook(i){ const g=(window._saBookList||[])[i]; if(!g) return; _saOpen.has(g.key)?_saOpen.delete(g.key):_saOpen.add(g.key); saRenderList(); }
@@ -196,7 +196,7 @@ function saRenderHand(){
         <span style="margin-right:auto;display:flex;gap:6px" onclick="event.stopPropagation()">
           <button class="btn" onclick="saEdit('${b.batch}')"><i class="ti ti-edit"></i> تعديل</button>
           <button class="btn" style="color:#B91C1C" onclick="saCancel('${b.batch}')"><i class="ti ti-arrow-back-up"></i> إلغاء التجهيز</button></span></div>
-      ${open?`<div class="sa-det"><table class="sa-t"><thead><tr><th>رقم القنينة</th><th>الفصيلة</th><th>نوع القنينة</th><th>المكوّن</th><th></th></tr></thead><tbody>${(b.bottles||[]).map(x=>`<tr><td><b>${x.num}</b></td><td>${saX(x.bt||'—')}</td><td>${saEsc(x.btype||'—')}</td><td>${saEsc(saLbl(x.ct))}</td><td><button class="btn" style="color:#B91C1C;padding:2px 8px" onclick="saRemove('${x.id}','${b.batch}',${x.num})" title="إرجاع هذه القنينة للرصيد"><i class="ti ti-arrow-back-up"></i> إرجاع</button></td></tr>`).join('')}</tbody></table></div>`:''}
+      ${open?`<div class="sa-det"><table class="sa-t"><thead><tr><th>رقم القنينة</th><th>الفصيلة</th><th>نوع القنينة</th><th>المكوّن</th><th></th></tr></thead><tbody>${(b.bottles||[]).map(x=>`<tr><td><b>${x.num}</b></td><td>${saX(bbBt(x.bt,x.ct)||'—')}</td><td>${saEsc(x.btype||'—')}</td><td>${saEsc(saLbl(x.ct))}</td><td><button class="btn" style="color:#B91C1C;padding:2px 8px" onclick="saRemove('${x.id}','${b.batch}',${x.num})" title="إرجاع هذه القنينة للرصيد"><i class="ti ti-arrow-back-up"></i> إرجاع</button></td></tr>`).join('')}</tbody></table></div>`:''}
     </div>`;
   }).join('');
 }
@@ -261,15 +261,17 @@ async function saEditSave(){
 // ---------- الإحصائيات ----------
 function saAgg(rows,filter){
   const f=rows.filter(filter), bt={}, tot={n:0};
-  f.forEach(r=>{ (bt[r.ct]=bt[r.ct]||{}); bt[r.ct][r.bt]=(bt[r.ct][r.bt]||0)+r.n; tot.n+=r.n; });
+  f.forEach(r=>{ const k=bbBt(r.bt,r.ct); (bt[r.ct]=bt[r.ct]||{}); bt[r.ct][k]=(bt[r.ct][k]||0)+r.n; tot.n+=r.n; });
   return {map:bt,total:tot.n};
 }
 function saMatrix(rows,filter){
   const a=saAgg(rows,filter); const cts=SA_CT.filter(c=>a.map[c]);
-  const heads=['المكوّن',...SA_BT,'المجموع'];
-  const trs=cts.map(c=>{ const m=a.map[c]; return [saLbl(c),...SA_BT.map(b=>m[b]||0),Object.values(m).reduce((s,x)=>s+x,0)]; });
-  if(trs.length){ trs.push(['المجموع',...SA_BT.map((b,i)=>trs.reduce((s,r)=>s+r[i+1],0)),a.total]); }
-  const extra=[...new Set(Object.values(a.map).flatMap(m=>Object.keys(m)))].filter(x=>!SA_BT.includes(x));
+  const hasPl=!!a.map['بلازما'];
+  const heads=['المكوّن',...SA_BT,...(hasPl?PLASMA_ABO.map(x=>'بلازما '+x):[]),'المجموع'];
+  const trs=cts.map(c=>{ const m=a.map[c], pl=c==='بلازما';
+    return [saLbl(c),...SA_BT.map(b=>pl?0:(m[b]||0)),...(hasPl?PLASMA_ABO.map(b=>pl?(m[b]||0):0):[]),Object.values(m).reduce((s,x)=>s+x,0)]; });
+  if(trs.length){ const w=heads.length-2; trs.push(['المجموع',...Array.from({length:w},(_,i)=>trs.reduce((s,r)=>s+r[i+1],0)),a.total]); }
+  const extra=[...new Set(Object.values(a.map).flatMap(m=>Object.keys(m)))].filter(x=>!SA_BT.includes(x)&&!PLASMA_ABO.includes(x));
   return {heads,rows:trs,total:a.total,extra};
 }
 function saBuildStats(){

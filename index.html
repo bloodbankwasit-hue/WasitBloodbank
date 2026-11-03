@@ -2183,10 +2183,15 @@ async function bbFetchAll(build,size){
   }
   return all;
 }
+// تسلسل واحد مشترك لهذه الأنواع الخمسة (الباقي: تريما، ريفيوس... كل نوع بتسلسله). يطابق دالة seq_key في قاعدة البيانات.
+const SEQ_SHARED=['أحادي','ثنائي','رباعي','رباعي SAG','مفلتر'];
+const SEQ_SHARED_KEY='تسلسل (أحادي، ثنائي، رباعي، رباعي SAG، مفلتر)';
+function seqKey(t){ return SEQ_SHARED.includes(t) ? SEQ_SHARED_KEY : t; }
 // Return a bottle number to the reuse pool — never twice (a double click / retry used to add the same
 // number again, and the pool then offered it to two donors).
 async function releaseBottleNumber(type,num){
   if(!type||num==null) return;
+  type=seqKey(type);
   const{data:ex}=await db.from('bottle_number_pool').select('id').eq('bottle_type',type).eq('bottle_number',num).limit(1);
   if(ex&&ex.length) return;
   const{error}=await db.from('bottle_number_pool').insert({bottle_type:type,bottle_number:num,created_by:SES?.user?.id});
@@ -4048,6 +4053,7 @@ async function computeSeqAlerts(){
   (seqs||[]).forEach(s=>{ (byType[s.bottle_type]=byType[s.bottle_type]||[]).push(s); });
   const out=[];
   Object.entries(byType).forEach(([type,list])=>{
+    if(seqKey(type)!==type) return;   // الأنواع الخمسة تُحسب على التسلسل المشترك فقط
     // same pick as reception: the newest ACTIVE sequence of that type
     const cur=list.filter(s=>s.is_active).sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)))[0];
     const left=cur ? Math.max(0, cur.end_number-cur.current_number+1) : 0;
@@ -4247,6 +4253,10 @@ function openSupplyExport(){
   });
 }
 
+// البلازما تُعرض وتُجمَّع بالفصيلة فقط (A, B, AB, O) بدون موجب/سالب — بقية المكونات تبقى بإشارتها.
+// البيانات المخزنة (blood_type على السجل) لا تتغير؛ هذا للعرض والتجميع.
+const PLASMA_ABO=['A','B','AB','O'];
+function bbBt(bt,ct){ return (ct==='بلازما' && bt) ? String(bt).replace(/[+\-−]/g,'') : bt; }
 async function loadSupply(){
   await autoMarkExpiredDamaged();
   const{count:dmgCount}=await db.from('blood_donations').select('id',{count:'exact',head:true}).eq('status','damaged').eq('is_deleted',false).is('destruction_report_id',null);
@@ -4276,10 +4286,10 @@ async function loadSupplyComponentGrid(){
 // Level 2 — blood types, counted WITHIN the selected component type only
 async function loadSupplyByComponent(componentType){
   _supplySelectedComponent=componentType;
-  const bts=['A+','A-','B+','B-','O+','O-','AB+','AB-'];
+  const bts=componentType==='بلازما' ? PLASMA_ABO : ['A+','A-','B+','B-','O+','O-','AB+','AB-'];
   let counts; try{ counts=await bbFetchAll(()=>db.from('blood_donations').select('id,blood_type').eq('status','in_stock').eq('is_deleted',false).eq('component_type',componentType)); }catch(e){ toast('تعذر تحميل أعداد الرصيد: '+e.message,'error'); counts=[]; }
   const cnt={};
-  (counts||[]).forEach(r=>{ cnt[r.blood_type]=(cnt[r.blood_type]||0)+1; });
+  (counts||[]).forEach(r=>{ const k=bbBt(r.blood_type,componentType); cnt[k]=(cnt[k]||0)+1; });
   G('supplyGrid').innerHTML=`
     <div style="font-size:18px;font-weight:700;color:#BE123C;margin-bottom:10px">${componentType} — اختر الفصيلة</div>
     <div class="btg">${bts.map(bt=>`<div class="stock-bt ${(cnt[bt]||0)===0?'empty-bt':''}" onclick="loadSupplyList('${bt}')">
@@ -4356,7 +4366,7 @@ function bloodBagCard(r, onclickJs){
     <div class="bb-card" onclick="${onclickJs}">
       <svg viewBox="68 34 228 298" class="bb-svg"><use href="#bb-halo" fill="${color}" stroke="${color}"/><use href="#bb-sep"/><use href="#bb-liquid" fill="${liquid}"/><use href="#bb-label"/></svg>
       <div class="bb-num">${r.bottle_number||'—'}</div>
-      <div class="bb-bt">${r.blood_type||'—'} ${r.component_type&&r.component_type!=='دم كامل'?'· '+r.component_type:''}</div>
+      <div class="bb-bt">${bbBt(r.blood_type,r.component_type)||'—'} ${r.component_type&&r.component_type!=='دم كامل'?'· '+r.component_type:''}</div>
       <div class="bb-dates">
         <span>سحب: ${fd(r.draw_date)}</span>
         <span>نفاد: ${fd(r.expiry_date)}</span>
@@ -4368,7 +4378,7 @@ function bloodBagCard(r, onclickJs){
 async function loadSupplyList(bt){
   _supplySelectedBT = bt;
   const ct=_supplySelectedComponent||'دم كامل';
-  let data=[]; try{ data=await bbFetchAll(()=>db.from('blood_donations').select('id,bottle_number,bottle_type,blood_type,component_type,draw_date,expiry_date,donors(full_name)').eq('status','in_stock').eq('blood_type',bt).eq('component_type',ct).eq('is_deleted',false)); data.sort((a,b)=>String(a.expiry_date||'').localeCompare(String(b.expiry_date||''))); }catch(e){ toast('تعذر تحميل القائمة: '+e.message,'error'); }
+  let data=[]; try{ data=await bbFetchAll(()=>db.from('blood_donations').select('id,bottle_number,bottle_type,blood_type,component_type,draw_date,expiry_date,donors(full_name)').eq('status','in_stock').in('blood_type',ct==='بلازما'?[bt,bt+'+',bt+'-']:[bt]).eq('component_type',ct).eq('is_deleted',false)); data.sort((a,b)=>String(a.expiry_date||'').localeCompare(String(b.expiry_date||''))); }catch(e){ toast('تعذر تحميل القائمة: '+e.message,'error'); }
   const titleBar=`<div style="font-size:18px;font-weight:700;color:#BE123C;margin-bottom:10px">${ct} — فصيلة ${bt} — ${(data||[]).length} قنينة</div>`;
   if(data&&data.length){
     const bar=`<div id="supplyBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
@@ -4498,6 +4508,35 @@ async function confirmSeparate(){
       await withScrollPreserved(_supplyRefreshCurrentLevel);
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }
+}
+
+// «لم تُفصل»: القنينة تبقى دم كامل وتكمل مسارها (المخزن المؤقت ← الرصيد) كدم طبيعي. لا تُنشأ مكوّنات.
+async function markNotSeparated(ids, fromModal){
+  ids=(ids||[]).filter(Boolean);
+  if(!ids.length){ toast('يرجى تحديد قنينة واحدة على الأقل','error'); return; }
+  if(!confirm(ids.length===1?'تأكيد: هذه القنينة لم تُفصل وتبقى دم طبيعي؟':'تأكيد: '+ids.length+' قنينة لم تُفصل وتبقى دم طبيعي؟')) return;
+  load(true);
+  try{
+    const{data,error}=await db.from('blood_donations').update({not_separated:true})
+      .in('id',ids).eq('component_type','دم كامل').eq('is_deleted',false).in('status',['pending_lab','pending_release','in_stock']).select('id');
+    if(error) throw error;
+    const n=(data||[]).length;
+    if(!n){ toast('لا توجد قنينة قابلة لهذا الإجراء','error'); return; }
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:ids[0],new_values:{not_separated:true,count:n}});
+    toast('✅ '+n+' قنينة بقيت دم طبيعي وانتقلت للمخزن المؤقت','success',4500);
+    if(fromModal) G('separateModal').classList.remove('on');
+    if(G('s-separation')?.classList.contains('on')) await withScrollPreserved(()=> loadSeparationList());
+    else if(G('s-pending_release')?.classList.contains('on')) await withScrollPreserved(loadPendingRelease);
+    else await withScrollPreserved(_supplyRefreshCurrentLevel);
+  }catch(e){ toast('خطأ: '+(e.message||e),'error'); }
+  finally{ load(false); }
+}
+async function undoNotSeparated(id){
+  load(true);
+  try{ const{error}=await db.from('blood_donations').update({not_separated:false}).eq('id',id).neq('status','separated'); if(error) throw error;
+    toast('رجعت القنينة لقائمة الفصل','success');
+    if(G('s-separation')?.classList.contains('on')) await withScrollPreserved(()=> loadSeparationList());
+  }catch(e){ toast('خطأ: '+(e.message||e),'error'); } finally{ load(false); }
 }
 
 // ── Damage (تلف) — manual (any reason, asked) + automatic (expiry, no prompt — see
@@ -4915,8 +4954,9 @@ async function fetchNextBN(){
   inp.dataset.poolId=''; inp.dataset.seqId='';
   // First offer a number released earlier (e.g. a donor rejected medically at the draw stage
   // after a number was already reserved for them) before drawing a fresh one from the sequence.
+  const sqk=seqKey(btype);
   const{data:pooled}=await db.from('bottle_number_pool')
-    .select('id,bottle_number').eq('bottle_type',btype)
+    .select('id,bottle_number').eq('bottle_type',sqk)
     .order('bottle_number',{ascending:true}).limit(1);
   if(pooled && pooled.length){
     inp.value = pooled[0].bottle_number;
@@ -4925,16 +4965,16 @@ async function fetchNextBN(){
   }
   const{data,error}=await db.from('bottle_sequences')
     .select('id,current_number,end_number')
-    .eq('bottle_type', btype)
+    .eq('bottle_type', sqk)
     .eq('is_active', true)
     .order('created_at',{ascending:false})
     .limit(1);
   if(error||!data||!data.length){
-    inp.value=''; showSeqEndModal(btype,false); return;
+    inp.value=''; showSeqEndModal(sqk,false); return;
   }
   const seq = data[0];
   if(seq.current_number > seq.end_number){
-    inp.value=''; showSeqEndModal(btype,true); return;
+    inp.value=''; showSeqEndModal(sqk,true); return;
   }
   inp.value = seq.current_number;
   inp.dataset.seqId = seq.id;
@@ -5199,14 +5239,10 @@ if('serviceWorker' in navigator){
         <div class="fgrp s2">
           <label>نوع القنينة *</label>
           <select id="sq-type">
-            <option value="مفلتر">مفلتر</option>
+            <option value="تسلسل (أحادي، ثنائي، رباعي، رباعي SAG، مفلتر)">تسلسل (أحادي، ثنائي، رباعي، رباعي SAG، مفلتر)</option>
             <option value="ريفيوس">ريفيوس</option>
-            <option value="رباعي SAG">رباعي SAG</option>
-            <option value="رباعي">رباعي</option>
-            <option value="ثنائي">ثنائي</option>
             <option value="تريما">تريما (سحب آلي)</option>
-            <option value="أحادي">أحادي</option>
-          </select>
+</select>
         </div>
         <div class="fgrp"><label>من رقم *</label><input type="text" inputmode="numeric" id="sq-from" placeholder="21928" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
         <div class="fgrp"><label>إلى رقم *</label><input type="text" inputmode="numeric" id="sq-to" placeholder="25000" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
@@ -5633,9 +5669,11 @@ if('serviceWorker' in navigator){
       <div style="font-size:15.5px;font-weight:700;color:#374151;margin-bottom:8px">حدد المكونات الناتجة فعلياً:</div>
       <div id="sep-list"></div>
       <div style="font-size:14.5px;color:#94A3B8;margin-top:6px">القنينة الأصلية (دم كامل) ستختفي من الخزين، وكل مكوّن محدد يدخل الخزين كسطر مستقل بنفس اسم المتبرع ورقم القنينة.</div>
+      <div style="font-size:14.5px;color:#0F766E;margin-top:6px">«لم تُفصل»: تبقى القنينة دم طبيعي (دم كامل) وتنتقل للمخزن المؤقت ثم تُحفظ بالرصيد كدم طبيعي.</div>
     </div>
     <div class="modal-foot">
       <button class="btn" onclick="G('separateModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
+      <button class="btn" style="border-color:#0F766E;color:#0F766E" onclick="markNotSeparated(G('sep-id').value.split(',').filter(Boolean),true)"><i class="ti ti-droplet"></i> لم تُفصل</button>
       <button class="btn btn-p" onclick="confirmSeparate()"><i class="ti ti-check"></i> تأكيد الفصل</button>
     </div>
   </div>

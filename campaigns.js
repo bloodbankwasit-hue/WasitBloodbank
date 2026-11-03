@@ -25,6 +25,7 @@ const SEP_FV = {
     if(m.status==='pending_draw') return {k:'notready',t:'بانتظار السحب'};
     if(m.status==='damaged') return {k:'excl',t:'⛔ تالف'+(note?': '+note:'')};
     if(m.status==='rejected_positive') return {k:'excl',t:'🦠 إصابة: '+(m.serology_type||'')};
+    if(m.not_separated && m.status!=='separated') return {k:'done',ns:true,t:'🩸 لم تُفصل — دم طبيعي (تُحفظ كدم كامل)'};
     if(m.status==='pending_lab') return {k:'ready',t:'⏳ لم تُفحص لحد الآن'};
     if(m.status==='pending_release'||m.status==='in_stock') return {k:'ready',t:'✅ سليمة — جاهزة للفصل'};
     if(m.status==='separated') return {k:'done',t:'✓ تم الفصل'};
@@ -35,12 +36,16 @@ const SEP_FV = {
     <span id="sepBulkCount">0 محدد</span>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn" style="background:#0369A1;color:#fff;border:none" onclick="sepBulkSeparate()"><i class="ti ti-git-fork"></i> فصل المحدد</button>
+      <button class="btn" style="background:#0F766E;color:#fff;border:none" onclick="sepBulkNotSeparated()"><i class="ti ti-droplet"></i> لم تُفصل</button>
       <button class="btn" style="background:#7F1D1D;color:#fff;border:none" onclick="sepBulkDamage()"><i class="ti ti-trash"></i> تلف المحدد</button>
       <button class="btn" style="background:#374151;color:#fff;border:none" onclick="document.querySelectorAll('.sep-chk').forEach(c=>c.checked=false);updateSepBulkBar()">إلغاء التحديد</button>
     </div></div>`,
   actions(m,st){
+    if(st.ns) return `<button class="btn" style="font-size:15px;padding:8px 10px" onclick="openSeparateModalBulk(['${m.id}'],'${m.bottle_type}','${m.bottle_number}')"><i class="ti ti-git-fork"></i> فصل</button>
+      <button class="btn" style="font-size:15px;padding:8px 10px" onclick="undoNotSeparated('${m.id}')"><i class="ti ti-arrow-back-up"></i> تراجع</button>`;
     if(st.k!=='ready') return '';
     return `<button class="btn btn-p" style="font-size:15px;padding:8px 10px" onclick="openSeparateModalBulk(['${m.id}'],'${m.bottle_type}','${m.bottle_number}')"><i class="ti ti-git-fork"></i> فصل</button>
+      <button class="btn" style="font-size:15px;padding:8px 10px;border-color:#0F766E;color:#0F766E" onclick="markNotSeparated(['${m.id}'])"><i class="ti ti-droplet"></i> لم تُفصل</button>
       <button class="btn" style="font-size:15px;padding:8px 10px;border-color:#7F1D1D;color:#7F1D1D" onclick="openDamageModal(['${m.id}'])"><i class="ti ti-trash"></i> تلف</button>`;
   },
   async legacy(){
@@ -64,6 +69,11 @@ async function loadSeparationBoard(){ _sepSelectedType=null; _sepShowLevel(1); a
 // بعد فصل/إتلاف: تحديث العرض الحالي مع البقاء داخل نفس الاستمارة
 async function loadSeparationList(){ _sepShowLevel(1); await FV.refresh('sep'); }
 
+function sepBulkNotSeparated(){
+  const ids=[...document.querySelectorAll('.sep-chk:checked')].map(c=>c.value);
+  if(!ids.length){ toast('يرجى تحديد قنينة واحدة على الأقل','error'); return; }
+  markNotSeparated(ids);
+}
 function sepBulkDamage(){
   const checked=[...document.querySelectorAll('.sep-chk:checked')].map(c=>c.value);
   if(!checked.length){ toast('يرجى تحديد قنينة واحدة على الأقل','error'); return; }
@@ -123,8 +133,11 @@ async function loadPendingRelease(){
   // (a separable type's un-separated دم كامل row stays out of here; it's tracked in شاشة الفصل)
   const d3=await bbFetchAll(()=>db.from('blood_donations').select('id,'+sel)
     .eq('status','pending_lab').neq('component_type','دم كامل').eq('is_deleted',false));
+  // (4) دم كامل لنوع قابل للفصل اختير له «لم تُفصل» — يكمل مساره كدم طبيعي حتى قبل اكتمال الفحص
+  let d4=[]; try{ d4=await bbFetchAll(()=>db.from('blood_donations').select('id,'+sel)
+    .eq('status','pending_lab').eq('not_separated',true).eq('component_type','دم كامل').eq('is_deleted',false)); }catch(e){ d4=[]; }
   load(false);
-  _prAllRows=[...(d1||[]),...(d2||[]),...(d3||[])].sort((a,b)=>(a.bottle_number||0)-(b.bottle_number||0));
+  _prAllRows=[...(d1||[]),...(d2||[]),...(d3||[]),...d4].sort((a,b)=>(a.bottle_number||0)-(b.bottle_number||0));
 
   const counts={}; PR_CATEGORIES.forEach(c=>counts[c]=0); let infectedCount=0;
   _prAllRows.forEach(r=>{

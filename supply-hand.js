@@ -87,7 +87,7 @@ async function shLookup(id,enter){
   }
   ready.sort((a,b)=>SH_ORDER.indexOf(a.component_type||'دم كامل')-SH_ORDER.indexOf(b.component_type||'دم كامل'));
   r.opts=ready;
-  info.textContent=(ready[0].bottle_type||'—')+' — '+(ready[0].blood_type||'—');
+  info.textContent=(ready[0].bottle_type||'—')+' — '+(bbBt(ready[0].blood_type,ready.every(x=>x.component_type==='بلازما')?'بلازما':'')||'—');
   sel.innerHTML='<option value="">— اختر —</option>'+ready.map(x=>`<option value="${x.id}">${shEsc(SH_LABEL[x.component_type||'دم كامل']||x.component_type)}</option>`).join('');
   sel.disabled=false;
   shRefreshOptions();
@@ -111,7 +111,7 @@ function shSummary(){
   const box=G('sh-sum'); if(!box) return;
   const picked=_shRows.map(r=>r.opts.find(o=>o.id===r.pick)).filter(Boolean);
   if(!picked.length){ box.style.display='none'; return; }
-  const by={}; picked.forEach(o=>{ const c=o.component_type||'دم كامل'; (by[c]=by[c]||{}); by[c][o.blood_type||'—']=(by[c][o.blood_type||'—']||0)+1; });
+  const by={}; picked.forEach(o=>{ const c=o.component_type||'دم كامل'; (by[c]=by[c]||{}); const k=bbBt(o.blood_type,c)||'—'; by[c][k]=(by[c][k]||0)+1; });
   box.style.display='block';
   box.innerHTML='<b>الملخص ('+picked.length+' قنينة):</b><br>'+SH_ORDER.filter(c=>by[c]).map(c=>
     '• '+shEsc(SH_LABEL[c])+': '+Object.entries(by[c]).map(([bt,n])=>shEsc(bt)+' ← '+n).join('، ')).join('<br>');

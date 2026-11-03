@@ -161,7 +161,7 @@ async function shpLookup(id,enter){
       return bad('⛔ القنينة '+num+' غير جاهزة للتجهيز — حالتها: '+st);
     }
     r.opts=ready;
-    info.textContent=(ready[0].blood_type||'—')+'  —  '+(ready[0].bottle_type||'—');   // الفصيلة + نوع القنينة تلقائياً
+    info.textContent=(bbBt(ready[0].blood_type,G('shp-comp')?.value)||'—')+'  —  '+(ready[0].bottle_type||'—');   // الفصيلة + نوع القنينة تلقائياً
     shpApplyAll();
     if(enter && r.pick) shpNext(id);
   }catch(e){ bad('تعذر البحث: '+(e.message||e)); }
