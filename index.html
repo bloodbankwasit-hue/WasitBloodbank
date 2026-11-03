@@ -1713,7 +1713,7 @@ tbody tr:hover td{background:#fafafa}
         </div>
         <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:nowrap">
           <button class="btn" style="background:#DCFCE7;color:#166534;border:1.5px solid #86EFAC;font-weight:800;font-size:16px;padding:10px 16px;white-space:nowrap" onclick="openSupplyHand()"><i class="ti ti-hand-grab"></i> تجهيز by hand</button>
-          <button class="btn" style="background:#DCFCE7;color:#166534;border:1.5px solid #86EFAC;font-weight:800;font-size:16px;padding:10px 16px;white-space:nowrap" onclick="toast('تجهيز المستشفيات — قيد التصميم، نكمله بعد by hand','info',4000)"><i class="ti ti-building-hospital"></i> تجهيز مستشفيات</button>
+          <button class="btn" style="background:#DCFCE7;color:#166534;border:1.5px solid #86EFAC;font-weight:800;font-size:16px;padding:10px 16px;white-space:nowrap" onclick="openSupplyHosp()"><i class="ti ti-building-hospital"></i> تجهيز مستشفيات</button>
           <button class="btn" style="background:#FEE2E2;color:#991B1B;border:1.5px solid #FCA5A5;font-weight:800;font-size:16px;padding:10px 16px;margin-right:auto;white-space:nowrap" onclick="toast('الإتلاف — قيد التصميم','info',4000)"><i class="ti ti-trash"></i> إتلاف</button>
         </div>
         <div id="supplyTypeGrid" class="comp-stock-grid" style="margin-bottom:16px"></div>
@@ -2090,6 +2090,10 @@ function load(v){ G('loader').classList.toggle('on',v); }
 // Opens the donation editor from any screen (donors.js is loaded on demand).
 // Opens the donor/donation record READ-ONLY first (👁); the «تعديل الاستمارة» button inside unlocks it.
 // opts: {edit:true} opens unlocked straight away; {noEdit:true} hides the unlock button (viewing only).
+async function openSupplyHosp(){
+  try{ await loadOneScript('supply-hosp.js'); }catch(e){ toast('تعذر تحميل شاشة تجهيز المستشفيات','error'); return; }
+  shpOpen();
+}
 async function openSupplyHand(){
   try{ await loadOneScript('supply-hand.js'); }catch(e){ toast('تعذر تحميل شاشة التجهيز','error'); return; }
   shOpen();
