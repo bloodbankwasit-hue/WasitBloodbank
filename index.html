@@ -931,12 +931,12 @@ tbody tr:hover td{background:#fafafa}
     <div class="lerr" id="lerr"><i class="ti ti-alert-circle"></i><span id="lerrMsg">خطأ</span></div>
     <div class="fg">
       <label>البريد الإلكتروني</label>
-      <input type="email" id="lemail" placeholder="user@health.gov.iq" onkeydown="if(event.key==='Enter')document.getElementById('lpw').focus()">
+      <input type="email" id="lemail" name="email" autocomplete="username" placeholder="user@health.gov.iq" onkeydown="if(event.key==='Enter')document.getElementById('lpw').focus()">
     </div>
     <div class="fg">
       <label>كلمة المرور</label>
       <div class="fw">
-        <input type="password" id="lpw" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+        <input type="password" id="lpw" name="password" autocomplete="current-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
         <button class="eye" onclick="togglePw()" type="button" id="eyeIco" style="font-size:21px">👁</button>
       </div>
     </div>
@@ -1050,7 +1050,7 @@ tbody tr:hover td{background:#fafafa}
       <div class="ptb-title" id="pgTitle">لوحة التحكم</div>
       <span class="tb-date" id="tbDate"></span>
       <button class="dt-logout" id="dtPrinterBtn" style="display:none" onclick="openPrinterSettings()" title="إعدادات الطابعات">🖨️ الطابعات</button>
-      <button class="dt-logout" onclick="if(confirm('تسجيل الخروج؟'))doLogout()" title="تسجيل الخروج"><i class="ti ti-logout"></i> <span id="dtUserName"></span> · خروج</button>
+      <button class="dt-logout" onclick="bbAskLogout()" title="تسجيل الخروج"><i class="ti ti-logout"></i> <span id="dtUserName"></span> · خروج</button>
     </div>
     <div class="page">
 
@@ -2995,7 +2995,7 @@ async function appInit(){
     }
     if(ev==='SIGNED_OUT'){
       SES=null; UPROF=null;
-      showLogin();
+      showLogin();   // also re-focuses the login fields and pre-fills the remembered e-mail
     }
   });
 }
@@ -3021,6 +3021,8 @@ async function doLogin(){
     eb.classList.add('on');
     G('lbtn').innerHTML='<i class="ti ti-login"></i> دخول آمن';
     G('lbtn').disabled=false;
+  } else {
+    try{ localStorage.setItem('bb_lastEmail',email); }catch(e){}   // remember the account name for next time (never the password)
   }
 }
 
@@ -3128,6 +3130,41 @@ function showLogin(){
   diag("Login page shown ✅");
   G('loginPage').style.display='flex'; G('app').classList.remove('on');
   G('lbtn').innerHTML='<i class="ti ti-login"></i> دخول آمن'; G('lbtn').disabled=false;
+  bbLoginPrefill();
+}
+// Remembered account: the e-mail is pre-filled; focus goes to the password (or the e-mail if none remembered).
+function bbLoginPrefill(){
+  try{
+    const em=G('lemail'), pw=G('lpw'); if(!em||!pw) return;
+    let last=''; try{ last=localStorage.getItem('bb_lastEmail')||''; }catch(e){}
+    if(last && !em.value) em.value=last;
+    pw.value='';
+    bbRefocus(em.value?pw:em);
+  }catch(e){}
+}
+// Desktop app (Electron) can lose keyboard focus after a native dialog or a sign-out, so typing is ignored until the app is
+// restarted. Re-take focus explicitly (a few retries) instead of relying on the window keeping it.
+function bbRefocus(el){
+  const go=()=>{ try{ window.focus(); if(el){ el.disabled=false; el.readOnly=false; el.blur(); el.focus(); } }catch(e){} };
+  go(); setTimeout(go,60); setTimeout(go,250); setTimeout(go,700);
+}
+// Same recovery after any native confirm()/alert() — they are what takes the focus away in the desktop app.
+(function(){
+  const _c=window.confirm.bind(window), _a=window.alert.bind(window);
+  const back=()=>setTimeout(()=>{ try{ window.focus(); const a=document.activeElement; if(a&&a!==document.body&&a.focus){ a.blur(); a.focus(); } }catch(e){} },0);
+  window.confirm=function(m){ const r=_c(m); back(); return r; };
+  window.alert=function(m){ const r=_a(m); back(); return r; };
+})();
+// Logout confirmation without a native dialog (the native one is what froze the login fields in the desktop app)
+function bbAskLogout(){
+  let ov=G('bbLogoutOv'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='bbLogoutOv';
+  ov.style.cssText='position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:20px 22px;max-width:340px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.3);text-align:center"><div style="font-size:17px;font-weight:700;margin-bottom:6px">تسجيل الخروج؟</div><div style="font-size:14px;color:#6B7280;margin-bottom:16px">سيُطلب منك الدخول مجدداً.</div><div style="display:flex;gap:8px"><button class="btn" id="bbLoNo" style="flex:1;justify-content:center">إلغاء</button><button class="btn btn-p" id="bbLoYes" style="flex:1;justify-content:center">خروج</button></div></div>';
+  document.body.appendChild(ov);
+  G('bbLoNo').onclick=()=>ov.remove();
+  G('bbLoYes').onclick=()=>{ ov.remove(); doLogout(); };
+  G('bbLoYes').focus();
 }
 async function showApp(){
   G('loginPage').style.display='none';
@@ -4972,7 +5009,7 @@ function applyMobileLayout(){
   else { sb.style.cssText='display:flex;flex-direction:column'; }
 }
 window.addEventListener('resize', applyMobileLayout);
-window.addEventListener('load', ()=>{ appInit().catch(e=>console.log('appInit err:',e)); setTimeout(applyMobileLayout,100); });
+window.addEventListener('load', ()=>{ appInit().catch(e=>console.log('appInit err:',e)); setTimeout(applyMobileLayout,100); setTimeout(()=>{ try{ const lp=G('loginPage'); if(lp && lp.style.display!=='none' && !G('app').classList.contains('on')) bbLoginPrefill(); }catch(e){} },400); });
 
 // Service Worker — PWA offline support
 if('serviceWorker' in navigator){
