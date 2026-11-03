@@ -585,7 +585,7 @@ tbody tr:hover td{background:#fafafa}
   .bottom-nav{display:none !important}
   .back-btn{display:none !important}
 
-  .dth-hero{
+  .dth-hero{position:relative;
     display:flex;align-items:center;gap:16px;
     background:linear-gradient(120deg,#BE123C,#E11D48 60%,#F43F5E);
     border-radius:22px;padding:28px 32px;margin-bottom:26px;color:#fff;
@@ -1459,6 +1459,7 @@ tbody tr:hover td{background:#fafafa}
             <div class="dth-hero-title">مصرف الدم الرئيسي — واسط</div>
             <div class="dth-hero-sub">اختر القسم اللي تريد تشتغل عليه</div>
           </div>
+          <button class="sb-notif can" id="dthNotifBtn" onclick="openNotifPanel()" title="التنبيهات" style="display:flex;left:18px;width:46px;height:46px;font-size:26px"><i class="ti ti-bell"></i><span class="sb-notif-badge" id="dthNotifBadge">0</span></button>
         </div>
         <div class="dth-grid" id="dtHomeGrid"></div>
       </div>
@@ -4085,7 +4086,7 @@ async function refreshExpiryNotifications(){
   } else {
     badge.style.display='none';
   }
-  const sbb=G('sbNotifBadge'); if(sbb){ sbb.textContent=total>99?'99+':total; sbb.style.display=total?'flex':'none'; }
+  ['sbNotifBadge','dthNotifBadge'].forEach(i=>{ const sbb=G(i); if(sbb){ sbb.textContent=total>99?'99+':total; sbb.style.display=total?'flex':'none'; } });
   try{ setupNotifTabVisibility(); }catch(e){}
   try{ if(G('notifModal')?.classList.contains('on')) openNotifPanel(); }catch(e){}   // اللوحة مفتوحة: حدّثها فوراً بعد أي إجراء
 }
@@ -4106,7 +4107,7 @@ async function bbGoSupplyList(ct,bt){
 function bbNotifGo(fn){ G('notifModal').classList.remove('on'); try{ fn(); }catch(e){} }
 
 function openNotifPanel(){
-  const badge=G('notifBadge'); if(badge) badge.style.display='none'; const sbb0=G('sbNotifBadge'); if(sbb0) sbb0.style.display='none'; // seen — dismiss until next refresh
+  const badge=G('notifBadge'); if(badge) badge.style.display='none'; ['sbNotifBadge','dthNotifBadge'].forEach(i=>{ const x=G(i); if(x) x.style.display='none'; }); // seen — dismiss until next refresh
   const seqList=window._SEQ_NOTIFS||[];
   if(seqList.length){ const seen=_seqSeenGet(); seqList.forEach(a=>{ seen[a.type]=a.rung; }); _seqSeenSet(seen); }
   const expList=window._EXPIRY_NOTIFS||[];
