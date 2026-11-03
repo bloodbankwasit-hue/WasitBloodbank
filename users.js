@@ -59,6 +59,7 @@ async function loadUsers(){
   load(true);
   const{data}=await db.from('user_profiles').select('id,full_name,role,is_active,created_at,permissions').order('created_at',{ascending:true});
   load(false);
+  window._USERS_CACHE=data||[];
   const rl={admin:'مدير النظام',tech:'فني مختبر',reception:'موظف استقبال',viewer:'عرض فقط'};
   if(data&&data.length){
     G('usersTbl').innerHTML=`<div class="tw"><table><thead><tr>
@@ -69,7 +70,7 @@ async function loadUsers(){
       <td><span class="pill ${u.is_active?'pg':'pr'}">${u.is_active?'نشط':'معطّل'}</span></td>
       <td>${fd(u.created_at)}</td>
       <td>${u.id!==SES?.user?.id?`
-        <button class="ibtn" onclick="showEditUser('${u.id}','${esc(u.full_name)}','${u.role}')" title="تعديل"><i class="ti ti-edit"></i></button>
+        <button class="ibtn" onclick="showEditUser('${u.id}')" title="تعديل"><i class="ti ti-edit"></i></button>
         <button class="ibtn" onclick="toggleUserActive('${u.id}',${u.is_active})" title="${u.is_active?'تعطيل':'تفعيل'}">
           <i class="ti ${u.is_active?'ti-user-off':'ti-user-check'}"></i>
         </button>`:'<span style="font-size:13px;color:#9e9e9e">حسابك الحالي</span>'}
@@ -127,10 +128,25 @@ async function createUser(){
   finally{load(false);}
 }
 
-function showEditUser(id,name,role,perms){
-  G('eu-id').value=id; G('eu-name').value=name;
-  const permArr = perms ? JSON.parse(perms) : [];
+async function showEditUser(id){
+  // Always read the account's CURRENT saved permissions so the boxes show what it already has (add / remove from there)
+  let u=(window._USERS_CACHE||[]).find(x=>x.id===id);
+  load(true);
+  try{
+    const{data,error}=await db.from('user_profiles').select('id,full_name,role,permissions').eq('id',id).single();
+    if(error) throw error;
+    u=data;
+  }catch(e){
+    if(!u){ load(false); toast('تعذر جلب بيانات الحساب: '+(e.message||''),'error'); return; }
+    toast('⚠️ تعذر تحديث الصلاحيات من السيرفر — المعروض من آخر تحميل للقائمة','warning',4500);
+  }
+  load(false);
+  G('eu-id').value=u.id; G('eu-name').value=u.full_name||'';
+  let permArr=u.permissions;
+  if(typeof permArr==='string'){ try{ permArr=JSON.parse(permArr); }catch(e){ permArr=[]; } }
+  if(!Array.isArray(permArr)) permArr=[];
   renderPermCheckboxes('eu-perms', permArr);
+  const cnt=G('eu-perm-count'); if(cnt) cnt.textContent=permArr.filter(k=>k!=='hide_stock').length+' صلاحية حالية';
   G('editUserModal').classList.add('on');
 }
 
@@ -138,6 +154,11 @@ async function saveUserEdit(){
   const id=G('eu-id').value, nm=G('eu-name').value.trim();
   if(!nm){toast('أدخل الاسم','error');return;}
   const perms = getCheckedPerms('eu-perms');
+  // 'hide_stock' is a hidden flag that has no checkbox: keep it as the account already had it (otherwise saving would silently drop it)
+  try{
+    const{data:cur}=await db.from('user_profiles').select('permissions').eq('id',id).single();
+    if((cur?.permissions||[]).includes('hide_stock') && !perms.includes('hide_stock')) perms.push('hide_stock');
+  }catch(e){}
   load(true);
   const{error}=await db.from('user_profiles').update({full_name:nm,permissions:perms}).eq('id',id);
   load(false);

@@ -100,12 +100,24 @@ async function colPrintBlank(){
   }catch(e){ toast('خطأ: '+e.message,'error'); }
 }
 
+// تعديل اسم/تفاصيل متبرع من داخل الاستمارة (نفس شاشة تعديل المتبرعين). بعد الحفظ تُحدَّث الاستمارة تلقائياً (راجع saveDonorEdit).
+let _colEditBusy=false;
+async function colEditMember(donationId){
+  if(_colEditBusy) return; _colEditBusy=true;
+  try{
+    if(!IS_ONLINE){ toast('التعديل يحتاج اتصالاً بالإنترنت','warning'); return; }
+    if(!donationId){ toast('تعذّر تحديد السجل','error'); return; }
+    await openEditDonation(donationId,{edit:true});
+  }catch(e){ toast('تعذّر فتح التعديل: '+(e.message||e),'error',5000); }
+  finally{ _colEditBusy=false; }
+}
+
 function colTab(t){ _colTab = t; colRender(); }
 async function openCollectionModal(t){ _colTab = t||'T'; G('collectionModal').classList.add('on'); await colRender(); }
 
 function _colFormBlock(f, members, mode){
   const act = members.filter(m=>m.exit_reason!=='medical_reject');
-  const names = members.map((m,i)=>`<div style="display:flex;gap:8px;padding:6px 10px;border-bottom:1px solid #F3F4F6;font-size:14px"><b style="width:22px">${i+1}</b><span style="flex:1;${m.exit_reason==='medical_reject'?'color:#B91C1C;text-decoration:line-through':''}">${esc(bbTa(m.full_name||''))}</span><span style="color:#6B7280">${esc(m.bottle_type||'')} ${esc(m.bottle_number||'')}</span></div>`).join('');
+  const names = members.map((m,i)=>`<div style="display:flex;gap:8px;padding:6px 10px;border-bottom:1px solid #F3F4F6;font-size:14px"><b style="width:22px">${i+1}</b><span style="flex:1;${m.exit_reason==='medical_reject'?'color:#B91C1C;text-decoration:line-through':''}">${esc(bbTa(m.full_name||''))}</span><span style="color:#6B7280">${esc(m.bottle_type||'')} ${esc(m.bottle_number||'')}</span>${(m.id && !m.is_deleted && m.exit_reason!=='medical_reject')?`<button class="ibtn" title="تعديل الاسم / التفاصيل" onclick="colEditMember('${esc(m.id)}')" style="color:#BE123C;flex-shrink:0"><i class="ti ti-edit"></i></button>`:''}</div>`).join('');
   const dt = _colDate(f.last_name_at);
   const head = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px"><b style="font-size:15px">استمارة #${f.form_no} — ${esc((COL_GROUPS[f.form_group]||{}).name||'')}</b><span style="font-size:12.5px;color:#6B7280">${esc(dt)} — ${members.length} أسماء${f.status==='open'?' (مفتوحة)':''}</span></div>`;
   const args = `'${f.id}',${f.form_no},'${dt}',${f.printed_at?'true':'false'}`;

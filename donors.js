@@ -328,9 +328,15 @@ async function saveDonorEdit(printAfter){
 
     toast('✅ تم حفظ التعديلات','success');
     G('editDonorModal').classList.remove('on');
-    // Refresh whichever screen the editor was opened from.
-    if(G('s-donors')?.classList.contains('on')) await loadDonors(DPAGE);
-    else if((G('s-draw')?.classList.contains('on')||G('s-trima')?.classList.contains('on')) && typeof reloadDrawView==='function') await reloadDrawView();
+    // Refresh whichever screens show this record (the data is already saved — a refresh problem must never look like a failed save).
+    try{
+      if(G('s-donors')?.classList.contains('on')) await loadDonors(DPAGE);
+      else if((G('s-draw')?.classList.contains('on')||G('s-trima')?.classList.contains('on')) && typeof reloadDrawView==='function') await reloadDrawView();
+      else if(typeof FV!=='undefined' && FV.refresh){
+        for(const [sec,u] of [['classification','classification'],['virology','virology'],['separation','sep']]){ if(G('s-'+sec)?.classList.contains('on')){ try{ await FV.refresh(u); }catch(e){} } }
+      }
+      if(G('collectionModal')?.classList.contains('on') && typeof colRender==='function') await colRender();
+    }catch(re){ console.log('refresh after edit:',re); toast('تم الحفظ — حدّث الصفحة لرؤية التغيير','info',4000); }
     if(printAfter===true){
       // The print routine re-reads the saved record from the database (by id), so the new data is what prints.
       _lastDonation={id:donId, donor_name:G('ed-name').value.trim(), bottle_number:G('ed-bnum').value, bottle_type:G('ed-btyp').value,

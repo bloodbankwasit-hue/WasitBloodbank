@@ -44,6 +44,7 @@ html{-webkit-text-size-adjust:100%}
 
 /* ===== MODAL ===== */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:7700;display:none;align-items:center;justify-content:center}
+#editDonorModal{z-index:8100}   /* above the collection-form window so editing a name from inside it is visible */
 /* The desktop section popup hosts a whole screen (list, form...) and must always sit BELOW any
    action modal (test/separate/damage/bottle-detail...) opened from within it — otherwise its own
    translucent backdrop can paint over a same-z-index modal that happens to be earlier in the DOM,
@@ -90,7 +91,12 @@ html{-webkit-text-size-adjust:100%}
   padding:0;border-bottom:none;
   background:linear-gradient(135deg,#BE123C 0%,#881337 100%);
 }
+.sb-head{position:relative}
 .sb-logo{display:flex;align-items:center;gap:10px;padding:20px 14px 16px}
+.sb-notif{display:none;position:absolute;left:8px;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:10px;border:1.5px solid rgba(255,255,255,.35);background:rgba(255,255,255,.18);color:#fff;cursor:pointer;align-items:center;justify-content:center;font-size:20px;padding:0}
+.sb-notif:hover{background:rgba(255,255,255,.3)}
+@media(min-width:769px){.sb-notif.can{display:flex}.sb-head .sb-logo{padding:18px 8px 16px 54px;gap:8px}.sb-head .sb-dot{width:38px;height:38px}.sb-head .sb-name{font-size:14px;white-space:nowrap}.sb-head .sb-org{font-size:12px;white-space:nowrap}}
+.sb-notif-badge{position:absolute;top:-7px;left:-7px;background:#fff;color:#BE123C;font-size:12px;font-weight:800;min-width:18px;height:18px;border-radius:9px;display:none;align-items:center;justify-content:center;padding:0 4px;box-shadow:0 1px 4px rgba(0,0,0,.3)}
 .sb-dot{width:42px;height:42px;background:rgba(255,255,255,.2);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1.5px solid rgba(255,255,255,.3)}
 .sb-dot i{font-size:25px;color:#fff}
 .sb-name{font-size:16px;font-weight:700;color:#fff;line-height:1.3}
@@ -960,6 +966,7 @@ tbody tr:hover td{background:#fafafa}
         <div class="sb-dot" style="font-size:25px">🩸</div>
         <div><div class="sb-name">مصرف الدم الرئيسي</div><div class="sb-org">واسط — وزارة الصحة</div></div>
       </div>
+      <button class="sb-notif" id="sbNotifBtn" onclick="openNotifPanel()" title="التنبيهات"><i class="ti ti-bell"></i><span class="sb-notif-badge" id="sbNotifBadge">0</span></button>
     </div>
     <div class="sb-nav">
       <div class="nb"><div class="nl">الرئيسية</div>
@@ -3154,6 +3161,7 @@ function setupNotifTabVisibility(){
   const canSee = (UPROF?.role==='admin') || hasPermission('notifications') || (canAutoBackup() && bbNoticeList().length>0) || ((window._WAIT_FORMS||[]).length>0);
   const btn=G('tab-notif-btn');
   if(btn) btn.style.display = canSee ? '' : 'none';
+  const sbn=G('sbNotifBtn'); if(sbn) sbn.classList.toggle('can', !!canSee);   // desktop: bell in the red sidebar header
 }
 
 
@@ -3919,6 +3927,7 @@ async function refreshExpiryNotifications(){
   } else {
     badge.style.display='none';
   }
+  const sbb=G('sbNotifBadge'); if(sbb){ sbb.textContent=total>99?'99+':total; sbb.style.display=total?'flex':'none'; }
   try{ setupNotifTabVisibility(); }catch(e){}
 }
 async function bbOpenWaitingForms(){
@@ -3929,7 +3938,7 @@ async function bbOpenWaitingForms(){
 function bbNotifGo(fn){ G('notifModal').classList.remove('on'); try{ fn(); }catch(e){} }
 
 function openNotifPanel(){
-  const badge=G('notifBadge'); if(badge) badge.style.display='none'; // seen — dismiss until next refresh
+  const badge=G('notifBadge'); if(badge) badge.style.display='none'; const sbb0=G('sbNotifBadge'); if(sbb0) sbb0.style.display='none'; // seen — dismiss until next refresh
   const seqList=window._SEQ_NOTIFS||[];
   if(seqList.length){ const seen=_seqSeenGet(); seqList.forEach(a=>{ seen[a.type]=a.rung; }); _seqSeenSet(seen); }
   const expList=window._EXPIRY_NOTIFS||[];
@@ -5074,7 +5083,7 @@ if('serviceWorker' in navigator){
         <div class="fgrp s2"><label>الاسم الكامل</label><input type="text" id="eu-name" placeholder="اسم الموظف"></div>
       </div>
       <div style="margin-top:12px">
-        <label style="font-size:16px;color:#616161;font-weight:600;display:block;margin-bottom:8px">الأقسام المسموح بها</label>
+        <label style="font-size:16px;color:#616161;font-weight:600;display:block;margin-bottom:8px">الأقسام المسموح بها <span id="eu-perm-count" style="font-size:13px;color:#BE123C;font-weight:700;margin-right:8px"></span></label>
         <div id="eu-perms" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
       </div>
     </div>
