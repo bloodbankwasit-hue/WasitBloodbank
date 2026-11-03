@@ -13,7 +13,8 @@
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="icon.png">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<!-- Icons: served from this site first (works on old/locked-down PCs that can't reach the CDN); falls back to the CDN if the local copy isn't uploaded -->
+<link rel="stylesheet" href="tabler/tabler-icons.min.css" onerror="this.onerror=null;var l=document.createElement('link');l.rel='stylesheet';l.href='https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css';document.head.appendChild(l)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap" rel="stylesheet">

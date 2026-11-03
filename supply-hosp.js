@@ -5,7 +5,7 @@
 // ================================================================
 const SHP_COMPS = [ ['دم كامل','دم'], ['دم مضغوط','دم مضغوط'], ['بلازما','بلازما'], ['بروتين بارد','بروتين بارد'] ];
 const SHP_EXTRA = { 'صفائح دموية':'صفيحات دموية' };          // يظهر فقط إذا كانت القنينة المدخلة فيها صفيحات جاهزة
-const SHP_MAX = 200;
+const SHP_SANE = 3000;   // لا حد عملي للعدد؛ هذا فقط حارس ضد خطأ كتابة (مثل 100000) يجمّد الصفحة
 let _shpRows = [], _shpSeq = 0;
 const shpEsc = s => (typeof esc==='function' ? esc(s) : String(s==null?'':s));
 
@@ -62,14 +62,14 @@ function shpOpen(){
 function shpHeader(){
   let hosp=G('shp-hosp').value; if(hosp==='أخرى') hosp=G('shp-hosp-o').value.trim();
   const cnt=parseInt(G('shp-cnt').value)||0, book=G('shp-book').value.trim(), bdate=G('shp-bdate').value;
-  return { hosp, cnt, book, bdate, ok: !!(hosp && cnt>0 && cnt<=SHP_MAX && book && bdate) };
+  return { hosp, cnt, book, bdate, ok: !!(hosp && cnt>0 && cnt<=SHP_SANE && book && bdate) };
 }
 
 // (re)generate the rows to match the count — rows already filled are never thrown away by accident
 function shpBuild(){
   const h=shpHeader(), box=G('shp-rows');
   if(!h.ok){
-    const why = h.cnt>SHP_MAX ? 'الحد الأقصى '+SHP_MAX+' قنينة بالكتاب الواحد' : 'أكمل الحقول الأربعة (المستشفى، العدد، رقم الكتاب، تاريخه) لتظهر أسطر القناني';
+    const why = h.cnt>SHP_SANE ? 'العدد '+h.cnt+' كبير جداً — تأكد من الرقم' : 'أكمل الحقول الأربعة (المستشفى، العدد، رقم الكتاب، تاريخه) لتظهر أسطر القناني';
     if(!_shpRows.length) box.innerHTML='<div class="shp-hint"><i class="ti ti-list-numbers" style="font-size:26px;display:block;margin-bottom:6px"></i>'+why+'</div>';
     else { const hint=G('shp-hint2'); if(!hint){ const d=document.createElement('div'); d.id='shp-hint2'; d.style.cssText='color:#B45309;font-size:13.5px;font-weight:700;margin-bottom:6px'; box.prepend(d); } G('shp-hint2').textContent='⚠️ '+why; }
     shpProgress(); return;
@@ -77,9 +77,10 @@ function shpBuild(){
   G('shp-hint2')?.remove();
   if(!_shpRows.length) box.innerHTML='';
   while(_shpRows.length<h.cnt) shpAddRow();
+  // تقليل العدد: الأسطر الفارغة بالنهاية تُحذف تلقائياً؛ أي سطر فيه قنينة لا يُحذف إلا بزر الحذف (حتى لا يضيع إدخال بالخطأ)
   while(_shpRows.length>h.cnt){
     const last=_shpRows[_shpRows.length-1];
-    if(last.num){ toast('⚠️ لا يمكن تقليل العدد: السطر '+_shpRows.length+' فيه قنينة مُدخلة — احذفها أولاً','warning',4500); G('shp-cnt').value=String(_shpRows.length); break; }
+    if(last.num) break;
     G('shpr-'+last.id)?.remove(); _shpRows.pop();
   }
   shpRenumber(); shpProgress();
@@ -93,7 +94,7 @@ function shpAddRow(){
     <input type="text" inputmode="numeric" id="shpn-${id}" placeholder="رقم القنينة" oninput="this.value=normDigits(this.value).replace(/[^0-9]/g,'')" onchange="shpLookup(${id})" onkeydown="if(event.key==='Enter'){event.preventDefault();shpLookup(${id},true)}">
     <div class="shp-info" id="shpi-${id}">—</div>
     <select id="shps-${id}" onchange="shpPick(${id})" disabled>${shpCompOptions([])}</select>
-    <button class="btn" title="مسح السطر" onclick="shpClear(${id})" style="padding:3px 6px;color:#B91C1C"><i class="ti ti-eraser"></i></button>
+    <button class="btn" title="حذف هذا السطر" onclick="shpDelRow(${id})" style="padding:3px 6px;color:#B91C1C"><i class="ti ti-trash"></i></button>
     <div class="shp-msg" id="shpm-${id}"></div>`;
   G('shp-rows').appendChild(d);
 }
@@ -106,9 +107,14 @@ function shpCompOptions(avail){
   return h;
 }
 
-function shpClear(id){
+// حذف سطر. إذا عدد الأسطر أكبر من العدد المطلوب نكتفي بحذفه (تقترب من العدد)؛ وإلا ينقص العدد المكتوب معه ليبقيا متطابقين.
+function shpDelRow(id){
   const r=_shpRows.find(x=>x.id===id); if(!r) return;
-  G('shpn-'+id).value=''; shpLookup(id);
+  if(_shpRows.length<=1){ G('shpn-'+id).value=''; shpLookup(id); return; }
+  const h=shpHeader(), wasOver=_shpRows.length>h.cnt;
+  _shpRows=_shpRows.filter(x=>x.id!==id); G('shpr-'+id)?.remove();
+  if(!wasOver) G('shp-cnt').value=String(_shpRows.length);
+  shpRenumber(); shpRefreshOptions(); shpProgress();
 }
 
 async function shpLookup(id,enter){
@@ -162,8 +168,11 @@ function shpPick(id){
 function shpProgress(){
   const p=G('shp-prog'), go=G('shp-go'); if(!p) return;
   const h=shpHeader(), done=_shpRows.filter(r=>r.pick).length, total=_shpRows.length;
-  p.innerHTML = total ? `مكتمل <span style="color:#166534">${done}</span> من ${total}` + (_shpRows.some(r=>r.state==='bad')?' <span style="color:#B91C1C">— فيه أسطر فيها خطأ</span>':'') : '';
-  if(go) go.disabled = !(h.ok && total && done===total && !_shpRows.some(r=>r.state==='bad'));
+  const over = h.ok ? total-h.cnt : 0;
+  p.innerHTML = total ? `مكتمل <span style="color:#166534">${done}</span> من ${total}`
+    + (over>0 ? ` <span style="color:#B45309">— العدد المطلوب ${h.cnt}: احذف ${over} سطراً بزر 🗑️ ثم احفظ</span>` : '')
+    + (_shpRows.some(r=>r.state==='bad')?' <span style="color:#B91C1C">— فيه أسطر فيها خطأ</span>':'') : '';
+  if(go) go.disabled = !(h.ok && total && total===h.cnt && done===total && !_shpRows.some(r=>r.state==='bad'));
 }
 
 function shpSubmit(){
