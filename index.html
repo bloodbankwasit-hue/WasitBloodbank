@@ -57,6 +57,11 @@ html{-webkit-text-size-adjust:100%}
    making the new popup look like it opened "underneath" the list instead of on top of it. */
 #sectionPopup{z-index:7690}
 .overlay.on{display:flex}
+.bb-back-btn{display:inline-flex;align-items:center;gap:4px;border:1.5px solid #E5E7EB;background:#F9FAFB;color:#374151;border-radius:10px;padding:4px 11px;font-family:inherit;font-size:14.5px;font-weight:800;cursor:pointer;flex-shrink:0;margin-inline-end:6px}
+.bb-back-btn:hover{background:#FCE7F3;border-color:#F9A8D4;color:#9D174D}
+.bb-back-bar{display:flex;margin-bottom:10px}
+.sec-popup-back{border:1.5px solid #E5E7EB;background:#F9FAFB;color:#374151;border-radius:10px;padding:5px 12px;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-inline-end:10px}
+.sec-popup-back:hover{background:#FCE7F3;color:#9D174D}
 .modal{background:#fff;border-radius:12px;padding:22px;width:500px;max-width:96vw;max-height:90vh;overflow-y:auto}
 .modal-title{font-size:17px;font-weight:700;color:#1a1a1a;margin-bottom:14px;display:flex;align-items:center;gap:7px}
 .modal-title i{color:#BE123C}
@@ -1395,7 +1400,7 @@ tbody tr:hover td{background:#fafafa}
         <div style="height:1px;background:#EEF2F6;margin:16px 0"></div>
         <div class="sh"><div class="sh-t">⚙️ إعدادات النظام</div></div>
         <div class="setg">
-          <div class="setc" onclick="nav('audit',document.querySelector('.ni'))">
+          <div class="setc" onclick="bbGoSection('audit')">
             <div class="setc-ico"><i class="ti ti-shield-lock"></i></div>
             <div class="setc-t">سجل التتبع (Audit Log)</div>
             <div class="setc-d">مراجعة جميع العمليات والتعديلات مع التاريخ والمستخدم المسؤول</div>
@@ -1717,7 +1722,7 @@ tbody tr:hover td{background:#fafafa}
           <div class="sh-t"><i class="ti ti-package"></i> خزين القناني</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn" style="font-size:15px;padding:7px 12px" onclick="openSupplyExport()"><i class="ti ti-file-export"></i> تصدير متقدم</button>
-            <button id="viewDamagedBtn" class="btn" style="border-color:#7F1D1D;color:#7F1D1D;font-size:15px;padding:7px 12px" onclick="nav('damaged_store')">🗑️ القناني التالفة (0)</button>
+            <button id="viewDamagedBtn" class="btn" style="border-color:#7F1D1D;color:#7F1D1D;font-size:15px;padding:7px 12px" onclick="bbGoSection('damaged_store')">🗑️ القناني التالفة (0)</button>
           </div>
         </div>
         <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
@@ -2055,6 +2060,26 @@ function enableEnterAsTab(containerSelector){
     }
   });
 }
+// «رجوع»: كل نافذة تُفتح بزر تحصل زر رجوع يعيدك للمكان الذي كنت فيه (الإغلاق بدون حفظ). تُستثنى النوافذ التي تنتظر قراراً صريحاً.
+(function(){
+  const SKIP=new Set(['sectionPopup','bloodTypeConflictModal','intervalBlockModal','printChoiceModal']);
+  function addBack(ov){
+    if(!ov||!ov.classList||!ov.classList.contains('overlay')||SKIP.has(ov.id)||ov.dataset.bbBack) return;
+    const m=ov.querySelector(':scope > .modal'); if(!m) return;
+    ov.dataset.bbBack='1';
+    const b=document.createElement('button'); b.type='button'; b.className='bb-back-btn'; b.innerHTML='‹ رجوع'; b.title='رجوع للمكان السابق';
+    b.onclick=function(e){ e.stopPropagation(); ov.classList.remove('on'); };
+    const t=m.querySelector(':scope > .modal-title');
+    if(t) t.insertBefore(b,t.firstChild);
+    else { const bar=document.createElement('div'); bar.className='bb-back-bar'; bar.appendChild(b); m.insertBefore(bar,m.firstChild); }
+  }
+  function scan(root){ if(!root||root.nodeType!==1) return; if(root.classList.contains('overlay')) addBack(root); root.querySelectorAll&&root.querySelectorAll('.overlay').forEach(addBack); }
+  window.bbBackScan=function(){ scan(document.body); };
+  const start=()=>{ scan(document.body);
+    new MutationObserver(ms=>ms.forEach(m=>{ if(m.type==='attributes'){ if(m.target.classList.contains('on')) addBack(m.target); } else m.addedNodes.forEach(scan); }))
+      .observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class']}); };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
+})();
 // A word-final «ة» is always written «ه» (the bank's convention): converted while typing in the donor forms,
 // and also applied when printing so older records print the same way.
 function bbTa(v){ return (typeof v==='string') ? v.replace(/\u0629(?=\s|$)/g,'\u0647') : v; }
@@ -4102,7 +4127,15 @@ async function bbNotifForm(act,id,no,dt){
 // تنبيه الانتهاء: يفتح قائمة القناني المعنية مباشرة (المكوّن + الفصيلة) لتتخذ إجراءً عليها
 async function bbGoSupplyList(ct,bt){
   G('notifModal').classList.remove('on');
-  try{ await nav('supply',null); await loadSupplyByComponent(ct); await loadSupplyList(bt); }catch(e){}
+  try{ await bbGoSection('supply'); await loadSupplyByComponent(ct); await loadSupplyList(bt); }catch(e){}
+}
+// فتح قسم من التنبيهات: على الكمبيوتر الأقسام تُفتح كنافذة (popup) من الرئيسية بزر إغلاق، وعلى الموبايل بالتنقل العادي.
+// الاستدعاء المباشر لـ nav() على الكمبيوتر كان يترك القسم بلا زر رجوع (الصفحة «تتجمد»).
+async function bbGoSection(key){
+  if(window.matchMedia('(min-width:769px)').matches && G('s-dthome') && G('sectionPopup')){
+    if(_popupSectionId) closeSectionPopup(true);
+    await openSectionPopup(key, TITLES[key]);
+  } else await nav(key,null);
 }
 function bbNotifGo(fn){ G('notifModal').classList.remove('on'); try{ fn(); }catch(e){} }
 
@@ -4117,7 +4150,7 @@ function openNotifPanel(){
   // Low / finished bottle-number sequences — shown first because only a refill fixes them
   const seqRows=seqList.map(a=>{
     const done=a.remaining<=0, red=a.remaining<=20;
-    return `<div onclick="G('notifModal').classList.remove('on');nav('settings',null)" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid ${red?'#FECACA':'#FDE68A'};background:${red?'#FEF2F2':'#FFFBEB'};border-radius:10px;margin-bottom:8px">
+    return `<div onclick="bbNotifGo(()=>bbGoSection('settings'))" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid ${red?'#FECACA':'#FDE68A'};background:${red?'#FEF2F2':'#FFFBEB'};border-radius:10px;margin-bottom:8px">
       <div>
         <div style="font-weight:700;font-size:16.5px;color:${red?'#7F1D1D':'#92400E'}">${done?'⛔ انتهى تسلسل «'+esc(a.type)+'»':'⚠️ تسلسل «'+esc(a.type)+'»: بقي '+a.remaining+' قنينة فقط'}</div>
         <div style="font-size:14.5px;color:#757575;margin-top:2px">املأ تسلسلاً جديداً من الإعدادات${done?' — الاستقبال متوقف لهذا النوع':''}</div>
@@ -4127,7 +4160,7 @@ function openNotifPanel(){
 
   // Infected bottles — one row per bottle, always on top (more urgent than expiry warnings)
   const infRows=infList.map(r=>`
-    <div onclick="bbNotifGo(()=>nav('infected',null))" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid #FECACA;background:#FEF2F2;border-radius:10px;margin-bottom:8px">
+    <div onclick="bbNotifGo(()=>bbGoSection('infected'))" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid #FECACA;background:#FEF2F2;border-radius:10px;margin-bottom:8px">
       <div>
         <div style="font-weight:700;font-size:16.5px;color:#7F1D1D">⛔ القنينة رقم ${r.bottle_number||'—'} مصابة</div>
         <div style="font-size:14.5px;color:#757575;margin-top:2px">${r.blood_type||'—'}${r.serology_type?' — '+esc(r.serology_type):''} — بانتظار الفرز بالمخزن المؤقت</div>
@@ -4726,7 +4759,7 @@ async function openSectionPopup(key, title){
   await nav(key, null);
 }
 
-function closeSectionPopup(){
+function closeSectionPopup(noNav){
   if(_popupSectionId){
     const sec=G(_popupSectionId);
     if(sec && _popupHostParent){
@@ -4736,7 +4769,7 @@ function closeSectionPopup(){
   }
   G('sectionPopup').classList.remove('on');
   _popupSectionId=null; _popupHostParent=null; _popupHostNext=null;
-  nav('dthome', null);
+  if(!noNav) nav('dthome', null);
 }
 
 function buildWorkGrid(){
@@ -5582,6 +5615,7 @@ if('serviceWorker' in navigator){
 <div class="overlay" id="sectionPopup">
   <div class="sec-popup-box">
     <div class="sec-popup-head">
+      <button class="sec-popup-back" onclick="closeSectionPopup()">‹ رجوع</button>
       <div class="sec-popup-title" id="sectionPopupTitle">—</div>
       <button class="sec-popup-close" onclick="closeSectionPopup()"><i class="ti ti-x"></i></button>
     </div>
@@ -5614,7 +5648,7 @@ if('serviceWorker' in navigator){
     <div class="modal-body"><div id="seqEndMsg" style="font-size:18px;font-weight:700;color:#7F1D1D;line-height:1.7"></div></div>
     <div class="modal-foot" style="display:flex;gap:8px">
       <button class="btn" style="flex:1;justify-content:center" onclick="G('seqEndModal').classList.remove('on')">موافق</button>
-      <button class="btn btn-p" id="seqEndGo" style="flex:1;justify-content:center" onclick="G('seqEndModal').classList.remove('on');nav('settings',null)"><i class="ti ti-settings"></i> فتح الإعدادات</button>
+      <button class="btn btn-p" id="seqEndGo" style="flex:1;justify-content:center" onclick="G('seqEndModal').classList.remove('on');bbGoSection('settings')"><i class="ti ti-settings"></i> فتح الإعدادات</button>
     </div>
   </div>
 </div>
