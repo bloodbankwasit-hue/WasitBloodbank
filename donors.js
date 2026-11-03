@@ -249,6 +249,7 @@ async function editDonorRow(id,opts){
     G('ed-ser').value=r.serology_result||'';   // '' = not tested yet (never default to Negative)
     G('ed-sert').value=r.serology_type||'HIV';
     toggleEdSer();
+    { const _f=G('ed-bnum'); if(_f) delete _f.dataset.keep; const _h=G('ed-bnum-hint'); if(_h) _h.style.display='none'; }
     const md=G('editDonorModal'); md.dataset.status=r.status||''; md.dataset.origType=r.bottle_type||''; md.dataset.noEdit=opts.noEdit?'1':'';
     edSetMode(!!opts.edit && !opts.noEdit);
     md.classList.add('on');
@@ -270,6 +271,21 @@ function edSetMode(editable){
   G('edBtnCancel').innerHTML = editable ? '<i class="ti ti-x"></i> إلغاء' : '<i class="ti ti-x"></i> إغلاق';
 }
 function edUnlock(){ edSetMode(true); }
+// Bottle type picked in the editor: the new number is only taken from the server at SAVE time (so two PCs can never get the same
+// one) — make that visible instead of leaving the old number on screen as if nothing will change.
+function edTypeChanged(){
+  const md=G('editDonorModal'), nt=G('ed-btyp').value, h=G('ed-bnum-hint'), f=G('ed-bnum');
+  if(!md||!f) return;
+  const changed = md.dataset.status==='pending_draw' && nt && nt!==md.dataset.origType;
+  if(changed){
+    if(!f.dataset.keep) f.dataset.keep=f.value;
+    f.value='— يُحدَّد عند الحفظ —';
+    if(h){ h.style.display='block'; h.textContent='سيأخذ رقماً جديداً من تسلسل «'+nt+'» عند الحفظ، ويرجع الرقم '+f.dataset.keep+' للتسلسل.'; }
+  } else {
+    if(f.dataset.keep){ f.value=f.dataset.keep; delete f.dataset.keep; }
+    if(h) h.style.display='none';
+  }
+}
 
 function toggleEdSer(){ G('edSerTypGrp').style.display=G('ed-ser').value==='Positive'?'flex':'none'; }
 
@@ -292,7 +308,7 @@ async function saveDonorEdit(printAfter){
     if(md.dataset.status==='pending_draw' && newType && newType!==md.dataset.origType){
       const{data:cr,error:ce}=await db.rpc('change_bottle_type',{p_donation:donId,p_new_type:newType});
       if(ce) throw new Error(ce.message||'تعذر تغيير نوع القنينة');
-      G('ed-bnum').value=cr.bottle_number; md.dataset.origType=newType;
+      G('ed-bnum').value=cr.bottle_number; delete G('ed-bnum').dataset.keep; md.dataset.origType=newType;
       toast('🔁 تغيّر النوع إلى «'+newType+'» — رقم القنينة الجديد: '+cr.bottle_number+' (الرقم القديم '+cr.old_number+' رجع للمخزن). أعد طباعة الملصق إن كان مطبوعاً.','info',9000);
     }
     if(donorId){
