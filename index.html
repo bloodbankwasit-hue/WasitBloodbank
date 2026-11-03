@@ -1054,6 +1054,7 @@ tbody tr:hover td{background:#fafafa}
         <span class="back-btn-icon">‹</span> رجوع
       </button>
       <div class="ptb-title" id="pgTitle">لوحة التحكم</div>
+      <button class="dt-logout" id="secStatsBtn" style="display:none" onclick="openSecStats(window._secStatsKey)" title="إحصائيات عمل هذا القسم">📊 إحصائيات القسم</button>
       <span class="tb-date" id="tbDate"></span>
       <button class="dt-logout" id="dtPrinterBtn" style="display:none" onclick="openPrinterSettings()" title="إعدادات الطابعات">🖨️ الطابعات</button>
       <button class="dt-logout" onclick="bbAskLogout()" title="تسجيل الخروج"><i class="ti ti-logout"></i> <span id="dtUserName"></span> · خروج</button>
@@ -1366,6 +1367,7 @@ tbody tr:hover td{background:#fafafa}
           <div class="fgrp"><label style="font-size:14px;color:#757575;font-weight:600">السنة</label><select id="stYear" onchange="stPickYear(this.value)"><option value="">—</option></select></div>
           <div class="fgrp"><label style="font-size:14px;color:#757575;font-weight:600">من تاريخ</label><input type="date" id="stFrom"></div>
           <div class="fgrp"><label style="font-size:14px;color:#757575;font-weight:600">إلى تاريخ</label><input type="date" id="stTo"></div>
+          <button class="btn" style="background:#E0F2FE;color:#075985;border:1.5px solid #7DD3FC;font-weight:800" onclick="openSecStats()"><i class="ti ti-layout-dashboard"></i> إحصائيات الأقسام</button>
           <button class="btn btn-p" onclick="loadStats()"><i class="ti ti-chart-bar"></i> توليد التقرير</button>
           <button class="btn" onclick="printStats()"><i class="ti ti-printer"></i> طباعة PDF</button>
           <button class="btn" style="background:#166534;color:#fff;border:none" onclick="exportStatsExcel()"><i class="ti ti-table"></i> Excel</button>
@@ -2101,6 +2103,16 @@ function load(v){ G('loader').classList.toggle('on',v); }
 async function openSupplyHosp(){
   try{ await loadOneScript('supply-hosp.js'); }catch(e){ toast('تعذر تحميل شاشة تجهيز المستشفيات','error'); return; }
   shpOpen();
+}
+async function openSecStats(key){
+  try{ await loadOneScript('section-stats.js'); }catch(e){ toast('تعذر تحميل الإحصائيات','error'); return; }
+  ssOpen(key);
+}
+const SEC_STATS_MAP={reception:'reception',add:'reception',collection:'reception',draw:'draw',trima:'trima',virology:'virology',classification:'classification',separation:'separation',pending_release:'separation',supply:'supply',damaged_store:'damaged_store'};
+function bbSecStatsBtn(name){
+  const k=SEC_STATS_MAP[name], b=G('secStatsBtn'); if(!b) return;
+  const ok=!!k && (UPROF?.role==='admin' || hasPermission(k));
+  window._secStatsKey=k; b.style.display=ok?'':'none';
 }
 async function openSupplyArch(tab){
   try{ await loadOneScript('supply-arch.js'); }catch(e){ toast('تعذر تحميل الأرشيف','error'); return; }
@@ -3343,6 +3355,7 @@ async function nav(name, el){
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
   if(el) el.classList.add('on');
   G('pgTitle').textContent=TITLES[name]||name;
+  try{ bbSecStatsBtn(name); }catch(e){}
   closeSb();
   // Back button: show on all screens except main ones
   const _noBack=['dashboard','workhome','account','dthome'];

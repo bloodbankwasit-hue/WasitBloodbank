@@ -78,27 +78,27 @@ const HS_BLOCKS=[
  {perm:'draw', icon:'💉', title:'السحب', load: async (r)=>{
    const ok=await _hsFetchAll(()=>_hsBD().select('id,bottle_type').gte('draw_date',r.from).lte('draw_date',r.to)
      .eq('component_type','دم كامل').eq('is_deleted',false).neq('bottle_type','تريما').not('status','in','(damaged,pending_draw)'));
-   const dmg=await _hsFetchAll(()=>_hsBD().select('id,bottle_type').gte('draw_date',r.from).lte('draw_date',r.to).eq('status','damaged').neq('bottle_type','تريما'));
-   const med=await _hsExitCount(r,'medical_reject',false);
+   const dmg=await _hsFetchAll(()=>_hsBD().select('id,bottle_type,damage_reason').gte('draw_date',r.from).lte('draw_date',r.to).eq('status','damaged').neq('bottle_type','تريما'));
+   const med=await _hsExitCount(r,'medical_reject',false), wdr=await _hsExitCount(r,'withdrawn',false);
    const wait=await _hsCount(_hsBD().select('id',{count:'exact',head:true}).eq('status','pending_draw').eq('is_deleted',false).neq('bottle_type','تريما'));
-   return {tiles:[['قناني مسحوبة',ok.length],['تالفة',dmg.length,'bad'],['رفض طبي',med,'warn'],['بانتظار الآن',wait]],
-     groups:[['حسب نوع القنينة',hsCount(ok,x=>x.bottle_type)]]};
+   return {tiles:[['قناني مسحوبة',ok.length],['تالفة',dmg.length,'bad'],['انسحبوا (لم يتم السحب)',wdr,'warn'],['رفض طبي',med,'warn'],['بانتظار الآن',wait]],
+     groups:[['حسب نوع القنينة',hsCount(ok,x=>x.bottle_type)],['سبب التلف',hsCount(dmg,x=>x.damage_reason)],['التالفة حسب النوع',hsCount(dmg,x=>x.bottle_type)]]};
  }},
  {perm:'trima', icon:'🩸', title:'التريما', load: async (r)=>{
    const comps=await _hsFetchAll(()=>_hsBD().select('id,donor_id,bottle_number,draw_date,component_type').eq('bottle_type','تريما')
      .gte('draw_date',r.from).lte('draw_date',r.to).in('component_type',['دم مضغوط','صفائح دموية']).eq('is_deleted',false));
-   const dmg=await _hsFetchAll(()=>_hsBD().select('id').gte('draw_date',r.from).lte('draw_date',r.to).eq('status','damaged').eq('bottle_type','تريما'));
-   const med=await _hsExitCount(r,'medical_reject',true);
+   const dmg=await _hsFetchAll(()=>_hsBD().select('id,damage_reason').gte('draw_date',r.from).lte('draw_date',r.to).eq('status','damaged').eq('bottle_type','تريما'));
+   const med=await _hsExitCount(r,'medical_reject',true), wdr=await _hsExitCount(r,'withdrawn',true);
    const wait=await _hsCount(_hsBD().select('id',{count:'exact',head:true}).eq('status','pending_draw').eq('is_deleted',false).eq('bottle_type','تريما'));
-   return {tiles:[['سحوبات تريما',hsDistinctDraws(comps).length],['تالفة',dmg.length,'bad'],['رفض طبي',med,'warn'],['بانتظار الآن',wait]],
-     groups:[['الناتج',hsCount(comps,x=>x.component_type)]]};
+   return {tiles:[['سحوبات تريما',hsDistinctDraws(comps).length],['تالفة',dmg.length,'bad'],['انسحبوا (لم يتم السحب)',wdr,'warn'],['رفض طبي',med,'warn'],['بانتظار الآن',wait]],
+     groups:[['الناتج',hsCount(comps,x=>x.component_type)],['سبب التلف',hsCount(dmg,x=>x.damage_reason)]]};
  }},
  {perm:'virology', icon:'🧪', title:'وحدة الفيروسات', load: async (r)=>{
    const rows=hsDistinctDraws(await _hsFetchAll(()=>_hsBD().select('id,donor_id,bottle_number,draw_date,serology_result,serology_type')
      .gte('serology_date',r.from).lte('serology_date',r.to).not('serology_result','is',null).eq('is_deleted',false)));
    const wait=hsDistinctDraws(await _hsFetchAll(()=>_hsBD().select('id,donor_id,bottle_number,draw_date').eq('status','pending_lab').is('serology_result',null).eq('is_deleted',false))).length;
    const pos=rows.filter(x=>x.serology_result==='Positive');
-   return {tiles:[['تم فحصها',rows.length],['سالبة',rows.length-pos.length],['موجبة',pos.length,'bad'],['بانتظار الآن',wait]],
+   return {tiles:[['تم فحصها',rows.length],['سالبة (غير مصابة)',rows.length-pos.length],['موجبة (مصابة)',pos.length,'bad'],['نسبة الإصابة %',rows.length?(Math.round(pos.length*1000/rows.length)/10):0,'warn'],['بانتظار الآن',wait]],
      groups:[['نوع الإصابة',hsCount(pos,x=>x.serology_type)]]};
  }},
  {perm:'classification', icon:'🅰️', title:'وحدة التصنيف', load: async (r)=>{
