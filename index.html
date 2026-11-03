@@ -1479,6 +1479,9 @@ tbody tr:hover td{background:#fafafa}
       <div class="sc" id="s-separation">
         <div class="sh" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><div class="sh-t"><i class="ti ti-dna"></i> الفصل — متابعة القناني بعد السحب</div>
           <button class="btn" id="sepStatsBtn" style="font-size:15px;padding:7px 12px;flex-shrink:0" onclick="sepStatsOpen()"><i class="ti ti-chart-bar"></i> إحصائيات</button></div>
+        <div id="sepPltBox" onclick="openPltStock()" style="cursor:pointer;display:flex;align-items:center;gap:10px;background:#FFFBEB;border:1.5px solid #FDE68A;border-radius:12px;padding:10px 14px;margin-bottom:12px">
+          <span style="font-size:22px">🟡</span><div style="flex:1;font-weight:800;color:#92400E">رصيد الصفيحات الدموية</div>
+          <div id="sepPltCount" style="font-size:24px;font-weight:800;color:#92400E">—</div><i class="ti ti-chevron-left" style="color:#92400E"></i></div>
         <div id="sepTypeGrid" class="comp-stock-grid" style="margin-bottom:16px"></div>
         <div id="sepBoardList"></div>
         <div id="sepStatsPane" style="display:none"></div>
@@ -2019,9 +2022,13 @@ async function bbRangeClash(from,to,opt){
   if(d.data&&d.data.length) m.push('قناني مسجّلة مسبقاً (مثل '+d.data.map(r=>r.bottle_number).join('، ')+')');
   const c=await db.from('campaign_slots').select('bottle_number').gte('bottle_number',from).lte('bottle_number',to).limit(4);
   if(c.data&&c.data.length) m.push('أرقام محجوزة لحملة (مثل '+c.data.map(r=>r.bottle_number).join('، ')+')');
-  let q=db.from('bottle_sequences').select('id,bottle_type,current_number,end_number').eq('is_active',true).lte('current_number',to).gte('end_number',from);
-  if(opt.skipSeq) q=q.neq('id',opt.skipSeq);
-  const sq2=await q.limit(3);
+  // أرقام الحملات لا تتعارض مع «مدى» تسلسلات الاستقبال: الاستقبال يتجاوز تلقائياً أي رقم محجوز لحملة (claim_bottle_number)
+  let sq2={data:[]};
+  if(!opt.ignoreSeqs){
+    let q=db.from('bottle_sequences').select('id,bottle_type,current_number,end_number').eq('is_active',true).lte('current_number',to).gte('end_number',from);
+    if(opt.skipSeq) q=q.neq('id',opt.skipSeq);
+    sq2=await q.limit(3);
+  }
   if(sq2.data&&sq2.data.length) m.push('تتداخل مع تسلسل «'+sq2.data.map(r=>r.bottle_type+' '+r.current_number+'–'+r.end_number).join('، ')+'»');
   return m.length ? ('الأرقام '+from+'–'+to+' متعارضة: '+m.join(' + ')) : '';
 }
@@ -4404,7 +4411,7 @@ async function loadSupplyList(bt){
     const bar=`<div id="supplyBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
       <span id="supplyBulkCount">0 محدد</span>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn" style="background:#7F1D1D;color:#fff;border:none" onclick="bulkDamage()"><i class="ti ti-trash"></i> تلف</button>
+        ${(ct==='صفائح دموية' && !bbCanPlt())?'':'<button class="btn" style="background:#7F1D1D;color:#fff;border:none" onclick="bulkDamage()"><i class="ti ti-trash"></i> تلف</button>'}
         <button class="btn" style="background:#0369A1;color:#fff;border:none" onclick="bulkSeparate()"><i class="ti ti-git-fork"></i> فصل</button>
         <button class="btn" style="background:#374151;color:#fff;border:none" onclick="clearSupplyBulkSelection()">إلغاء التحديد</button>
       </div>
@@ -4458,6 +4465,7 @@ async function openBottleDetail(id){
   const canSeparate = r.component_type==='دم كامل' && !!COMPONENT_RULES[r.bottle_type];
   const sepBtn=G('bd-separate-btn');
   if(sepBtn) sepBtn.style.display = canSeparate ? 'flex' : 'none';
+  const dmgB=G('bd-damage-btn'); if(dmgB) dmgB.style.display = (r.component_type==='صفائح دموية' && !bbCanPlt()) ? 'none' : '';
   G('bottleDetailModal').classList.add('on');
 }
 
@@ -4584,6 +4592,7 @@ async function confirmDamage(){
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:ids[0],new_values:{status:'damaged',reason,count:ids.length}});
     toast('⚠️ تم تسجيل '+ids.length+' قنينة كتالفة','warning',4000);
     G('damageModal').classList.remove('on');
+    if(G('pltStockModal')?.classList.contains('on')) await openPltStock(true);
     if(G('s-pending_release')?.classList.contains('on'))
       await withScrollPreserved(loadPendingRelease);
     else if(G('s-separation')?.classList.contains('on'))
@@ -4592,6 +4601,40 @@ async function confirmDamage(){
       await withScrollPreserved(_supplyRefreshCurrentLevel);
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }
+}
+
+// ── الصفيحات الدموية: إدارتها (تلف، انتهاء...) من مسؤولية حساب الفصل؛ التجهيز يصرفها فقط ويرى رصيدها ──
+function bbCanPlt(){ return UPROF?.role==='admin' || hasPermission('separation'); }
+async function refreshPltBox(){
+  const el=G('sepPltCount'); if(!el) return;
+  try{ const{count,error}=await db.from('blood_donations').select('id',{count:'exact',head:true}).eq('status','in_stock').eq('component_type','صفائح دموية').eq('is_deleted',false);
+    if(error) throw error; el.textContent=count||0; }catch(e){ el.textContent='—'; }
+}
+async function openPltStock(keep){
+  let m=G('pltStockModal');
+  if(!m){ m=document.createElement('div'); m.className='overlay'; m.id='pltStockModal'; document.body.appendChild(m); }
+  if(!keep) m.innerHTML='<div class="modal" style="width:min(640px,96vw)"><div class="modal-body"><div class="empty"><p>جاري التحميل...</p></div></div></div>';
+  m.classList.add('on');
+  let rows=[]; try{ rows=await bbFetchAll(()=>db.from('blood_donations').select('id,bottle_number,blood_type,draw_date,expiry_date').eq('status','in_stock').eq('component_type','صفائح دموية').eq('is_deleted',false)); }catch(e){ toast('تعذر تحميل الصفيحات: '+e.message,'error'); }
+  rows.sort((a,b)=>String(a.expiry_date||'').localeCompare(String(b.expiry_date||'')));
+  const by={}; rows.forEach(r=>{ const k=bbBt(r.blood_type,'صفائح دموية')||'—'; by[k]=(by[k]||0)+1; });
+  const today=new Date(); today.setHours(0,0,0,0);
+  const can=bbCanPlt();
+  const dl=r=>{ if(!r.expiry_date) return '—'; const d=Math.floor((new Date(r.expiry_date)-today)/86400000); return d<0?'منتهية':d===0?'اليوم':d+' يوم'; };
+  m.innerHTML=`<div class="modal" style="width:min(640px,96vw)"><div class="modal-title"><i class="ti ti-droplet"></i> رصيد الصفيحات الدموية — ${rows.length}</div>
+    <div class="modal-body">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${['A','B','AB','O'].map(k=>`<div style="flex:1;min-width:70px;text-align:center;border:1.5px solid #FDE68A;background:#FFFBEB;border-radius:10px;padding:8px"><div style="font-weight:800;color:#92400E">${k}</div><div style="font-size:20px;font-weight:800">${by[k]||0}</div></div>`).join('')}</div>
+      ${rows.length?`${can?`<div style="display:flex;gap:8px;margin-bottom:8px"><button class="btn" style="border-color:#7F1D1D;color:#7F1D1D" onclick="pltDamageSel()"><i class="ti ti-trash"></i> تلف المحدد</button></div>`:''}
+      <div style="max-height:52vh;overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>${can?'<th></th>':''}<th style="text-align:right;padding:6px">رقم القنينة</th><th style="padding:6px">الفصيلة</th><th style="padding:6px">تاريخ النفاد</th><th style="padding:6px">المتبقي</th></tr></thead><tbody>
+      ${rows.map(r=>`<tr style="border-top:1px solid #F1F5F9">${can?`<td style="padding:6px"><input type="checkbox" class="plt-chk" value="${r.id}" style="width:18px;height:18px"></td>`:''}<td style="padding:6px;font-weight:800">${r.bottle_number}</td><td style="padding:6px;text-align:center">${bbBt(r.blood_type,'صفائح دموية')||'—'}</td><td style="padding:6px;text-align:center">${fd(r.expiry_date)}</td><td style="padding:6px;text-align:center">${dl(r)}</td></tr>`).join('')}
+      </tbody></table></div>`:'<div class="empty"><p>لا توجد صفيحات بالرصيد</p></div>'}
+    </div><div class="modal-foot"><button class="btn" onclick="G('pltStockModal').classList.remove('on')">إغلاق</button></div></div>`;
+  refreshPltBox();
+}
+function pltDamageSel(){
+  const ids=[...document.querySelectorAll('.plt-chk:checked')].map(c=>c.value);
+  if(!ids.length){ toast('يرجى تحديد قنينة واحدة على الأقل','error'); return; }
+  openDamageModal(ids);
 }
 
 // ── القناني التالفة — view + permanently clear (bulk soft-delete) ──
@@ -5645,7 +5688,7 @@ if('serviceWorker' in navigator){
     </div>
     <button id="bd-separate-btn" class="btn" style="display:none;width:100%;justify-content:center;margin-top:12px;border-color:#0369A1;color:#0369A1" onclick="openSeparateModal()"><i class="ti ti-git-fork"></i> فصل المكونات</button>
     <div style="display:flex;gap:8px;margin-top:12px">
-      <button class="btn" style="flex:1;justify-content:center;border-color:#7F1D1D;color:#7F1D1D" onclick="openDamageModal([G('bd-id').value])"><i class="ti ti-trash"></i> تلف</button>
+      <button class="btn" id="bd-damage-btn" style="flex:1;justify-content:center;border-color:#7F1D1D;color:#7F1D1D" onclick="openDamageModal([G('bd-id').value])"><i class="ti ti-trash"></i> تلف</button>
       <button class="btn btn-p" style="flex:1;justify-content:center" onclick="toast('قيد الإضافة','warning')"><i class="ti ti-package"></i> تجهيز</button>
     </div>
     <button class="btn" style="width:100%;justify-content:center;margin-top:8px" onclick="G('bottleDetailModal').classList.remove('on')"><i class="ti ti-x"></i> إغلاق</button>

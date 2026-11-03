@@ -65,9 +65,9 @@ const SEP_FV = {
       + (old.length?'<div style="margin:14px 0 6px;font-weight:700;color:#6B7280">بدون استمارة (سجلات قديمة)</div>'+old.map(row).join(''):'');
   }
 };
-async function loadSeparationBoard(){ _sepSelectedType=null; _sepShowLevel(1); await FV.show(SEP_FV); }
+async function loadSeparationBoard(){ _sepSelectedType=null; _sepShowLevel(1); if(typeof autoMarkExpiredDamaged==='function'){ try{ await autoMarkExpiredDamaged(); }catch(e){} } refreshPltBox(); await FV.show(SEP_FV); }
 // بعد فصل/إتلاف: تحديث العرض الحالي مع البقاء داخل نفس الاستمارة
-async function loadSeparationList(){ _sepShowLevel(1); await FV.refresh('sep'); }
+async function loadSeparationList(){ _sepShowLevel(1); refreshPltBox(); await FV.refresh('sep'); }
 
 function sepBulkNotSeparated(){
   const ids=[...document.querySelectorAll('.sep-chk:checked')].map(c=>c.value);
@@ -371,7 +371,7 @@ async function saveCampaign(){
   try{
     // لا يُقبل أي تعارض: الأرقام يجب أن تكون حرّة تماماً (غير مسجلة، غير محجوزة، وخارج تسلسل الاستقبال)
     for(const r of rows){
-      const msg=await bbRangeClash(Math.min(r.from,r.to),Math.max(r.from,r.to));
+      const msg=await bbRangeClash(Math.min(r.from,r.to),Math.max(r.from,r.to),{ignoreSeqs:true});
       if(msg){ load(false); toast('⛔ السطر '+r.n+': '+msg+'. غيّر الرقم ولا يمكن المتابعة','error',10000); return; }
     }
     const{data:camp,error:ce}=await db.from('campaigns').insert({
