@@ -3306,7 +3306,7 @@ function setupNotifTabVisibility(){
   const canSee = (UPROF?.role==='admin') || hasPermission('notifications') || (canAutoBackup() && bbNoticeList().length>0) || ((window._WAIT_FORMS||[]).length>0);
   const btn=G('tab-notif-btn');
   if(btn) btn.style.display = canSee ? '' : 'none';
-  const sbn=G('sbNotifBtn'); if(sbn) sbn.classList.toggle('can', !!canSee);   // desktop: bell in the red sidebar header
+  const sbn=G('sbNotifBtn'); if(sbn) sbn.classList.add('can');   // desktop: the bell in the red header is ALWAYS shown for any signed-in account (the panel itself lists only what the account may see)
 }
 
 
