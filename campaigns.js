@@ -661,7 +661,7 @@ function sepStatsHtml(S){
       <div class="rs"><div class="rs-t">الملخص</div>
         ${rr('قناني دم كامل مفصولة',fnum(a.bottles))}
         ${rr('مكوّنات ناتجة',fnum(a.comps))}
-        ${rr('المعدل اليومي (قنينة/يوم)',a.perDay.toLocaleString('ar-IQ',{maximumFractionDigits:1}))}
+        ${rr('المعدل اليومي (قنينة/يوم)',a.perDay.toLocaleString('en',{maximumFractionDigits:1}))}
       </div>
       <div class="rs"><div class="rs-t">حسب المكوّن</div>${sortRows(a.byComp).map(([k,v])=>rr(k,fnum(v))).join('')}</div>
       <div class="rs"><div class="rs-t">حسب نوع القنينة (قناني مفصولة)</div>${sortRows(a.byType).map(([k,v])=>rr(k,fnum(v))).join('')}</div>

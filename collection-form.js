@@ -7,7 +7,7 @@ const COL_LISTS = ['T','R','B'];
 function colGroupOf(bottleType){ return bbFormGroup(bottleType); }
 let _colTab = 'T', _colBusy = false, _colPopupTimer = null;
 
-const _colDate = v => { if(!v) return ''; const d=new Date(v); return isNaN(d)?'':d.toLocaleDateString('en-CA').replace(/-/g,'/'); };
+const _colDate = v => (typeof bbDmy==='function' ? bbDmy(v) : '');   // DD/MM/YYYY
 async function _colRpc(fn,args){ const r=await db.rpc(fn,args||{}); if(r.error) throw r.error; return r.data; }
 async function colForms(groups,limit){ return await _colRpc('forms_recent',{p_groups:groups,p_limit:limit||60}) || []; }
 async function colMembers(ids){

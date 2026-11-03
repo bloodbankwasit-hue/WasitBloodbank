@@ -195,7 +195,7 @@ async function openBackupAutoModal(){
   G('backupAutoModal').classList.add('on');
   let st={}; try{ st=await window.nativeBackup.get(); }catch(e){}
   const uid=SES?.user?.id; let last=0; try{ last=await _bbaLastStamp(uid); }catch(e){}
-  const lastTxt=last?new Date(last).toLocaleString('ar-IQ'):'لم يتم بعد';
+  const lastTxt=last?bbDmyTime(last):'لم يتم بعد';
   const on=st&&st.folder&&st.exists;
   body.innerHTML=
     '<div style="font-size:13px;line-height:1.9">'+

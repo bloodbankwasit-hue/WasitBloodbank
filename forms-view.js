@@ -10,7 +10,7 @@ const FV = (function(){
   const units = {};
   const GN = { T:'تريما', R:'ريفيوس', B:'بقية الأنواع', A:'قديمة' };
   const esc2 = s => (typeof esc==='function' ? esc(s) : String(s==null?'':s));
-  const dfmt = v => { if(!v) return ''; const d=new Date(v); return isNaN(d)?'':d.toLocaleDateString('en-CA').replace(/-/g,'/'); };
+  const dfmt = v => (typeof bbDmy==='function' ? bbDmy(v) : '');   // DD/MM/YYYY
   const today = () => new Date().toLocaleDateString('en-CA');
 
   (function css(){

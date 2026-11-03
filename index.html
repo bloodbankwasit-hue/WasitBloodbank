@@ -46,7 +46,11 @@ html{-webkit-text-size-adjust:100%}
 
 /* ===== MODAL ===== */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:7700;display:none;align-items:center;justify-content:center}
-#editDonorModal{z-index:8100}   /* above the collection-form window so editing a name from inside it is visible */
+#editDonorModal{z-index:8100}
+.bb-dt{position:relative;display:block;width:100%}
+.bb-dt>input{width:100%;padding-right:36px !important;direction:ltr;text-align:left}
+.bb-dt-btn{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:none;background:none;color:#BE123C;font-size:19px;cursor:pointer;padding:3px;line-height:1}
+.bb-dt-bad{border-color:#DC2626 !important;background:#FEF2F2 !important}   /* above the collection-form window so editing a name from inside it is visible */
 /* The desktop section popup hosts a whole screen (list, form...) and must always sit BELOW any
    action modal (test/separate/damage/bottle-detail...) opened from within it — otherwise its own
    translucent backdrop can paint over a same-z-index modal that happens to be earlier in the DOM,
@@ -1713,9 +1717,11 @@ tbody tr:hover td{background:#fafafa}
             <button id="viewDamagedBtn" class="btn" style="border-color:#7F1D1D;color:#7F1D1D;font-size:15px;padding:7px 12px" onclick="nav('damaged_store')">🗑️ القناني التالفة (0)</button>
           </div>
         </div>
-        <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:nowrap">
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
           <button class="btn" style="background:#DCFCE7;color:#166534;border:1.5px solid #86EFAC;font-weight:800;font-size:16px;padding:10px 16px;white-space:nowrap" onclick="openSupplyHand()"><i class="ti ti-hand-grab"></i> تجهيز by hand</button>
           <button class="btn" style="background:#DCFCE7;color:#166534;border:1.5px solid #86EFAC;font-weight:800;font-size:16px;padding:10px 16px;white-space:nowrap" onclick="openSupplyHosp()"><i class="ti ti-building-hospital"></i> تجهيز مستشفيات</button>
+          <button class="btn" style="background:#E0F2FE;color:#075985;border:1.5px solid #7DD3FC;font-weight:800;font-size:16px;padding:10px 16px;white-space:nowrap" onclick="openSupplyArch('hospital')"><i class="ti ti-archive"></i> الأرشيف</button>
+          <button class="btn" style="background:#E0F2FE;color:#075985;border:1.5px solid #7DD3FC;font-weight:800;font-size:16px;padding:10px 16px;white-space:nowrap" onclick="openSupplyArch('stats')"><i class="ti ti-chart-bar"></i> إحصائيات التجهيز</button>
           <button class="btn" style="background:#FEE2E2;color:#991B1B;border:1.5px solid #FCA5A5;font-weight:800;font-size:16px;padding:10px 16px;margin-right:auto;white-space:nowrap" onclick="toast('الإتلاف — قيد التصميم','info',4000)"><i class="ti ti-trash"></i> إتلاف</button>
         </div>
         <div id="supplyTypeGrid" class="comp-stock-grid" style="margin-bottom:16px"></div>
@@ -2031,7 +2037,7 @@ function enableEnterAsTab(containerSelector){
     // Empty field warning: a required one (label marked *) stops here; an optional one warns and moves on.
     const t = e.target;
     if((t.tagName==='INPUT' || t.tagName==='SELECT') && !t.readOnly && t.type!=='checkbox' && t.type!=='radio' && String(t.value||'').trim()===''){
-      const lb = t.parentElement && t.parentElement.querySelector('label');
+      const lb = (t.closest('.fgrp')||t.parentElement) && (t.closest('.fgrp')||t.parentElement).querySelector('label');
       const lt = lb ? lb.textContent.replace(/\*/g,'').trim() : '';
       if(lb && lb.textContent.indexOf('*')>-1){ toast('⚠️ الخانة فارغة: '+lt+' (مطلوبة)','error',2500); try{ t.focus(); }catch(x){} return; }
       toast('⚠️ الخانة فارغة'+(lt?': '+lt:''),'warning',1800);
@@ -2051,7 +2057,7 @@ function enableEnterAsTab(containerSelector){
 function bbTa(v){ return (typeof v==='string') ? v.replace(/\u0629(?=\s|$)/g,'\u0647') : v; }
 function enableTaNormalize(containerSelector){
   const c=document.querySelector(containerSelector); if(!c) return;
-  const isTxt=el=>el && (el.tagName==='TEXTAREA' || (el.tagName==='INPUT' && (el.type==='text'||el.type==='search'||!el.type)));
+  const isTxt=el=>el && !(el.dataset&&el.dataset.bbDate) && (el.tagName==='TEXTAREA' || (el.tagName==='INPUT' && (el.type==='text'||el.type==='search'||!el.type)));
   c.addEventListener('input', function(e){
     const el=e.target; if(!isTxt(el) || e.isComposing) return;
     const v=el.value.replace(/\u0629(?=\s)/g,'\u0647');
@@ -2095,6 +2101,10 @@ function load(v){ G('loader').classList.toggle('on',v); }
 async function openSupplyHosp(){
   try{ await loadOneScript('supply-hosp.js'); }catch(e){ toast('تعذر تحميل شاشة تجهيز المستشفيات','error'); return; }
   shpOpen();
+}
+async function openSupplyArch(tab){
+  try{ await loadOneScript('supply-arch.js'); }catch(e){ toast('تعذر تحميل الأرشيف','error'); return; }
+  saOpen(tab);
 }
 async function openSupplyHand(){
   try{ await loadOneScript('supply-hand.js'); }catch(e){ toast('تعذر تحميل شاشة التجهيز','error'); return; }
@@ -2171,20 +2181,112 @@ function showIntervalBlockModal(message){
   G('intervalBlockModal').classList.add('on');
 }
 function fd(d){
-  if(!d) return '—';
-  // Built manually (not via toLocaleDateString) so the digits are always plain English 0-9 —
-  // locale-based formatting (e.g. 'ar-IQ') renders Arabic-Indic digits (٠١٢٣...) by default,
-  // which is exactly what we don't want here (matches the "numbers always display in English"
-  // rule already applied to input fields via toEnNums()).
-  const dt=new Date(d);
-  const y=dt.getFullYear(), m=String(dt.getMonth()+1).padStart(2,'0'), day=String(dt.getDate()).padStart(2,'0');
-  return `${y}/${m}/${day}`;
+  const r=bbDmy(d); return r||'—';
+}
+// DD/MM/YYYY (day left, month middle, year right) — built by hand, never from the PC's regional settings.
+// A date-only string (YYYY-MM-DD) is split directly (no time-zone shift); a full timestamp is read in the PC's local time.
+function bbDmy(d){
+  if(!d) return '';
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d));
+  if(m) return m[3]+'/'+m[2]+'/'+m[1];
+  const dt=new Date(d); if(isNaN(dt)) return '';
+  return String(dt.getDate()).padStart(2,'0')+'/'+String(dt.getMonth()+1).padStart(2,'0')+'/'+dt.getFullYear();
+}
+function bbDmyTime(d){
+  if(!d) return '';
+  const dt=new Date(d); if(isNaN(dt)) return '';
+  return bbDmy(d)+' '+String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0');
 }
 function ft(t){ return t ? t.substring(0,5) : '—'; }
 // Typed numbers from any keyboard: Arabic-Indic digits / Arabic decimal separators become plain ones.
+
+// ================================================================
+// DATE FIELDS — one format everywhere: DD/MM/YYYY (day | month | year), typed with an automatic mask.
+// The native <input type="date"> follows the PC's regional settings (mm/dd/yyyy on some PCs), so every date input is
+// swapped for a text field with a calendar button. The rest of the code is unchanged: reading .value still gives
+// YYYY-MM-DD (or '' when empty/incomplete/invalid) and writing .value = 'YYYY-MM-DD' still fills it.
+// ================================================================
+(function(){
+  const proto=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
+  const iso2dmy=v=>{ const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(v||''); return m?m[3]+'/'+m[2]+'/'+m[1]:''; };
+  const dmy2iso=t=>{
+    const m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(t||''); if(!m) return '';
+    const d=+m[1], mo=+m[2], y=+m[3];
+    if(y<1900||y>2100||mo<1||mo>12||d<1||d>new Date(y,mo,0).getDate()) return '';
+    return m[3]+'-'+m[2]+'-'+m[1];
+  };
+  const raw=el=>proto.get.call(el), setRaw=(el,v)=>proto.set.call(el,v);
+  function check(el,final){
+    const t=raw(el);
+    const bad = t && ((t.length===10 && !dmy2iso(t)) || (final && t.length<10));
+    el.classList.toggle('bb-dt-bad',!!bad);
+    el.title = bad ? 'التاريخ غير صحيح — الصيغة: يوم/شهر/سنة (مثال 25/12/2026)' : '';
+    if(bad && final && typeof toast==='function') toast('⚠️ التاريخ غير صحيح: اكتبه بالشكل يوم/شهر/سنة (مثال 25/12/2026)','error',3500);
+    return !bad;
+  }
+  function pick(el,btn){
+    if(el.disabled||el.readOnly) return;
+    const h=document.createElement('input'); h.type='date';
+    const r=btn.getBoundingClientRect();
+    h.style.cssText='position:fixed;opacity:0;width:1px;height:1px;border:0;padding:0;left:'+Math.round(r.left)+'px;top:'+Math.round(r.bottom)+'px';
+    h.value=el.value||'';
+    document.body.appendChild(h);
+    const done=()=>setTimeout(()=>h.remove(),0);
+    h.addEventListener('change',()=>{ if(h.value){ el.value=h.value; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); } done(); });
+    h.addEventListener('blur',done);
+    try{ h.focus(); if(h.showPicker) h.showPicker(); else h.click(); }catch(e){ try{ h.click(); }catch(x){ done(); } }
+  }
+  function enhance(el){
+    if(el.dataset.bbDate) return; el.dataset.bbDate='1';
+    const init=raw(el);
+    el.type='text';
+    el.setAttribute('inputmode','numeric'); el.setAttribute('dir','ltr'); el.setAttribute('maxlength','10'); el.setAttribute('autocomplete','off'); el.placeholder='DD/MM/YYYY';
+    Object.defineProperty(el,'value',{configurable:true,
+      get(){ return dmy2iso(raw(el)); },
+      set(v){ setRaw(el, iso2dmy(v)); el.classList.remove('bb-dt-bad'); el.title=''; }});
+    setRaw(el, iso2dmy(init));
+    const wrap=document.createElement('span'); wrap.className='bb-dt';
+    el.parentNode.insertBefore(wrap,el); wrap.appendChild(el);
+    const btn=document.createElement('button'); btn.type='button'; btn.className='bb-dt-btn'; btn.tabIndex=-1; btn.title='اختيار من التقويم'; btn.innerHTML='<i class="ti ti-calendar"></i>';
+    btn.onclick=()=>pick(el,btn); wrap.appendChild(btn);
+    el.addEventListener('input',()=>{
+      const d=(typeof normDigits==='function'?normDigits(raw(el)):raw(el)).replace(/\D/g,'').slice(0,8);
+      let out=d.slice(0,2); if(d.length>2) out+='/'+d.slice(2,4); if(d.length>4) out+='/'+d.slice(4);
+      if(out!==raw(el)) setRaw(el,out);
+      if(check(el,false) && out.length===10) el.dispatchEvent(new Event('change',{bubbles:true}));
+    });
+    el.addEventListener('blur',()=>check(el,true));
+  }
+  function scan(root){
+    if(!root||root.nodeType!==1) return;
+    if(root.matches&&root.matches('input[type=date]')) enhance(root);
+    root.querySelectorAll&&root.querySelectorAll('input[type=date]').forEach(enhance);
+  }
+  window.bbDateScan=scan;
+  const start=()=>{ scan(document.body); new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(scan))).observe(document.body,{childList:true,subtree:true}); };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
+})();
+
 function normDigits(s){ return String(s||'').replace(/[\u0660-\u0669]/g,c=>String(c.charCodeAt(0)-0x0660)).replace(/[\u06F0-\u06F9]/g,c=>String(c.charCodeAt(0)-0x06F0)); }
 function normDec(s){ s=normDigits(s).replace(/[\u066B\u066C,\u060C]/g,'.').replace(/[^0-9.]/g,''); const i=s.indexOf('.'); return i<0?s:s.slice(0,i+1)+s.slice(i+1).replace(/\./g,''); }
-function fnum(n){ return n!=null ? Number(n).toLocaleString('ar-IQ') : '—'; }
+function fnum(n){ return n!=null ? Number(n).toLocaleString('en') : '—'; }
+// Every typed/pasted/dictated number becomes English digits (0-9) in ALL fields of the app, whatever the keyboard
+(function(){
+  const AR=/[\u0660-\u0669\u06F0-\u06F9]/;
+  function fix(e){
+    const el=e.target; if(!el||e.isComposing) return;
+    const t=el.tagName; if(t!=='INPUT'&&t!=='TEXTAREA') return;
+    if(t==='INPUT' && ['checkbox','radio','file','button','submit','range','color'].includes(el.type)) return;
+    let v; try{ v=el.value; }catch(x){ return; }
+    if(!v||!AR.test(v)) return;
+    const nv=normDigits(v).replace(/\u066B/g,'.');
+    const a=el.selectionStart,b=el.selectionEnd;
+    el.value=nv;
+    try{ if(a!=null) el.setSelectionRange(a,b); }catch(x){}
+  }
+  document.addEventListener('input',fix,true);
+  document.addEventListener('change',fix,true);
+})();
 // HTML-escape any user-supplied text before inserting into innerHTML (prevents stored XSS
 // from donor/employee names, addresses, notes, etc. containing HTML/script characters)
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
@@ -2973,7 +3075,7 @@ async function appInit(){
   diag("appInit started");
   try{ await initOfflineDB(); diag("IndexedDB OK"); }catch(e){ diag("IndexedDB failed: "+e.message, "#ffd700"); }
   try{ if(IS_ONLINE) cacheRejectedDonors(); else onOffline(); }catch(e){}
-  G('tbDate').textContent = new Date().toLocaleDateString('ar-IQ-u-nu-latn',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  G('tbDate').textContent = new Date().toLocaleDateString('ar-IQ-u-nu-latn',{weekday:'long'})+'  '+bbDmy(new Date());
   setDefaults();
   diag("Checking Supabase session...");
   try{
@@ -4030,7 +4132,7 @@ function openNotifPanel(){
   }).join('');
 
   const bkList=bbNoticeList().slice(0,12);
-  const bkRows=bkList.map(n=>{ const ok=n.kind!=='err', d=new Date(n.t); const dt=d.toLocaleDateString('en-CA')+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const bkRows=bkList.map(n=>{ const ok=n.kind!=='err', d=new Date(n.t); const dt=bbDmyTime(n.t);
     return `<div onclick="bbNotifGo(()=>openBackupAutoFromNav())" style="cursor:pointer;padding:12px 14px;border:1px solid ${ok?'#BBF7D0':'#FECACA'};background:${ok?'#F0FDF4':'#FEF2F2'};border-radius:10px;margin-bottom:8px">
       <div style="font-weight:700;font-size:16.5px;color:${ok?'#166534':'#7F1D1D'}">${ok?'✅':'⛔'} ${esc(n.title)}</div>
       <div style="font-size:14px;color:#757575;margin-top:2px;direction:ltr;text-align:right;word-break:break-all">${esc(n.sub||'')}</div>
