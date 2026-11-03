@@ -115,15 +115,21 @@ async function colEditMember(donationId){
 function colTab(t){ _colTab = t; colRender(); }
 async function openCollectionModal(t){ _colTab = t||'T'; G('collectionModal').classList.add('on'); await colRender(); }
 
+// الاستمارات تظهر كسطور (التاريخ + الرقم + عدد الأسماء)؛ الضغط على السطر يفتح الأسماء وأزرار المعاينة والطباعة بداخله.
+// الاستمارات المفتوحة بيد المستخدم تبقى مفتوحة بعد أي تحديث للقائمة (مثلاً بعد تعديل اسم).
+const _colOpen = new Set();
+function colToggle(id, isOpen){ if(isOpen) _colOpen.add(id); else _colOpen.delete(id); }
 function _colFormBlock(f, members, mode){
   const act = members.filter(m=>m.exit_reason!=='medical_reject');
-  const names = members.map((m,i)=>`<div style="display:flex;gap:8px;padding:6px 10px;border-bottom:1px solid #F3F4F6;font-size:14px"><b style="width:22px">${i+1}</b><span style="flex:1;${m.exit_reason==='medical_reject'?'color:#B91C1C;text-decoration:line-through':''}">${esc(bbTa(m.full_name||''))}</span><span style="color:#6B7280">${esc(m.bottle_type||'')} ${esc(m.bottle_number||'')}</span>${(m.id && !m.is_deleted && m.exit_reason!=='medical_reject')?`<button class="ibtn" title="تعديل الاسم / التفاصيل" onclick="colEditMember('${esc(m.id)}')" style="color:#BE123C;flex-shrink:0"><i class="ti ti-edit"></i></button>`:''}</div>`).join('');
+  const names = members.map((m,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid #F3F4F6;font-size:14px"><b style="width:22px">${i+1}</b><span style="flex:1;${m.exit_reason==='medical_reject'?'color:#B91C1C;text-decoration:line-through':''}">${esc(bbTa(m.full_name||''))}</span><span style="color:#6B7280">${esc(m.bottle_type||'')} ${esc(m.bottle_number||'')}</span>${(m.id && !m.is_deleted && m.exit_reason!=='medical_reject')?`<button class="ibtn" title="تعديل الاسم / التفاصيل" onclick="colEditMember('${esc(m.id)}')" style="color:#BE123C;flex-shrink:0"><i class="ti ti-edit"></i></button>`:''}</div>`).join('');
   const dt = _colDate(f.last_name_at);
-  const head = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px"><b style="font-size:15px">استمارة #${f.form_no} — ${esc((COL_GROUPS[f.form_group]||{}).name||'')}</b><span style="font-size:12.5px;color:#6B7280">${esc(dt)} — ${members.length} أسماء${f.status==='open'?' (مفتوحة)':''}</span></div>`;
+  const full = f.status==='closed';
+  const pill = f.status==='open' ? '<span style="background:#DCFCE7;color:#166534;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:700">مفتوحة</span>' : '<span style="background:#FEF3C7;color:#92400E;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:700">مكتملة</span>';
+  const head = `<summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 12px;list-style:none"><span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:16px">📅 ${esc(dt||'—')}</b><span style="color:#6B7280;font-size:13.5px">استمارة #${f.form_no}</span>${pill}</span><span style="font-size:13.5px;color:#374151;font-weight:700">${members.length} ${members.length===1?'اسم':'أسماء'} <span style="color:#9CA3AF">▾</span></span></summary>`;
   const args = `'${f.id}',${f.form_no},'${dt}',${f.printed_at?'true':'false'}`;
   const btns = `<div style="display:flex;gap:6px;margin-top:8px"><button class="btn" style="flex:1;justify-content:center" ${act.length?'':'disabled'} onclick="colPreviewForm('${f.id}',${f.form_no},'${dt}',${f.printed_at?'true':'false'})">👁 معاينة</button><button class="btn btn-p" style="flex:1;justify-content:center" ${act.length?'':'disabled'} onclick="colPrintForm(${args})">🖨️ طباعة (${act.length})</button>`
     + (mode==='print' && !f.printed_at && !f.waiting_print_at ? `<button class="btn" style="flex:1;justify-content:center" onclick="colMoveWaiting('${f.id}')">⏳ نقل للانتظار</button>` : '') + `</div>`;
-  return `<div style="border:1px solid #E5E7EB;border-radius:10px;padding:10px;margin-bottom:10px">${head}<div style="max-height:30vh;overflow:auto;border:1px solid #F3F4F6;border-radius:8px">${names||'<div style="padding:10px;color:#6B7280;text-align:center">لا توجد أسماء</div>'}</div>${btns}</div>`;
+  return `<details ${_colOpen.has(f.id)?'open':''} ontoggle="colToggle('${f.id}',this.open)" style="border:1px solid ${full?'#FDE68A':'#E5E7EB'};border-radius:10px;margin-bottom:10px;background:#fff">${head}<div style="padding:0 10px 10px"><div style="max-height:30vh;overflow:auto;border:1px solid #F3F4F6;border-radius:8px">${names||'<div style="padding:10px;color:#6B7280;text-align:center">لا توجد أسماء</div>'}</div>${btns}</div></details>`;
 }
 
 async function colRender(){
