@@ -150,6 +150,7 @@ const FV = (function(){
 
   let _qt=null;
   return { folders,
+    view(unit){ const u=units[unit]; return u?u.view:null; },
     async show(cfg){
       const prev=units[cfg.unit];
       units[cfg.unit]={cfg, view:'list', tab:'active', q:'', forms:null, by:{}, extra:{}};

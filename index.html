@@ -5322,6 +5322,18 @@ async function withScrollPreserved(fn){
 }
 
 function goBack(){
+  // استمارة مفتوحة داخل وحدة (السحب/التصنيف/الفيروسات/الفصل/التريما): الرجوع لقائمة الاستمارات أولاً
+  if(typeof FV!=='undefined' && FV.view){
+    for(const [sec,unit] of [['s-draw','draw'],['s-classification','classification'],['s-virology','virology'],['s-separation','sep'],['s-trima','trima']]){
+      if(G(sec)?.classList.contains('on') && FV.view(unit)==='detail'){ withScrollPreserved(()=>FV.back(unit)); return; }
+    }
+  }
+  // الحملات: متابعة حملة أو نموذج إضافة → رجوع لأرشيف الحملات
+  if(G('s-campaigns')?.classList.contains('on') && (G('camp-track-view')?.style.display==='block' || G('camp-add-view')?.style.display==='block')){
+    G('camp-track-view').style.display='none'; G('camp-add-view').style.display='none'; G('camp-archive-view').style.display='block';
+    if(typeof loadCampaigns==='function') loadCampaigns();
+    return;
+  }
   // Layered screens (التجهيز has 3 levels, الفصل has 2): step back ONE level instead of
   // leaving the screen entirely, unless already at that screen's top level.
   if(G('s-supply')?.classList.contains('on') && typeof _supplyLevel!=='undefined'){
@@ -5819,7 +5831,7 @@ if('serviceWorker' in navigator){
 <div class="overlay" id="sectionPopup">
   <div class="sec-popup-box">
     <div class="sec-popup-head">
-      <button class="sec-popup-back" onclick="closeSectionPopup()">‹ رجوع</button>
+      <button class="sec-popup-back" onclick="goBack()">‹ رجوع</button>
       <div class="sec-popup-title" id="sectionPopupTitle">—</div>
       <button class="sec-popup-close" onclick="closeSectionPopup()"><i class="ti ti-x"></i></button>
     </div>
