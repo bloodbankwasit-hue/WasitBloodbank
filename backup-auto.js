@@ -223,6 +223,6 @@ async function bbaManual(){
   if(r&&r.busy) toast('النسخ جارٍ بالفعل','info');
 }
 async function bbaDisable(){
-  if(!confirm('إيقاف النسخ التلقائي على هذه الحاسبة؟ (الملفات المحفوظة لا تُحذف)')) return;
+  if(!(await bbConfirm('إيقاف النسخ التلقائي على هذه الحاسبة؟ (الملفات المحفوظة لا تُحذف)'))) return;
   await window.nativeBackup.clear(); openBackupAutoModal();
 }

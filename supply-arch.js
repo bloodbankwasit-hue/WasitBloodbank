@@ -152,7 +152,7 @@ function saToggleBook(i){ const g=(window._saBookList||[])[i]; if(!g) return; _s
 
 async function saCancelBook(i){
   if(_saBusy) return; const g=(window._saBookList||[])[i]; if(!g) return;
-  if(!confirm('إلغاء الكتاب رقم '+g.book_no+' ('+g.hospital+') بكل عملياته؟\nترجع '+g.count+' قنينة إلى الرصيد.')) return;
+  if(!(await bbConfirm('إلغاء الكتاب رقم '+g.book_no+' ('+g.hospital+') بكل عملياته؟\nترجع '+g.count+' قنينة إلى الرصيد.'))) return;
   _saBusy=true; load(true);
   try{ const{error}=await db.rpc('dispatch_cancel_book',{p_oh:g.hospital,p_ob:g.book_no,p_od:g.book_date||null}); if(error) throw error;
     await saAudit('cancel_book',{count:g.count,hospital:g.hospital,book_no:g.book_no,book_date:g.book_date,bottles:g.bottles.map(x=>x.num)},g.bottles[0]?.id);
@@ -208,7 +208,7 @@ async function saRefreshAll(){ await saLoad(); if(typeof _supplyRefreshCurrentLe
 async function saRemove(id,batch,num){
   if(_saBusy) return;
   const b=_saData.find(x=>x.batch===batch);
-  if(!confirm('إرجاع القنينة '+num+' إلى الرصيد وإخراجها من هذا التجهيز؟')) { return; }
+  if(!(await bbConfirm('إرجاع القنينة '+num+' إلى الرصيد وإخراجها من هذا التجهيز؟'))) { return; }
   _saBusy=true; load(true);
   try{ const{error}=await db.rpc('dispatch_remove_bottle',{p_id:id}); if(error) throw error;
     await saAudit('remove_bottle',{bottle:num,hospital:b?.hospital,patient:b?.patient,book_no:b?.book_no},id);
@@ -218,7 +218,7 @@ async function saRemove(id,batch,num){
 async function saCancel(batch){
   if(_saBusy) return;
   const b=_saData.find(x=>x.batch===batch); if(!b) return;
-  if(!confirm('إلغاء عملية التجهيز كاملة؟\n'+(_saTab==='hospital'?b.hospital+' — كتاب '+b.book_no:b.patient)+'\nترجع '+b.count+' قنينة إلى الرصيد.')) return;
+  if(!(await bbConfirm('إلغاء عملية التجهيز كاملة؟\n'+(_saTab==='hospital'?b.hospital+' — كتاب '+b.book_no:b.patient)+'\nترجع '+b.count+' قنينة إلى الرصيد.'))) return;
   _saBusy=true; load(true);
   try{ const{error}=await db.rpc('dispatch_cancel',{p_batch:batch}); if(error) throw error;
     await saAudit('cancel_batch',{count:b.count,hospital:b.hospital,patient:b.patient,book_no:b.book_no,bottles:(b.bottles||[]).map(x=>x.num)},b.bottles?.[0]?.id);

@@ -131,7 +131,7 @@ async function shSubmit(){
   const ids=_shRows.map(r=>r.pick).filter(Boolean);
   if(!ids.length){ toast('أضف قنينة واحدة على الأقل','error'); return; }
   if(!IS_ONLINE){ toast('التجهيز يحتاج اتصالاً بالإنترنت','error'); return; }
-  if(!confirm('تأكيد تجهيز '+ids.length+' قنينة للمريض «'+pat+'»؟ ستُسحب من الرصيد.')) return;
+  if(!(await bbConfirm('تأكيد تجهيز '+ids.length+' قنينة للمريض «'+pat+'»؟ ستُسحب من الرصيد.'))) return;
   _shBusy=true; load(true);
   try{
     const{data,error}=await db.rpc('dispatch_bottles',{p_ids:ids,p_patient:pat,p_hospital:hosp,p_comp:comp,p_note:note});

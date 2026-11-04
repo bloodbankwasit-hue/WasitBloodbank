@@ -185,7 +185,7 @@ async function shpSubmit(){
   if(!ids.length || ids.length!==_shpRows.length || ids.length!==h.cnt){ toast('أكمل كل الأسطر ليتطابق العدد','error'); return; }
   if(new Set(ids).size!==ids.length){ toast('قنينة مكررة بأكثر من سطر','error'); return; }
   if(!IS_ONLINE){ toast('التجهيز يحتاج اتصالاً بالإنترنت','error'); return; }
-  if(!confirm('تأكيد تجهيز '+ids.length+' قنينة ('+shpLbl(h.comp)+') إلى «'+h.hosp+'»\nكتاب رقم '+h.book+' بتاريخ '+bbDmy(h.bdate)+'؟ ستُسحب من الرصيد.')) return;
+  if(!(await bbConfirm('تأكيد تجهيز '+ids.length+' قنينة ('+shpLbl(h.comp)+') إلى «'+h.hosp+'»\nكتاب رقم '+h.book+' بتاريخ '+bbDmy(h.bdate)+'؟ ستُسحب من الرصيد.'))) return;
   _shpBusy=true; shpProgress(); load(true);
   try{
     const{error}=await db.rpc('dispatch_hospital',{p_ids:ids,p_hospital:h.hosp,p_book:h.book,p_bdate:h.bdate});

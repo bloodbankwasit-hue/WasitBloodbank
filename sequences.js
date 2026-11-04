@@ -20,13 +20,15 @@ async function loadSeqGrid(){
     const span = s.end_number - s.start_number;
     const pct = span>0 ? Math.min(100, Math.max(0, (s.current_number - s.start_number)/span*100)).toFixed(0) : '0';
     const cls = remain > 500 ? 'ok' : remain > 100 ? 'warn' : 'danger';
-    const ignored = s.is_active && inUse[s.bottle_type] && inUse[s.bottle_type].id!==s.id;
+    const retired = SEQ_SHARED.includes(s.bottle_type);   // تسلسل قديم لنوع صار ضمن التسلسل المشترك
+    const ignored = !retired && s.is_active && inUse[s.bottle_type] && inUse[s.bottle_type].id!==s.id;
     return `<div class="seq-card ${s.is_active?'active':''}">
       <button class="seq-edit" onclick="openEditSeq('${s.id}','${s.bottle_type}',${s.current_number},${s.end_number},${s.start_number})">تعديل</button>
       <div class="seq-type">${s.bottle_type}</div>
       <div class="seq-num">${s.current_number}</div>
       <div class="seq-range">${s.start_number} ← ${s.end_number}</div>
       <div class="seq-remain ${cls}">متبقي: ${remain} قنينة (${pct}%)</div>
+      ${retired?'<div style="margin-top:6px;font-size:13.5px;font-weight:700;color:#6B7280">متوقف — النوع صار ضمن «'+SEQ_SHARED_KEY+'» (يمكن حذفه)</div>':''}
       ${ignored?'<div style="margin-top:6px;font-size:13.5px;font-weight:700;color:#B45309">⚠ غير مستخدم — يوجد تسلسل أحدث لنفس النوع (احذفه من «تعديل»)</div>':''}
     </div>`;
   }).join('');
@@ -34,7 +36,7 @@ async function loadSeqGrid(){
 
 function openAddSeqModal(){
   ['sq-from','sq-to','sq-notes'].forEach(id=>{const e=G(id);if(e)e.value='';});
-  G('sq-type').value='مفلتر';
+  G('sq-type').value=SEQ_SHARED_KEY;
   G('addSeqModal').classList.add('on');
 }
 
@@ -71,7 +73,7 @@ function openEditSeq(id,type,current,end,start){
 // Delete a sequence (e.g. a duplicate of the same type). Bottles already registered keep their numbers.
 async function deleteSeq(){
   const id=G('esq-id').value, type=G('esq-type-lbl').textContent;
-  if(!confirm('حذف تسلسل «'+type+'»؟\n'+G('esq-current-lbl').textContent+'\n\nالقناني المسجّلة سابقاً ما تتأثر. هل تريد الحذف؟')) return;
+  if(!(await bbConfirm('حذف تسلسل «'+type+'»؟\n'+G('esq-current-lbl').textContent+'\n\nالقناني المسجّلة سابقاً ما تتأثر. هل تريد الحذف؟'))) return;
   load(true);
   const{data,error}=await db.from('bottle_sequences').delete().eq('id',id).select();
   load(false);

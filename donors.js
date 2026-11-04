@@ -279,8 +279,10 @@ function edTypeChanged(){
   const changed = md.dataset.status==='pending_draw' && nt && nt!==md.dataset.origType;
   if(changed){
     if(!f.dataset.keep) f.dataset.keep=f.value;
-    f.value='— يُحدَّد عند الحفظ —';
-    if(h){ h.style.display='block'; h.textContent='سيأخذ رقماً جديداً من تسلسل «'+nt+'» عند الحفظ، ويرجع الرقم '+f.dataset.keep+' للتسلسل.'; }
+    if(!(typeof seqKey==='function' && seqKey(nt)===seqKey(md.dataset.origType))) f.value='— يُحدَّد عند الحفظ —';
+    if(h){ h.style.display='block'; h.textContent = (typeof seqKey==='function' && seqKey(nt)===seqKey(md.dataset.origType))
+      ? 'النوعان ضمن تسلسل واحد: يبقى رقم القنينة '+f.dataset.keep+' كما هو.'
+      : 'سيأخذ رقماً جديداً من تسلسل «'+nt+'» عند الحفظ، ويرجع الرقم '+f.dataset.keep+' للتسلسل.'; }
   } else {
     if(f.dataset.keep){ f.value=f.dataset.keep; delete f.dataset.keep; }
     if(h) h.style.display='none';
@@ -369,7 +371,7 @@ async function saveDonorEdit(printAfter){
 }
 
 async function deleteDonorRow(id,name){
-  if(!confirm(`هل تريد حذف تبرع "${name}"؟ سيتم إخفاؤه من كل القوائم والتقارير، ولا يمكن التراجع عن هذا الإجراء من الواجهة. (إذا كان بانتظار السحب يرجع رقم القنينة للاستخدام)`)) return;
+  if(!(await bbConfirm(`هل تريد حذف تبرع "${name}"؟ سيتم إخفاؤه من كل القوائم والتقارير، ولا يمكن التراجع عن هذا الإجراء من الواجهة. (إذا كان بانتظار السحب يرجع رقم القنينة للاستخدام)`))) return;
   load(true);
   try{
     // Still waiting for the draw → no blood was taken, so release the bottle number for reuse (same as «انسحب»).

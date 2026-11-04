@@ -213,13 +213,15 @@ async function confirmDamagedBottle(reason){
   const id=G('dm-id').value, draw=G('dm-draw').value;
   if(!draw){ toast('يرجى تحديد تاريخ السحب','error'); return; }
   if(reason!=='وزن قليل' && reason!=='وزن عالي'){ toast('يرجى اختيار سبب التلف','error'); return; }
-  if(!confirm('تأكيد: القنينة تالفة ('+reason+')؟ يُسمح لهذا المتبرع بالتبرع مجدداً بعد أسبوعين بدل 77 يوماً.')) return;
+  if(!(await bbConfirm('تأكيد: القنينة تالفة ('+reason+')؟ يُسمح لهذا المتبرع بالتبرع مجدداً بعد أسبوعين بدل 77 يوماً.'))) return;
   load(true);
   try{
     const upd={draw_date:draw, status:'damaged'};
     const userNote=(G('dm-note')?.value||'').trim();
     const note='سبب التلف: '+reason+(userNote?' — '+userNote:'');
     upd.bottle_note=note;
+    upd.damage_reason=reason;   // 'وزن قليل' | 'وزن عالي' — feeds the damaged-store statistics
+    upd.damaged_date=draw;
     const{error}=await db.from('blood_donations').update(upd).eq('id',id);
     if(error) throw error;
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'damaged',bottle_note:note||null}});
@@ -243,7 +245,7 @@ async function confirmMedicalReject(){
   const other=G('dm-med-other').value.trim();
   if(reasonSel==='أخرى' && !other){ toast('يرجى توضيح السبب','error'); return; }
   const reason = reasonSel==='أخرى' ? other : reasonSel;
-  if(!confirm('تأكيد رفض المتبرع مؤقتاً — السبب: '+reason+'؟')) return;
+  if(!(await bbConfirm('تأكيد رفض المتبرع مؤقتاً — السبب: '+reason+'؟'))) return;
   load(true);
   try{
     const{data:d}=await db.from('blood_donations').select('donor_id,bottle_number,bottle_type,donors(full_name)').eq('id',id).single();

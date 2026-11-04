@@ -17,7 +17,7 @@ const BACKUP_RESTORE_ORDER = [
 
 async function exportFullBackup(){
   if(UPROF?.role!=='admin'){ toast('تصدير النسخة الاحتياطية متاح لمدير النظام فقط','error'); return; }
-  if(!confirm('سيتم تصدير كل بيانات النظام (المتبرعون، التبرعات، الحملات، المستخدمون، سجل التتبع...) بملف واحد. متابعة؟')) return;
+  if(!(await bbConfirm('سيتم تصدير كل بيانات النظام (المتبرعون، التبرعات، الحملات، المستخدمون، سجل التتبع...) بملف واحد. متابعة؟'))) return;
   load(true);
   try{
     const backup = { exported_at: new Date().toISOString(), app: 'WasitBloodbank', version: 1, tables: {} };
@@ -62,8 +62,8 @@ function handleRestoreFileSelect(input){
 async function importFullBackup(){
   if(UPROF?.role!=='admin'){ toast('استعادة النسخة الاحتياطية متاحة لمدير النظام فقط','error'); return; }
   if(!_restoreFile){ toast('يرجى اختيار ملف النسخة الاحتياطية أولاً','error'); return; }
-  if(!confirm('⚠️ سيتم إضافة أو تحديث كل السجلات الموجودة بالملف داخل قاعدة البيانات الحالية.\nلن يُحذف أي شيء موجود حالياً. متابعة؟')) return;
-  if(!confirm('تأكيد أخير — هذا إجراء يمس كل بيانات النظام. متأكد تريد الاستمرار؟')) return;
+  if(!(await bbConfirm('⚠️ سيتم إضافة أو تحديث كل السجلات الموجودة بالملف داخل قاعدة البيانات الحالية.\nلن يُحذف أي شيء موجود حالياً. متابعة؟'))) return;
+  if(!(await bbConfirm('تأكيد أخير — هذا إجراء يمس كل بيانات النظام. متأكد تريد الاستمرار؟'))) return;
   load(true);
   try{
     const text = await _restoreFile.text();

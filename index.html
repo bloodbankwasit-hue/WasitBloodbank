@@ -2207,7 +2207,7 @@ async function releaseBottleNumber(type,num){
 }
 
 async function withdrawDonation(id, donorName){
-  if(!confirm('تأكيد: "'+donorName+'" لم يتم السحب منه؟ سيُحذف سجل الاستمارة ويُعاد رقم القنينة للتسلسل ليُستخدم لمتبرع آخر.')) return;
+  if(!(await bbConfirm('تأكيد: "'+donorName+'" لم يتم السحب منه؟ سيُحذف سجل الاستمارة ويُعاد رقم القنينة للتسلسل ليُستخدم لمتبرع آخر.'))) return;
   load(true);
   try{
     const{data:d}=await db.from('blood_donations').select('bottle_number,bottle_type').eq('id',id).single();
@@ -3325,6 +3325,26 @@ function bbRefocus(el){
   window.confirm=function(m){ const r=_c(m); back(); return r; };
   window.alert=function(m){ const r=_a(m); back(); return r; };
 })();
+// Confirmation without a native dialog (native confirm() freezes typing in the desktop app). Returns a Promise<boolean>.
+function bbConfirm(msg){
+  return new Promise(res=>{
+    const ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;z-index:99990;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
+    const box=document.createElement('div');
+    box.style.cssText='background:#fff;border-radius:14px;padding:20px 22px;max-width:420px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.3);text-align:center';
+    const t=document.createElement('div'); t.style.cssText='font-size:16px;font-weight:600;line-height:1.7;margin-bottom:16px;white-space:pre-wrap;word-break:break-word'; t.textContent=String(msg);
+    const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px';
+    const no=document.createElement('button'); no.className='btn'; no.style.cssText='flex:1;justify-content:center'; no.textContent='إلغاء';
+    const yes=document.createElement('button'); yes.className='btn btn-p'; yes.style.cssText='flex:1;justify-content:center'; yes.textContent='تأكيد';
+    row.append(yes,no); box.append(t,row); ov.append(box); document.body.appendChild(ov);
+    const done=v=>{ document.removeEventListener('keydown',kd,true); ov.remove(); res(v); };
+    const kd=e=>{ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); done(false); } };
+    document.addEventListener('keydown',kd,true);
+    yes.onclick=()=>done(true); no.onclick=()=>done(false);
+    ov.addEventListener('mousedown',e=>{ if(e.target===ov) done(false); });
+    try{ yes.focus(); }catch(e){}
+  });
+}
 // Logout confirmation without a native dialog (the native one is what froze the login fields in the desktop app)
 function bbAskLogout(){
   let ov=G('bbLogoutOv'); if(ov) ov.remove();
@@ -4554,7 +4574,7 @@ async function confirmSeparate(){
 async function markNotSeparated(ids, fromModal){
   ids=(ids||[]).filter(Boolean);
   if(!ids.length){ toast('يرجى تحديد قنينة واحدة على الأقل','error'); return; }
-  if(!confirm(ids.length===1?'تأكيد: هذه القنينة لم تُفصل وتبقى دم طبيعي؟':'تأكيد: '+ids.length+' قنينة لم تُفصل وتبقى دم طبيعي؟')) return;
+  if(!(await bbConfirm(ids.length===1?'تأكيد: هذه القنينة لم تُفصل وتبقى دم طبيعي؟':'تأكيد: '+ids.length+' قنينة لم تُفصل وتبقى دم طبيعي؟'))) return;
   load(true);
   try{
     const{data,error}=await db.from('blood_donations').update({not_separated:true})
@@ -4698,7 +4718,7 @@ async function saveNote(){
 async function finalizeDamagedSelected(){
   const ids=[...document.querySelectorAll('.dmg-chk:checked')].map(c=>c.value);
   if(!ids.length){ toast('يرجى تحديد قنينة واحدة على الأقل','error'); return; }
-  if(!confirm('تأكيد التلف النهائي لـ'+ids.length+' قنينة؟ لا يمكن التراجع عن هذا الإجراء.')) return;
+  if(!(await bbConfirm('تأكيد التلف النهائي لـ'+ids.length+' قنينة؟ لا يمكن التراجع عن هذا الإجراء.'))) return;
   load(true);
   try{
     const{error}=await markDonationExit(ids,'damaged_final');

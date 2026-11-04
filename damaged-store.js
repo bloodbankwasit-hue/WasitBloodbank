@@ -119,7 +119,7 @@ async function dstConfirmDestroy(){
   const method=G('dsd-method').value, date=G('dsd-date').value, officer=G('dsd-officer').value.trim(), notes=G('dsd-notes').value.trim();
   if(!ids.length){ toast('لا توجد قناني محددة','error'); return; }
   if(!date||!officer){ toast('اكتب تاريخ الإتلاف واسم المسؤول','error'); return; }
-  if(!confirm('تأكيد '+method+' لـ'+ids.length+' قنينة بمحضر رسمي؟\nلا يمكن التراجع، وتنتقل القناني للأرشيف.')) return;
+  if(!(await bbConfirm('تأكيد '+method+' لـ'+ids.length+' قنينة بمحضر رسمي؟\nلا يمكن التراجع، وتنتقل القناني للأرشيف.'))) return;
   load(true);
   try{
     const{data:rep,error:re}=await db.from('destruction_reports').insert({report_date:date,method,officer_name:officer,notes:notes||null,bottle_count:ids.length,created_by:SES?.user?.id}).select().single();
@@ -132,7 +132,7 @@ async function dstConfirmDestroy(){
     G('dstDestroyModal').classList.remove('on');
     toast('✅ تم إنشاء محضر الإتلاف رقم '+rep.report_no,'success',4500);
     await dstLoadWaiting();
-    if(confirm('هل تريد طباعة المحضر الآن؟')) dstPrintReport(rep.id);
+    if((await bbConfirm('هل تريد طباعة المحضر الآن؟'))) dstPrintReport(rep.id);
   }catch(e){ toast('خطأ: '+e.message,'error'); }
   finally{ load(false); }
 }

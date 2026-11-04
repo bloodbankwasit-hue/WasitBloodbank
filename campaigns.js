@@ -360,11 +360,11 @@ async function saveCampaign(){
   if(an.tooBig){ toast('السطر '+an.tooBig.n+': المدى كبير جداً (أكثر من 50,000 رقم) — راجع الأرقام','error'); return; }
   if(an.overlaps.length){
     const lines=an.overlaps.map(o=>'• '+o.a.type+': السطر '+o.a.n+' ('+o.a.from+'–'+o.a.to+') مع السطر '+o.b.n+' ('+o.b.from+'–'+o.b.to+')').join('\n');
-    if(!confirm('⚠️ التسلسل متداخل داخل هذه الحملة:\n'+lines+'\n\nالأرقام المتداخلة تُسجَّل مرة واحدة فقط.\nهل تريد الحفظ رغم ذلك؟')) return;
+    if(!(await bbConfirm('⚠️ التسلسل متداخل داخل هذه الحملة:\n'+lines+'\n\nالأرقام المتداخلة تُسجَّل مرة واحدة فقط.\nهل تريد الحفظ رغم ذلك؟'))) return;
   }
   if(an.big.length){
     const lines=an.big.map(r=>'• السطر '+r.n+': '+(r.to-r.from+1).toLocaleString('en')+' رقم').join('\n');
-    if(!confirm('المدى التالي كبير:\n'+lines+'\n\nهل الأرقام صحيحة؟')) return;
+    if(!(await bbConfirm('المدى التالي كبير:\n'+lines+'\n\nهل الأرقام صحيحة؟'))) return;
   }
   const groups=campExpandRanges(rows);
   load(true);
@@ -469,7 +469,7 @@ function bulkCampAction(outcome){
 //            the lab queue, exactly like a normal draw.
 // damaged  → just recorded on the slot; no blood_donations row (nothing was actually usable).
 async function resolveCampSlots(slotIds, outcome){
-  if(outcome==='damaged' && !confirm('تأكيد: '+slotIds.length+' قنينة تلفت أثناء السحب؟')) return;
+  if(outcome==='damaged' && !(await bbConfirm('تأكيد: '+slotIds.length+' قنينة تلفت أثناء السحب؟'))) return;
   load(true);
   try{
     const{data:campaign}=await db.from('campaigns').select('name,campaign_date,location').eq('id',_currentCampaignId).single();
