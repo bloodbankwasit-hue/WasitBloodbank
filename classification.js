@@ -17,7 +17,7 @@ function openClassificationExport(){
 
 // عرض الاستمارات (راجع forms-view.js): أخضر = جاهز، إطار أحمر = بانتظار السحب، رمادي ✓ = أُنجز، أحمر مظلل = خرج
 // حالات تسمح بتعديل الفصيلة (بعدها تكون المكوّنات أو التجهيز قد اعتمدت عليها)
-const CLS_EDITABLE=['pending_release','in_stock','rejected_positive'];
+const CLS_EDITABLE=['pending_lab','pending_release','in_stock','rejected_positive'];
 let _cmEditOld=null;
 const CLS_FV = {
   unit:'classification', host:'classificationList', groups:['T','R','B'], chk:'cm-chk', onSel:'updateCmBulkBar', bigBottle:true,
@@ -29,7 +29,7 @@ const CLS_FV = {
     const note=(m.bottle_note||'').replace(/^رفض طبي:\s*/,'');
     if(m.exit_reason==='medical_reject') return {k:'excl',t:'⛔ مرفوض طبياً'+(note?': '+note:'')};
     // قنينة مصابة (فحص موجب) بلا فصيلة: يُسمح بتصنيفها لتسجيل فصيلتها فقط (لا تتغير حالتها ولا تعود للمخزون)
-    if(!done && (m.status==='rejected_positive' || ((m.status==='damaged'||m.status==='pending_release') && m.serology_result==='Positive'))) return {k:'ready',t:'🦠 مصابة — سجّل فصيلتها فقط'};
+    if(!done && m.status!=='pending_draw' && (m.status==='rejected_positive' || m.serology_result==='Positive' || /infect|positive|sero/i.test(m.exit_reason||''))) return {k:'ready',t:'🦠 مصابة — سجّل فصيلتها فقط'};
     if(m.status==='damaged' && !done) return {k:'excl',t:'⛔ تالف'+(note?': '+note:'')};
     if(m.status==='pending_draw') return {k:'notready',t:'بانتظار السحب'};
     if(done) return {k:'done',t:'✓ صُنّفت: '+m.blood_type+(m.status==='rejected_positive'?' — 🦠 مصابة':'')};
@@ -47,7 +47,7 @@ const CLS_FV = {
   actions(m,st,ctx){
     if(st.k==='ready') return `<button class="btn btn-p" onclick="openClassificationModal('${m.id}','${sq(m.full_name)}','${m.bottle_number||''}','${m.draw_date||''}')"><i class="ti ti-droplet"></i> تصنيف</button>`;
     // تعديل الفصيلة: متاح ما دامت القنينة لم تُفصل ولم تُجهَّز ولم تُتلف رسمياً (قيد المخزن المؤقت، بالرصيد، أو مصابة)
-    if(st.k==='done' && m.blood_type && CLS_EDITABLE.includes(m.status)) return `<button class="btn" onclick="openClassificationModal('${m.id}','${sq(m.full_name)}','${m.bottle_number||''}','${m.draw_date||''}','${m.blood_type}')" title="تعديل الفصيلة"><i class="ti ti-edit"></i> تعديل</button>`;
+    if(st.k==='done' && m.blood_type && (CLS_EDITABLE.includes(m.status) || (m.status==='damaged' && m.serology_result==='Positive'))) return `<button class="btn" onclick="openClassificationModal('${m.id}','${sq(m.full_name)}','${m.bottle_number||''}','${m.draw_date||''}','${m.blood_type}')" title="تعديل الفصيلة"><i class="ti ti-edit"></i> تعديل</button>`;
     return '';
   },
   // سجلات بلا استمارة: قديمة (بأسماء) + قناني الحملات (مجلدات باسم الحملة)

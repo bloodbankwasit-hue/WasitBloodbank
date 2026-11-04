@@ -1,5 +1,5 @@
 // مصرف الدم الرئيسي — واسط | Service Worker v4
-const CACHE = 'bloodbank-wasit-v77';
+const CACHE = 'bloodbank-wasit-v78';
 
 const CRITICAL = [
   './',
