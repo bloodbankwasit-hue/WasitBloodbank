@@ -2275,17 +2275,20 @@ function ft(t){ return t ? t.substring(0,5) : '—'; }
     if(bad && final && typeof toast==='function') toast('⚠️ التاريخ غير صحيح: اكتبه بالشكل يوم/شهر/سنة (مثال 25/12/2026)','error',3500);
     return !bad;
   }
+  // منتقي التاريخ: حقل date مخفي دائم لكل حقل (بدل إنشائه وحذفه بكل نقرة) حتى لا يُغلق المنتقي قبل ما يظهر
   function pick(el,btn){
     if(el.disabled||el.readOnly) return;
-    const h=document.createElement('input'); h.type='date';
-    const r=btn.getBoundingClientRect();
-    h.style.cssText='position:fixed;opacity:0;width:1px;height:1px;border:0;padding:0;left:'+Math.round(r.left)+'px;top:'+Math.round(r.bottom)+'px';
+    let h=el._bbPicker;
+    if(!h){
+      h=document.createElement('input'); h.type='date'; h.dataset.bbDate='1'; h.tabIndex=-1; h.setAttribute('aria-hidden','true');
+      h.style.cssText='position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;border:0;padding:0;margin:0;left:0;bottom:0';
+      (btn.parentNode||document.body).appendChild(h);
+      h.addEventListener('change',()=>{ if(h.value){ el.value=h.value; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); } });
+      el._bbPicker=h;
+    }
     h.value=el.value||'';
-    document.body.appendChild(h);
-    const done=()=>setTimeout(()=>h.remove(),0);
-    h.addEventListener('change',()=>{ if(h.value){ el.value=h.value; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); } done(); });
-    h.addEventListener('blur',done);
-    try{ h.focus(); if(h.showPicker) h.showPicker(); else h.click(); }catch(e){ try{ h.click(); }catch(x){ done(); } }
+    try{ if(typeof h.showPicker==='function') h.showPicker(); else { h.focus(); h.click(); } }
+    catch(e){ try{ h.focus(); h.click(); }catch(x){} }
   }
   function enhance(el){
     if(el.dataset.bbDate) return; el.dataset.bbDate='1';
