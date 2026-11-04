@@ -22,11 +22,11 @@ function shEnsureModal(){
           <select id="sh-hosp" onchange="G('sh-hosp-o').style.display=this.value==='أخرى'?'block':'none'"><option value="">— اختر —</option>${hosp.map(h=>`<option value="${shEsc(h)}">${shEsc(h)}</option>`).join('')}<option value="أخرى">أخرى</option></select>
           <input type="text" id="sh-hosp-o" placeholder="اكتب اسم المستشفى" style="display:none;margin-top:5px"></div>
         <div class="fgrp"><label>نوع التعويض *</label>
-          <select id="sh-comp" onchange="G('sh-comp-o').style.display=this.value==='أخرى'?'block':'none'"><option value="">— اختر —</option><option value="عوض">عوض</option><option value="بثمن">بثمن</option><option value="مجاني (الإدارة)">مجاني (الإدارة)</option><option value="أخرى">أخرى</option></select>
+          <select id="sh-comp" onchange="shCompChange()"><option value="">— اختر —</option><option value="عوض">عوض</option><option value="بثمن">بثمن</option><option value="مجاني (الإدارة)">مجاني (الإدارة)</option><option value="تجهيز بكتاب">تجهيز بكتاب (قيد فقط — بدون سحب من الرصيد)</option><option value="أخرى">أخرى</option></select>
           <input type="text" id="sh-comp-o" placeholder="اكتب نوع التعويض" style="display:none;margin-top:5px"></div>
       </div>
       <div id="sh-rows" style="margin-top:12px"></div>
-      <button class="btn" onclick="shAddRow()" style="margin-top:6px"><i class="ti ti-plus"></i> إضافة تجهيز</button>
+      <button class="btn" id="sh-add" onclick="shAddRow()" style="margin-top:6px"><i class="ti ti-plus"></i> إضافة تجهيز</button>
       <div id="sh-sum" style="margin-top:12px;padding:10px 12px;border:1px solid #BBF7D0;background:#F0FDF4;border-radius:10px;font-size:15px;line-height:1.9;display:none"></div>
     </div>
     <div class="modal-foot">
@@ -41,9 +41,20 @@ function shOpen(){
   ['sh-pat','sh-hosp-o','sh-comp-o'].forEach(i=>G(i).value='');
   G('sh-hosp').value=''; G('sh-comp').value=''; G('sh-hosp-o').style.display='none'; G('sh-comp-o').style.display='none';
   _shRows=[]; G('sh-rows').innerHTML=''; shAddRow(true);
-  shSummary();
+  shSummary(); shCompChange();
   G('supplyHandModal').classList.add('on');
   setTimeout(()=>G('sh-pat').focus(),50);
+}
+
+const SH_BOOK='تجهيز بكتاب';
+// «تجهيز بكتاب»: قيد فقط (يُسجَّل ويظهر بالإحصائيات) — لا قناني ولا سحب من الرصيد
+function shCompChange(){
+  const v=G('sh-comp').value, book=v===SH_BOOK;
+  G('sh-comp-o').style.display = v==='أخرى' ? 'block' : 'none';
+  G('sh-rows').style.display = book ? 'none' : '';
+  G('sh-add').style.display = book ? 'none' : '';
+  if(book) G('sh-sum').style.display='none'; else shSummary();
+  G('sh-go').innerHTML = book ? '<i class="ti ti-device-floppy"></i> حفظ' : '<i class="ti ti-check"></i> تجهيز';
 }
 
 function shAddRow(noFocus){
@@ -126,6 +137,21 @@ async function shSubmit(){
   if(!pat){ toast('اكتب اسم المريض','error'); G('sh-pat').focus(); return; }
   if(!hosp){ toast('اختر المستشفى','error'); return; }
   if(!comp){ toast('اختر نوع التعويض','error'); return; }
+  if(comp===SH_BOOK){
+    if(!IS_ONLINE){ toast('الحفظ يحتاج اتصالاً بالإنترنت','error'); return; }
+    if(!(await bbConfirm('حفظ «تجهيز بكتاب» للمريض «'+pat+'» — '+hosp+'؟\nيُسجَّل بالإحصائيات فقط، ولا تُسحب أي قنينة من الرصيد.'))) return;
+    _shBusy=true; load(true);
+    try{
+      const today=new Date().toLocaleDateString('en-CA');
+      const{data,error}=await db.from('dispatch_book_records').insert({record_date:today,patient:pat,hospital:hosp,comp:SH_BOOK}).select().single();
+      if(error) throw error;
+      try{ await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'INSERT',table_name:'dispatch_book_records',record_id:data?.id||null,new_values:{patient:pat,hospital:hosp,type:SH_BOOK}}); }catch(e){}
+      toast('✅ تم حفظ التجهيز بكتاب (بدون سحب من الرصيد)','success',5000);
+      G('supplyHandModal').classList.remove('on');
+    }catch(e){ toast('⛔ '+(e.message||e)+(/dispatch_book_records|relation|does not exist/i.test(e.message||'')?' — شغّل SQL جدول «التجهيز بكتاب» في Supabase':''),'error',9000); }
+    finally{ _shBusy=false; load(false); }
+    return;
+  }
   const empty=_shRows.find(r=>!r.pick && (r.num || _shRows.length===1));
   if(empty){ toast('أكمل الصف: '+(empty.num?'اختر نوع التجهيز للقنينة '+empty.num:'اكتب رقم القنينة'),'error'); return; }
   const ids=_shRows.map(r=>r.pick).filter(Boolean);
