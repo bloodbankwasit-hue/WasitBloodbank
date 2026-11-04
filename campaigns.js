@@ -288,7 +288,9 @@ function showAddCampaignForm(){
   G('camp-name').value=''; G('camp-location').value='';
   G('camp-date').value=new Date().toISOString().split('T')[0];
   G('campReserveRows').innerHTML='';
+  G('camp-tot-from').value=''; G('camp-tot-to').value='';
   addCampReserveRow();
+  campPreviewReset();
   G('camp-archive-view').style.display='none';
   G('camp-add-view').style.display='block';
 }
@@ -342,57 +344,130 @@ function campExpandRanges(rows){
   return Object.entries(by).map(([type,s])=>({type, numbers:[...s].sort((x,y)=>x-y)}));
 }
 
-async function saveCampaign(){
-  const name=G('camp-name').value.trim();
-  const date=G('camp-date').value;
-  const location=G('camp-location').value.trim();
+let _campPlan=null;
+function campPreviewReset(){
+  _campPlan=null;
+  const p=G('campPreview'); if(p) p.style.display='none';
+  const sb=G('campSaveBtn'); if(sb) sb.style.display='none';
+  // live totals: sum of the type ranges against the total range
+  const t=G('campTotals'); if(!t) return;
+  const tf=campNum(G('camp-tot-from').value), tt=campNum(G('camp-tot-to').value);
+  const total=(Number.isInteger(tf)&&Number.isInteger(tt)&&tt>=tf)?tt-tf+1:0;
+  let sum=0;
+  document.querySelectorAll('.camp-reserve-row').forEach(r=>{
+    const f=campNum(r.querySelector('.crr-from').value), x=campNum(r.querySelector('.crr-to').value);
+    if(Number.isInteger(f)&&Number.isInteger(x)&&x>=f) sum+=x-f+1;
+  });
+  if(!total && !sum){ t.textContent=''; return; }
+  const ok = total && sum===total;
+  t.style.color = ok?'#166534':'#B45309';
+  t.textContent = 'المدى الكلي: '+total+' — مجموع الأنواع: '+sum+(ok?' ✅':(total?' ⚠ (الفرق '+Math.abs(total-sum)+')':''));
+}
+
+// Validates the whole form and shows every bottle as a tappable chip (tap = damaged). Nothing is saved yet.
+async function campPreviewBuild(){
+  const name=G('camp-name').value.trim(), date=G('camp-date').value;
   if(!name||!date){ toast('يرجى تعبئة اسم الحملة وتاريخها','error'); return; }
+  const tf=campNum(G('camp-tot-from').value), tt=campNum(G('camp-tot-to').value);
+  if(!Number.isInteger(tf)||!Number.isInteger(tt)||tf<1||tt<tf){ toast('اكتب المدى الكلي (من — إلى) بشكل صحيح','error'); return; }
+  if(tt-tf+1>5000){ toast('المدى الكلي كبير جداً (أكثر من 5000 رقم) — راجع الأرقام','error'); return; }
   const rows=[]; let n=0;
   for(const r of document.querySelectorAll('.camp-reserve-row')){
     n++;
     const f=r.querySelector('.crr-from').value.trim(), t=r.querySelector('.crr-to').value.trim();
-    if(!f && !t) continue;                       // empty optional row — ignore
+    if(!f && !t) continue;
     rows.push({n, type:r.querySelector('.crr-type').value, from:campNum(f), to:campNum(t)});
   }
-  if(!rows.length){ toast('اكتب تسلسلاً واحداً على الأقل (من — إلى) مع نوع القنينة','error'); return; }
+  if(!rows.length){ toast('اكتب نوع قنينة واحداً على الأقل (من — إلى)','error'); return; }
   const an=campAnalyzeRanges(rows);
   if(an.error){ toast(an.error,'error'); return; }
-  if(an.tooBig){ toast('السطر '+an.tooBig.n+': المدى كبير جداً (أكثر من 50,000 رقم) — راجع الأرقام','error'); return; }
-  if(an.overlaps.length){
-    const lines=an.overlaps.map(o=>'• '+o.a.type+': السطر '+o.a.n+' ('+o.a.from+'–'+o.a.to+') مع السطر '+o.b.n+' ('+o.b.from+'–'+o.b.to+')').join('\n');
-    if(!(await bbConfirm('⚠️ التسلسل متداخل داخل هذه الحملة:\n'+lines+'\n\nالأرقام المتداخلة تُسجَّل مرة واحدة فقط.\nهل تريد الحفظ رغم ذلك؟'))) return;
+  for(const r of rows){ if(r.from<tf||r.to>tt){ toast('السطر '+r.n+': الأرقام خارج المدى الكلي ('+tf+'–'+tt+')','error',7000); return; } }
+  for(let i=0;i<rows.length;i++) for(let j=i+1;j<rows.length;j++){
+    const a=rows[i], b=rows[j];
+    if(a.from<=b.to && b.from<=a.to){ toast('⛔ السطران '+a.n+' و'+b.n+' متداخلان ('+a.from+'–'+a.to+' مع '+b.from+'–'+b.to+'). كل رقم يجب أن يكون لنوع واحد فقط','error',9000); return; }
   }
-  if(an.big.length){
-    const lines=an.big.map(r=>'• السطر '+r.n+': '+(r.to-r.from+1).toLocaleString('en')+' رقم').join('\n');
-    if(!(await bbConfirm('المدى التالي كبير:\n'+lines+'\n\nهل الأرقام صحيحة؟'))) return;
-  }
-  const groups=campExpandRanges(rows);
+  const sum=rows.reduce((t,r)=>t+(r.to-r.from+1),0), total=tt-tf+1;
+  if(sum!==total){ toast('⛔ مجموع الأنواع ('+sum+') لا يساوي المدى الكلي ('+total+'). يجب أن يتطابقا تماماً','error',9000); return; }
   load(true);
   try{
-    // لا يُقبل أي تعارض: الأرقام يجب أن تكون حرّة تماماً (غير مسجلة، غير محجوزة، وخارج تسلسل الاستقبال)
-    for(const r of rows){
-      const msg=await bbRangeClash(Math.min(r.from,r.to),Math.max(r.from,r.to),{ignoreSeqs:true});
-      if(msg){ load(false); toast('⛔ السطر '+r.n+': '+msg+'. غيّر الرقم ولا يمكن المتابعة','error',10000); return; }
+    const sq=await db.from('bottle_sequences').select('start_number,end_number').eq('bottle_type','الحملات').eq('is_active',true);
+    if(sq.data && sq.data.length && !sq.data.some(x=>tf>=x.start_number && tt<=x.end_number)){
+      load(false); toast('⛔ المدى '+tf+'–'+tt+' خارج تسلسل «الحملات» المسجّل بالإعدادات ('+sq.data.map(x=>x.start_number+'–'+x.end_number).join('، ')+')','error',10000); return; }
+    const msg=await bbRangeClash(tf,tt,{ignoreSeqs:true});
+    if(msg){ load(false); toast('⛔ '+msg+'. ولا يمكن المتابعة','error',10000); return; }
+  }catch(e){ load(false); toast('خطأ: '+e.message,'error'); return; }
+  load(false);
+  _campPlan={name,date,location:G('camp-location').value.trim(),tf,tt,rows};
+  const sorted=rows.slice().sort((a,b)=>a.from-b.from);
+  G('campPreviewBody').innerHTML=sorted.map(r=>{
+    let chips=''; for(let k=r.from;k<=r.to;k++) chips+='<span class="camp-chip" data-t="'+esc(r.type)+'" data-n="'+k+'" onclick="campChipToggle(this)">'+k+'</span>';
+    return '<div style="margin-bottom:12px"><div style="font-size:16px;font-weight:800;margin-bottom:4px">'+esc(r.type)+' <span class="pill pb">'+(r.to-r.from+1)+'</span> <span style="font-size:13.5px;color:#6B7280;font-weight:600">'+r.from+' ← '+r.to+'</span></div>'+chips+'</div>';
+  }).join('');
+  G('campPreview').style.display='block';
+  G('campSaveBtn').style.display='';
+  campChipCount();
+}
+function campChipToggle(el){ el.classList.toggle('dmg'); campChipCount(); }
+function campChipCount(){
+  const all=document.querySelectorAll('#campPreviewBody .camp-chip').length;
+  const d=document.querySelectorAll('#campPreviewBody .camp-chip.dmg').length;
+  G('campPreviewCount').innerHTML='الإجمالي: '+all+' — <span style="color:#991B1B">تالفة: '+d+'</span> — <span style="color:#166534">تُسجَّل مسحوبة: '+(all-d)+'</span>';
+}
+
+async function saveCampaign(){
+  const P=_campPlan;
+  if(!P){ toast('اضغط «عرض القناني» أولاً','error'); return; }
+  const dmg=new Set([...document.querySelectorAll('#campPreviewBody .camp-chip.dmg')].map(e=>e.dataset.t+'|'+e.dataset.n));
+  const items=[];
+  P.rows.forEach(r=>{ for(let k=r.from;k<=r.to;k++) items.push({type:r.type,num:k,dmg:dmg.has(r.type+'|'+k)}); });
+  const nd=items.filter(i=>i.dmg).length;
+  if(!(await bbConfirm('حفظ الحملة «'+P.name+'»؟\n'+items.length+' قنينة: '+(items.length-nd)+' تُسجَّل مسحوبة وتكمل مسارها، و'+nd+' تالفة.'))) return;
+  load(true);
+  let camp=null;
+  try{
+    // الأرقام يجب أن تكون حرّة تماماً لحظة الحفظ (تحقق ثانٍ قبل الإدخال)
+    { const msg=await bbRangeClash(P.tf,P.tt,{ignoreSeqs:true}); if(msg){ load(false); toast('⛔ '+msg+'. ولا يمكن المتابعة','error',10000); return; } }
+    const ins=await db.from('campaigns').insert({name:P.name, campaign_date:P.date, location:P.location||null, created_by:SES?.user?.id}).select().single();
+    if(ins.error) throw ins.error;
+    camp=ins.data;
+    // 1) every number is first recorded as a slot (so a failure half-way leaves them visible & finishable in the campaign page)
+    const slots=[];
+    for(let i=0;i<items.length;i+=500){
+      const rows=items.slice(i,i+500).map(x=>({campaign_id:camp.id,bottle_type:x.type,bottle_number:x.num,status:x.dmg?'damaged':'reserved'}));
+      const r=await db.from('campaign_slots').insert(rows).select('id,bottle_type,bottle_number,status');
+      if(r.error) throw r.error;
+      slots.push(...r.data);
     }
-    const{data:camp,error:ce}=await db.from('campaigns').insert({
-      name, campaign_date:date, location:location||null, created_by:SES?.user?.id
-    }).select().single();
-    if(ce) throw ce;
-    let total=0;
-    for(const g of groups){
-      const slotRows=g.numbers.map(x=>({campaign_id:camp.id, bottle_type:g.type, bottle_number:x, status:'reserved'}));
-      for(let i=0;i<slotRows.length;i+=500){
-        const{error:se}=await db.from('campaign_slots').insert(slotRows.slice(i,i+500));
-        if(se) throw se;
-      }
-      total+=g.numbers.length;
+    // 2) the non-damaged ones become real bottles (pending_lab) — same row shape as a normal campaign draw
+    const toDraw=slots.filter(s=>s.status==='reserved');
+    let done=0;
+    for(let i=0;i<toDraw.length;i+=200){
+      const chunk=toDraw.slice(i,i+200);
+      const dRows=chunk.map(s=>{
+        const days=WHOLE_BLOOD_DAYS[s.bottle_type] ?? 45;
+        const e=new Date(P.date); e.setDate(e.getDate()+days);
+        return {donor_id:null, bottle_type:s.bottle_type, bottle_number:s.bottle_number, donation_type:'طوعي',
+          campaign_name:P.name, campaign_date:P.date, campaign_location:P.location||null, draw_date:P.date,
+          donation_date:P.date, expiry_date:e.toISOString().split('T')[0], status:'pending_lab', created_by:SES?.user?.id};
+      });
+      const dr=await db.from('blood_donations').insert(dRows).select('id,bottle_type,bottle_number');
+      if(dr.error) throw new Error('تعذّر تسجيل القناني ('+dr.error.message+'). الحملة محفوظة وما تم تسجيله يظهر بصفحتها');
+      const idBy={}; dr.data.forEach(d=>{ idBy[d.bottle_type+'|'+d.bottle_number]=d.id; });
+      const up=chunk.map(s=>({id:s.id,campaign_id:camp.id,bottle_type:s.bottle_type,bottle_number:s.bottle_number,status:'drawn',donation_id:idBy[s.bottle_type+'|'+s.bottle_number]}));
+      const ur=await db.from('campaign_slots').upsert(up,{onConflict:'id'});
+      if(ur.error) throw new Error('سُجّلت القناني لكن تعذّر تحديث حالة أرقام الحملة: '+ur.error.message);
+      done+=chunk.length;
     }
-    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'INSERT',table_name:'campaigns',record_id:camp.id,new_values:{name,numbers:total}});
-    toast('✅ تم إنشاء الحملة وتسجيل '+total+' رقم','success',4000);
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'INSERT',table_name:'campaigns',record_id:camp.id,new_values:{name:P.name,range:P.tf+'-'+P.tt,total:items.length,drawn:done,damaged:nd}});
+    toast('✅ تم إنشاء الحملة: '+done+' مسحوبة و'+nd+' تالفة','success',5000);
+    _campPlan=null;
     G('camp-add-view').style.display='none';
     G('camp-archive-view').style.display='block';
     await loadCampaigns();
-  }catch(e){ toast('خطأ: '+e.message,'error'); }
+  }catch(e){
+    toast('خطأ: '+e.message,'error',12000);
+    if(camp){ G('camp-add-view').style.display='none'; G('camp-archive-view').style.display='block'; try{ await loadCampaigns(); }catch(x){} }
+  }
   finally{ load(false); }
 }
 
@@ -420,8 +495,9 @@ async function refreshCampaignSlots(){
     ${cnt.returned?`<span class="pill pb">مرجّع: ${cnt.returned}</span>`:''}
   </div>`;
   const pending=list.filter(s=>s.status==='reserved');
+  const doneHtml=campDoneHtml(list);
   if(!pending.length){
-    G('campSlotsList').innerHTML='<div class="empty"><i class="ti ti-check"></i><p>لا توجد أرقام بانتظار إجراء</p></div>';
+    G('campSlotsList').innerHTML='<div class="empty"><i class="ti ti-check"></i><p>لا توجد أرقام بانتظار إجراء</p></div>'+doneHtml;
     updateCampBulkBar();
     return;
   }
@@ -447,8 +523,21 @@ async function refreshCampaignSlots(){
       ${selAllRow('camp-chk','updateCampBulkBar',true,'campGrp'+i)}
       ${items.map(card).join('')}
     </div>`;
-  }).join('');
+  }).join('')+doneHtml;
   updateCampBulkBar();
+}
+// Already-resolved numbers of a campaign (drawn / damaged). A damaged one can be put back as a normal drawn bottle.
+function campDoneHtml(list){
+  const dm=list.filter(s=>s.status==='damaged'), dr=list.filter(s=>s.status==='drawn');
+  let h='';
+  if(dr.length){
+    const types=[...new Set(dr.map(s=>s.bottle_type))];
+    h+='<div style="margin-top:14px;font-size:16px;font-weight:800;color:#166534">✅ مسحوبة ('+dr.length+')</div>'+types.map(tp=>'<div style="margin:6px 0 2px;font-weight:700">'+esc(tp)+'</div>'+dr.filter(s=>s.bottle_type===tp).map(s=>'<span class="camp-chip">'+s.bottle_number+'</span>').join('')).join('');
+  }
+  if(dm.length){
+    h+='<div style="margin-top:14px;font-size:16px;font-weight:800;color:#991B1B">🗑️ تالفة ('+dm.length+')</div>'+dm.map(s=>'<div class="flow-card"><div class="fc-av">'+BAG+'</div><div style="flex:1"><div class="fc-name">قنينة رقم '+s.bottle_number+'</div><div class="fc-sub">'+esc(s.bottle_type)+'</div></div><div class="fc-act"><button class="btn" style="font-size:14px;padding:6px 10px" onclick="resolveCampSlots([\''+s.id+'\'],\'drawn\')">سليمة — سجّلها مسحوبة</button></div></div>').join('');
+  }
+  return h;
 }
 
 function updateCampBulkBar(){
@@ -476,7 +565,7 @@ async function resolveCampSlots(slotIds, outcome){
     const failed=[];
     for(const id of slotIds){
       const{data:slot}=await db.from('campaign_slots').select('*').eq('id',id).single();
-      if(!slot || slot.status!=='reserved') continue;
+      if(!slot || !(slot.status==='reserved' || (outcome==='drawn' && slot.status==='damaged'))) continue;
       if(outcome==='drawn'){
         const days=WHOLE_BLOOD_DAYS[slot.bottle_type] ?? 45;
         const e=new Date(campaign.campaign_date); e.setDate(e.getDate()+days);

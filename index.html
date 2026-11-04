@@ -50,6 +50,8 @@ html{-webkit-text-size-adjust:100%}
 .bb-dt{position:relative;display:block;width:100%}
 .bb-dt>input{width:100%;padding-right:36px !important;direction:ltr;text-align:left}
 .bb-dt-btn{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:none;background:none;color:#BE123C;font-size:19px;cursor:pointer;padding:3px;line-height:1}
+.camp-chip{display:inline-block;min-width:64px;text-align:center;padding:7px 8px;margin:3px;border:1.5px solid #BBF7D0;background:#F0FDF4;color:#166534;border-radius:9px;font-weight:700;cursor:pointer;user-select:none;font-size:15px}
+.camp-chip.dmg{border-color:#DC2626;background:#FEE2E2;color:#991B1B;text-decoration:line-through}
 .bb-dt-bad{border-color:#DC2626 !important;background:#FEF2F2 !important}   /* above the collection-form window so editing a name from inside it is visible */
 /* The desktop section popup hosts a whole screen (list, form...) and must always sit BELOW any
    action modal (test/separate/damage/bottle-detail...) opened from within it — otherwise its own
@@ -1519,14 +1521,28 @@ tbody tr:hover td{background:#fafafa}
               <div class="fgrp"><label>تاريخ الحملة *</label><input type="date" id="camp-date"></div>
               <div class="fgrp"><label>المكان / الدائرة</label><input type="text" id="camp-location" placeholder="مثال: كلية الهندسة"></div>
             </div>
-            <div style="font-size:15.5px;font-weight:700;color:#374151;margin:14px 0 4px">تسلسلات القناني</div>
-            <div style="font-size:13.5px;color:#6B7280;margin-bottom:8px">اكتب أول رقم وآخر رقم من التسلسل المطبوع لكل نوع قنينة</div>
-            <div id="campReserveRows"></div>
+            <div style="font-size:15.5px;font-weight:700;color:#374151;margin:14px 0 4px">المدى الكلي للحملة</div>
+            <div style="font-size:13.5px;color:#6B7280;margin-bottom:8px">أول رقم وآخر رقم لكل قناني الحملة (يجب أن يكون ضمن تسلسل «الحملات» بالإعدادات)</div>
+            <div class="fgrid">
+              <div class="fgrp"><label>من رقم *</label><input type="text" inputmode="numeric" id="camp-tot-from" oninput="campPreviewReset()"></div>
+              <div class="fgrp"><label>إلى رقم *</label><input type="text" inputmode="numeric" id="camp-tot-to" oninput="campPreviewReset()"></div>
+            </div>
+            <div style="font-size:15.5px;font-weight:700;color:#374151;margin:14px 0 4px">توزيع الأنواع</div>
+            <div style="font-size:13.5px;color:#6B7280;margin-bottom:8px">لكل نوع قنينة اكتب من — إلى. مجموع الأنواع يجب أن يساوي المدى الكلي تماماً</div>
+            <div id="campReserveRows" oninput="campPreviewReset()"></div>
             <button class="btn" style="font-size:15px;padding:7px 12px;margin-top:6px" onclick="addCampReserveRow()"><i class="ti ti-plus"></i> إضافة نوع قنينة</button>
+            <div id="campTotals" style="margin-top:10px;font-size:15px;font-weight:700"></div>
+            <button class="btn btn-p" style="margin-top:10px" onclick="campPreviewBuild()"><i class="ti ti-list-details"></i> عرض القناني</button>
+            <div id="campPreview" style="display:none;margin-top:14px">
+              <div style="font-size:15.5px;font-weight:700;color:#374151;margin-bottom:4px">حدّد القناني التالفة</div>
+              <div style="font-size:13.5px;color:#6B7280;margin-bottom:8px">اضغط على رقم القنينة لتحديدها تالفة (أحمر). الباقي يُسجَّل «تم السحب» ويكمل مساره بالتطبيق</div>
+              <div id="campPreviewBody"></div>
+              <div id="campPreviewCount" style="margin-top:8px;font-size:15px;font-weight:700"></div>
+            </div>
           </div>
           <div style="display:flex;gap:8px;margin-top:14px">
             <button class="btn" style="flex:1;justify-content:center" onclick="G('camp-add-view').style.display='none';G('camp-archive-view').style.display='block'"><i class="ti ti-x"></i> إلغاء</button>
-            <button class="btn btn-p" style="flex:1;justify-content:center" onclick="saveCampaign()"><i class="ti ti-check"></i> حفظ الحملة</button>
+            <button class="btn btn-p" id="campSaveBtn" style="flex:1;justify-content:center;display:none" onclick="saveCampaign()"><i class="ti ti-check"></i> حفظ الحملة</button>
           </div>
         </div>
 
