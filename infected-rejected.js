@@ -71,9 +71,10 @@ async function loadInfected(type, tabEl, page=1){
   load(false);
   if(data&&data.length){
     G('infTbl').innerHTML=`<div class="tw"><table><thead><tr>
-      <th>رقم المتبرع</th><th>اسم المتبرع</th><th>رقم القنينة</th>
-      <th>نوع الإصابة</th><th>تاريخ الاكتشاف</th><th>رقم الموبايل</th><th>ملاحظة</th>${_canUnInfect()?'<th>إجراء</th>':''}
+      ${_canUnInfect()?'<th>إجراء</th>':''}<th>رقم المتبرع</th><th>اسم المتبرع</th><th>رقم القنينة</th>
+      <th>نوع الإصابة</th><th>تاريخ الاكتشاف</th><th>رقم الموبايل</th><th>ملاحظة</th>
     </tr></thead><tbody>${data.map(r=>`<tr>
+      ${_canUnInfect()?`<td><button class="btn" style="font-size:14px;padding:6px 10px;white-space:nowrap;color:#166534;border-color:#166534" onclick="openUnInfect('${r.id}')"><i class="ti ti-rotate-2"></i> إلغاء الإصابة</button></td>`:''}
       <td>${N(r.donors?.donor_number)}</td>
       <td>${esc(N(r.donors?.full_name))}</td>
       <td style="color:#BE123C;font-weight:700">${r.bottle_number}</td>
@@ -81,7 +82,6 @@ async function loadInfected(type, tabEl, page=1){
       <td>${fd(r.donation_date)}</td>
       <td dir="ltr">${esc(N(r.donors?.mobile))}</td>
       <td style="min-width:140px">${r.bottle_note?esc(r.bottle_note):'—'}</td>
-      ${_canUnInfect()?`<td><button class="btn" style="font-size:14px;padding:6px 10px;white-space:nowrap;color:#166534;border-color:#166534" onclick="openUnInfect('${r.id}')"><i class="ti ti-rotate-2"></i> إلغاء الإصابة</button></td>`:''}
     </tr>`).join('')}</tbody></table></div>`;
     G('infPag').innerHTML=_pagHtml(count,page,'goInfPage');
   } else {
@@ -216,8 +216,9 @@ async function loadRejected(page=1){
   const {data,count}=await q; load(false);
   if(data&&data.length){
     G('rjTbl').innerHTML=`<div class="tw"><table><thead><tr>
-      <th>الاسم</th><th>العمر</th><th>سبب الرفض</th><th>تاريخ الرفض</th><th>نوع الرفض</th><th>ملاحظات</th>
+      ${_canUnInfect()?'<th>إجراء</th>':''}<th>الاسم</th><th>العمر</th><th>سبب الرفض</th><th>تاريخ الرفض</th><th>نوع الرفض</th><th>ملاحظات</th>
     </tr></thead><tbody>${data.map(r=>`<tr>
+      ${_canUnInfect()?`<td><button class="btn" style="font-size:14px;padding:6px 10px;white-space:nowrap;color:#166534;border-color:#166534" onclick="rjRemove('${r.id}','${sq(r.full_name)}')"><i class="ti ti-user-check"></i> إزالة من المرفوضين</button></td>`:''}
       <td>${esc(r.full_name)}</td><td>${N(r.age)}</td><td>${esc(r.rejection_reason)}</td>
       <td>${fd(r.rejection_date)}</td>
       <td><span class="pill ${r.rejection_type==='مؤقت'?'py':'pr'}">${r.rejection_type}</span></td>
@@ -279,4 +280,40 @@ async function saveRejected(){
   });
   if(error){toast('خطأ: '+error.message,'error'); return;}
   toast('تم الحفظ بنجاح','success'); closeRjModal(); await loadRejected();
+}
+
+
+// ── إزالة شخص من قائمة المرفوضين (دائم/مؤقت) عندما يتبين أنه غير مصاب / رُفض بالخطأ ─────────────────
+// لا تغيّر نتيجة أي قنينة؛ لإلغاء نتيجة فحص موجبة لقنينة استخدم «إلغاء الإصابة» بتبويب المصابين.
+function rjRemove(id,name){
+  if(!_canUnInfect()){ toast('⛔ هذا الإجراء للمدير أو موظفي وحدة الفيروسات','error'); return; }
+  let ov=G('rjRemoveOv'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='rjRemoveOv'; ov.className='overlay on'; ov.style.zIndex=99980;
+  ov.innerHTML='<div class="modal" style="width:min(460px,96vw)"><div class="modal-title"><i class="ti ti-user-check"></i> إزالة من المرفوضين</div><div class="modal-body">'
+    +'<div style="font-weight:800;font-size:18px;margin-bottom:8px">'+esc(name)+'</div>'
+    +'<div style="font-size:14px;color:#6B7280;margin-bottom:10px">سيُسمح له بالتبرع مجدداً. لا تتغير نتيجة فحص أي قنينة سابقة له.</div>'
+    +'<div class="fgrp"><label>سبب الإزالة *</label><input type="text" id="rjr-reason" placeholder="مثال: فحص ثانٍ سالب بتاريخ ..."></div></div>'
+    +'<div class="modal-foot"><button class="btn" onclick="G(\'rjRemoveOv\').remove()">إلغاء</button><button class="btn btn-p" onclick="rjRemoveGo(\''+id+'\')">تأكيد الإزالة</button></div></div>';
+  document.body.appendChild(ov);
+  setTimeout(()=>G('rjr-reason').focus(),50);
+}
+async function rjRemoveGo(id){
+  const reason=(G('rjr-reason').value||'').trim();
+  if(!reason){ toast('اكتب سبب الإزالة','error'); return; }
+  if(!IS_ONLINE){ toast('هذا الإجراء يحتاج اتصالاً بالإنترنت','warning'); return; }
+  load(true);
+  try{
+    const{data:old,error:oe}=await db.from('rejected_donors').select('*').eq('id',id).single();
+    if(oe||!old) throw oe||new Error('السجل غير موجود');
+    const note=(old.notes?old.notes+' | ':'')+'أُزيل من المرفوضين: '+reason;
+    const{data:up,error}=await db.from('rejected_donors').update({is_deleted:true,notes:note}).eq('id',id).select();
+    if(error) throw error;
+    if(!up||!up.length) throw new Error('لم تتم الإزالة — لا توجد صلاحية');
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'rejected_donors',record_id:id,old_values:old,new_values:{is_deleted:true,reason}});
+    if(typeof cacheRejectedDonors==='function') await cacheRejectedDonors();
+    G('rjRemoveOv').remove();
+    toast('✅ أُزيل من قائمة المرفوضين','success',4000);
+    await loadRejected(_rjPage||1);
+  }catch(e){ toast('خطأ: '+e.message,'error',8000); }
+  finally{ load(false); }
 }
