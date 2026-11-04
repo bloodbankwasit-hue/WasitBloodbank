@@ -17,9 +17,26 @@ async function applyLabUpdate(id, fieldUpdates){
   if('serology_result' in fieldUpdates && !fieldUpdates.serology_date) fieldUpdates.serology_date=labToday();
   if('blood_type' in fieldUpdates && !fieldUpdates.blood_type_date) fieldUpdates.blood_type_date=labToday();
   const{data:cur}=await db.from('blood_donations')
-    .select('blood_type,serology_result,serology_type,donor_id,bottle_number,donors(full_name)')
+    .select('blood_type,serology_result,serology_type,status,donor_id,bottle_number,donors(full_name)')
     .eq('id',id).single();
 
+  // قنينة تجاوزت مرحلة الفحص (مصابة / بالمخزن المؤقت / بالرصيد / تالفة): تعديل أو تسجيل الفصيلة فقط —
+  // لا تتغير حالتها ولا يُعاد إدخال المتبرع بالمرفوضين (حصل ذلك سابقاً عند اكتمال الفحص).
+  if(cur && ['rejected_positive','pending_release','in_stock','damaged'].includes(cur.status) && 'blood_type' in fieldUpdates && !('serology_result' in fieldUpdates)){
+    const only={blood_type:fieldUpdates.blood_type, blood_type_date:fieldUpdates.blood_type_date};
+    let{error:e1}=await db.from('blood_donations').update(only).eq('id',id);
+    if(e1 && /blood_type_date/i.test(e1.message||'')){ delete only.blood_type_date; ({error:e1}=await db.from('blood_donations').update(only).eq('id',id)); }
+    if(e1) throw e1;
+    // مكوّنات/نواتج نفس السحبة (نفس المتبرع والرقم) ما زالت بنفس الفصيلة القديمة وبحالة مماثلة
+    if(cur.donor_id && cur.bottle_number){
+      let q=db.from('blood_donations').update({blood_type:fieldUpdates.blood_type}).eq('donor_id',cur.donor_id).eq('bottle_number',cur.bottle_number)
+        .in('status',['rejected_positive','pending_release','in_stock','damaged']).eq('is_deleted',false).neq('id',id);
+      q = cur.blood_type ? q.eq('blood_type',cur.blood_type) : q.is('blood_type',null);
+      const{error:e2}=await q;
+      if(e2) throw new Error('حُفظت الفصيلة لكن تعذّر تطبيقها على المكوّنات المرتبطة: '+e2.message);
+    }
+    return {complete:!!fieldUpdates.blood_type && !!cur.serology_result, effSer:cur.serology_result??null, effBt:fieldUpdates.blood_type, final:true};
+  }
   const effBt = ('blood_type' in fieldUpdates) ? fieldUpdates.blood_type : (cur?.blood_type ?? null);
   const effSer = ('serology_result' in fieldUpdates) ? fieldUpdates.serology_result : (cur?.serology_result ?? null);
   const effSerType = ('serology_type' in fieldUpdates) ? fieldUpdates.serology_type : (cur?.serology_type ?? null);

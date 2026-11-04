@@ -2291,22 +2291,65 @@ function ft(t){ return t ? t.substring(0,5) : '—'; }
     if(bad && final && typeof toast==='function') toast('⚠️ التاريخ غير صحيح: اكتبه بالشكل يوم/شهر/سنة (مثال 25/12/2026)','error',3500);
     return !bad;
   }
-  // منتقي التاريخ: حقل date مخفي دائم لكل حقل (بدل إنشائه وحذفه بكل نقرة) حتى لا يُغلق المنتقي قبل ما يظهر
+  // منتقي التاريخ: تقويم من تصميم الموقع يظهر أسفل الحقل مباشرة (تقويم المتصفح الأصلي كان يظهر بمكان خاطئ بتطبيق الويندوز)
+  const CAL_M=['كانون الثاني','شباط','آذار','نيسان','أيار','حزيران','تموز','آب','أيلول','تشرين الأول','تشرين الثاني','كانون الأول'];
+  const CAL_D=['س','ح','ن','ث','ر','خ','ج'];   // الأسبوع يبدأ السبت
+  let _cal=null;
+  function calClose(){ if(_cal){ document.removeEventListener('mousedown',_cal.out,true); document.removeEventListener('keydown',_cal.key,true); window.removeEventListener('resize',calClose); window.removeEventListener('scroll',_cal.scr,true); _cal.box.remove(); _cal=null; } }
   function pick(el,btn){
     if(el.disabled||el.readOnly) return;
-    let h=el._bbPicker;
-    if(!h){
-      h=document.createElement('input'); h.type='date'; h.dataset.bbDate='1'; h.tabIndex=-1; h.setAttribute('aria-hidden','true');
-      document.body.appendChild(h);
-      h.addEventListener('change',()=>{ if(h.value){ el.value=h.value; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); } });
-      el._bbPicker=h;
+    if(_cal && _cal.el===el){ calClose(); return; }
+    calClose();
+    const p2=n=>String(n).padStart(2,'0'), iso=(y,m,d)=>y+'-'+p2(m+1)+'-'+p2(d);
+    const cur=/^\d{4}-\d{2}-\d{2}$/.test(el.value||'')?el.value:'';
+    const now=new Date(), todayIso=iso(now.getFullYear(),now.getMonth(),now.getDate());
+    let vy=cur?+cur.slice(0,4):now.getFullYear(), vm=cur?+cur.slice(5,7)-1:now.getMonth();
+    const box=document.createElement('div');
+    box.setAttribute('dir','rtl');
+    box.style.cssText='position:fixed;z-index:99995;box-sizing:border-box;width:288px;background:#fff;border:1px solid #E5E7EB;border-radius:14px;box-shadow:0 10px 36px rgba(0,0,0,.28);padding:10px;font-family:inherit;direction:rtl;user-select:none';
+    document.body.appendChild(box);
+    function pickDay(d){ calClose(); el.value=iso(vy,vm,d); el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); try{ el.focus(); }catch(e){} }
+    function render(){
+      const first=new Date(vy,vm,1), lead=(first.getDay()+1)%7, days=new Date(vy,vm+1,0).getDate();
+      const nb='border:none;background:#F3F4F6;border-radius:8px;width:34px;height:34px;font-size:18px;cursor:pointer;font-family:inherit';
+      let h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+        +'<button type="button" data-a="next" style="'+nb+'">‹</button>'
+        +'<div style="font-weight:800;font-size:16px">'+CAL_M[vm]+' '+vy+'</div>'
+        +'<button type="button" data-a="prev" style="'+nb+'">›</button></div>'
+        +'<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center">';
+      CAL_D.forEach(d=>{ h+='<div style="font-size:13px;color:#6B7280;font-weight:700;padding:4px 0">'+d+'</div>'; });
+      for(let i=0;i<lead;i++) h+='<div></div>';
+      for(let d=1;d<=days;d++){
+        const v=iso(vy,vm,d), sel=v===cur, td=v===todayIso;
+        h+='<button type="button" data-d="'+d+'" style="border:'+(td&&!sel?'1.5px solid #BE123C':'none')+';background:'+(sel?'#BE123C':'transparent')+';color:'+(sel?'#fff':'#111')+';border-radius:8px;height:34px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit">'+d+'</button>';
+      }
+      h+='</div><div style="display:flex;justify-content:space-between;margin-top:8px"><button type="button" data-a="clear" style="border:none;background:none;color:#6B7280;font-size:14px;cursor:pointer;font-family:inherit">مسح</button><button type="button" data-a="today" style="border:none;background:none;color:#BE123C;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit">اليوم</button></div>';
+      box.innerHTML=h;
     }
-    // نضعه على مستوى الصفحة وبإحداثيات الحقل الفعلية حتى يظهر التقويم أسفل الحقل مباشرة
-    const r=el.getBoundingClientRect();
-    h.style.cssText='position:fixed;opacity:0;pointer-events:none;border:0;padding:0;margin:0;z-index:1;left:'+Math.round(r.left)+'px;top:'+Math.round(r.bottom-2)+'px;width:'+Math.max(120,Math.round(r.width))+'px;height:2px';
-    h.value=el.value||'';
-    try{ if(typeof h.showPicker==='function') h.showPicker(); else { h.focus(); h.click(); } }
-    catch(e){ try{ h.focus(); h.click(); }catch(x){} }
+    box.addEventListener('mousedown',e=>e.preventDefault());   // لا يسرق التركيز من الحقل
+    box.addEventListener('click',e=>{
+      const t=e.target.closest('button'); if(!t) return;
+      if(t.dataset.d){ pickDay(+t.dataset.d); return; }
+      const a=t.dataset.a;
+      if(a==='prev'){ vm--; if(vm<0){ vm=11; vy--; } render(); }
+      else if(a==='next'){ vm++; if(vm>11){ vm=0; vy++; } render(); }
+      else if(a==='today'){ vy=now.getFullYear(); vm=now.getMonth(); pickDay(now.getDate()); }
+      else if(a==='clear'){ calClose(); el.value=''; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); }
+    });
+    render();
+    // الموضع: أسفل الحقل مباشرة، وإذا ما كفى المكان يظهر فوقه
+    const r=el.getBoundingClientRect(), vw=window.innerWidth, vh=window.innerHeight, bh=box.offsetHeight||320;
+    let left=Math.min(Math.max(8,r.left),vw-288-8), top=r.bottom+4;
+    if(top+bh>vh-8 && r.top-bh-4>8) top=r.top-bh-4;
+    box.style.left=left+'px'; box.style.top=Math.max(8,top)+'px';
+    _cal={el,box,
+      out:e=>{ if(!box.contains(e.target) && !(btn&&btn.contains(e.target)) && e.target!==el) calClose(); },
+      key:e=>{ if(e.key==='Escape'){ e.stopPropagation(); calClose(); } },
+      scr:e=>{ if(!box.contains(e.target)) calClose(); }};
+    document.addEventListener('mousedown',_cal.out,true);
+    document.addEventListener('keydown',_cal.key,true);
+    window.addEventListener('resize',calClose);
+    window.addEventListener('scroll',_cal.scr,true);
   }
   function enhance(el){
     if(el.dataset.bbDate) return; el.dataset.bbDate='1';
