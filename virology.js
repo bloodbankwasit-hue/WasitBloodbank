@@ -42,8 +42,8 @@ const VIR_FV = {
     </div></div>`,
   actions(m,st,ctx){
     if(st.k==='ready') return `<button class="btn btn-p" onclick="openVirologyModal('${m.id}','${sq(m.full_name)}','${m.bottle_number||''}','${m.draw_date||''}')"><i class="ti ti-microscope"></i> فحص</button>`;
-    // الأرشيف: تعديل في نفس يوم العمل فقط وقبل تثبيتها في المخزن
-    if(ctx.canEdit && m.status==='pending_release') return `<button class="btn" onclick="openVirologyModal('${m.id}','${sq(m.full_name)}','${m.bottle_number||''}','${m.draw_date||''}')" title="تعديل (نفس يوم العمل فقط)"><i class="ti ti-edit"></i></button>`;
+    // الأرشيف: تعديل نتيجة الفحص (سليمة أو مصابة) في أي وقت، ما لم تُجهَّز القنينة. (للمدير أو من لديه صلاحية الفيروسات)
+    if(ctx.archive && m.serology_result && m.status!=='dispatched' && _vmCanEdit()) return `<button class="btn" onclick="openVirologyEdit('${m.id}','${sq(m.full_name)}','${m.bottle_number||''}','${m.draw_date||''}')" title="تعديل نتيجة الفحص"><i class="ti ti-edit"></i> تعديل</button>`;
     return '';
   },
   // سجلات بلا استمارة: قديمة (بأسماء) + قناني الحملات (مجلدات باسم الحملة)
@@ -103,7 +103,12 @@ async function confirmBulkVirology(){
   finally{ load(false); }
 }
 
+function _vmCanEdit(){ return UPROF?.role==='admin' || (typeof hasPermission==='function' && hasPermission('virology')); }
+let _vmEditing=null, _vmOld=null;
 async function openVirologyModal(id,name,bn,drawDate){
+  _vmEditing=null; _vmOld=null;
+  const _w=G('vm-edit-wrap'); if(_w) _w.remove();
+  const _t=document.querySelector('#vmModal .modal-title'); if(_t) _t.innerHTML='<i class="ti ti-microscope"></i> فحص الفيروسات';
   G('vm-id').value=id;
   G('vm-donor-name').textContent=name;
   G('vm-bnum-big').textContent=bn||'—';
@@ -138,11 +143,85 @@ function vmDiseaseChange(){
   vmNoteToggle();
 }
 
+// تعديل نتيجة فحص مسجّلة (سليمة ↔ مصابة، أو تغيير نوع الإصابة)
+async function openVirologyEdit(id,name,bn,drawDate){
+  if(!_vmCanEdit()){ toast('⛔ هذا الإجراء للمدير أو موظفي وحدة الفيروسات','error'); return; }
+  await openVirologyModal(id,name,bn,drawDate);
+  const{data:cur}=await db.from('blood_donations').select('serology_result,serology_type,status').eq('id',id).single();
+  _vmEditing=id; _vmOld=cur||{};
+  const t=document.querySelector('#vmModal .modal-title'); if(t) t.innerHTML='<i class="ti ti-edit"></i> تعديل نتيجة الفيروسات';
+  const body=document.querySelector('#vmModal .modal-body');
+  const w=document.createElement('div'); w.id='vm-edit-wrap'; w.style.cssText='margin-top:12px';
+  w.innerHTML=`<div style="font-size:14px;color:#6B7280;margin-bottom:6px">النتيجة الحالية: <b style="color:${cur?.serology_result==='Positive'?'#BE123C':'#166534'}">${cur?.serology_result==='Positive'?('إصابة: '+esc(cur.serology_type||'')):'سالبة'}</b></div>
+    <label style="font-size:16px;color:#616161;font-weight:700;display:block;margin-bottom:6px">سبب التعديل *</label>
+    <textarea id="vm-edit-reason" rows="2" placeholder="مثلاً: خطأ إدخال / فحص ثانٍ سالب" style="width:100%;padding:10px;border:1.5px solid #E5E7EB;border-radius:10px;font-size:16px;font-family:inherit"></textarea>
+    ${cur?.serology_result==='Positive'?`<label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-size:15px"><input type="checkbox" id="vm-edit-restore" checked style="width:18px;height:18px;margin-top:2px"><span>إن صارت النتيجة سالبة: أرجع القنينة للمخزن المؤقت وارفع المنع الدائم عن المتبرع</span></label>`:''}`;
+  body.appendChild(w);
+}
+async function saveVirologyEdit(id,ser,serType,note){
+  const reason=(G('vm-edit-reason')?.value||'').trim();
+  if(!reason){ toast('اكتب سبب التعديل','error'); return; }
+  if(!IS_ONLINE){ toast('التعديل يحتاج اتصالاً بالإنترنت','warning'); return; }
+  const restore=!!G('vm-edit-restore')?.checked;
+  load(true);
+  try{
+    const{data:main,error:me}=await db.from('blood_donations').select('id,donor_id,bottle_number,serology_result,serology_type,status,donors(full_name)').eq('id',id).single();
+    if(me||!main) throw me||new Error('القنينة غير موجودة');
+    const oldSer=main.serology_result, oldType=main.serology_type||null, donorName=main.donors?.full_name||null;
+    if(oldSer===ser && (oldType||null)===(serType||null)){ toast('لا يوجد تغيير في النتيجة','info'); return; }
+    let rows=[main];
+    if(main.donor_id && main.bottle_number){
+      const{data:rr,error:re}=await db.from('blood_donations').select('id,status,blood_type,bottle_note,serology_result,destruction_report_id')
+        .eq('donor_id',main.donor_id).eq('bottle_number',main.bottle_number).eq('is_deleted',false);
+      if(re) throw re;
+      rows=(rr||[]).filter(r=>r.serology_result || r.id===id);
+      if((rr||[]).some(r=>r.status==='dispatched')) throw new Error('هذه القنينة أو أحد مكوّناتها مجهّزة — لا يمكن تعديل نتيجتها');
+    }
+    const today=new Date().toISOString().split('T')[0];
+    const stamp='تعديل نتيجة الفيروسات ('+(oldSer==='Positive'?('إصابة: '+(oldType||'')):'سالبة')+' ← '+(ser==='Positive'?('إصابة: '+serType):'سالبة')+'): '+reason;
+    for(const r of rows){
+      const upd={serology_result:ser, serology_type:serType, serology_date:labToday(), bottle_note:((ser==='Positive'&&note)?note+' | ':(r.bottle_note?r.bottle_note+' | ':''))+stamp};
+      if(ser==='Positive' && oldSer!=='Positive' && ['pending_release','in_stock'].includes(r.status)) upd.status='rejected_positive';
+      if(ser==='Negative' && oldSer==='Positive' && restore){
+        const back=r.blood_type?'pending_release':'pending_lab';
+        if(r.status==='rejected_positive') upd.status=back;
+        else if(r.status==='damaged' && !r.destruction_report_id){ upd.status=back; upd.damage_reason=null; upd.damaged_date=null; }
+      }
+      let{error:ue}=await db.from('blood_donations').update(upd).eq('id',r.id);
+      if(ue && /serology_date/i.test(ue.message||'')){ delete upd.serology_date; ({error:ue}=await db.from('blood_donations').update(upd).eq('id',r.id)); }
+      if(ue) throw ue;
+    }
+    let rejNote='';
+    if(donorName){
+      if(ser==='Positive' && oldSer!=='Positive'){
+        const{data:ex}=await db.from('rejected_donors').select('id').eq('full_name',donorName).eq('rejection_reason','إصابة: '+serType).eq('is_deleted',false).limit(1);
+        if(!(ex&&ex.length)){
+          const{error:ie}=await db.from('rejected_donors').insert({full_name:donorName,rejection_reason:'إصابة: '+serType,rejection_date:today,rejection_type:'دائم',created_by:SES?.user?.id});
+          if(ie) toast('⚠️ تعذّرت إضافة '+donorName+' للمرفوضين تلقائياً — أضفه يدوياً حالاً','error',10000); else { rejNote=' وأُضيف المتبرع للمرفوضين'; if(typeof cacheRejectedDonors==='function') await cacheRejectedDonors(); }
+        }
+      } else if(ser==='Positive' && oldSer==='Positive'){
+        await db.from('rejected_donors').update({rejection_reason:'إصابة: '+serType}).eq('full_name',donorName).eq('rejection_type','دائم').eq('rejection_reason','إصابة: '+oldType).eq('is_deleted',false);
+        if(typeof cacheRejectedDonors==='function') await cacheRejectedDonors();
+      } else if(ser==='Negative' && oldSer==='Positive' && restore){
+        const{data:others}=await db.from('blood_donations').select('id').eq('donor_id',main.donor_id).eq('serology_result','Positive').eq('is_deleted',false).limit(1);
+        if(others&&others.length) toast('⚠️ لم يُرفع المنع: المتبرع عنده إصابة أخرى مسجّلة','warning',6000);
+        else { await db.from('rejected_donors').update({is_deleted:true}).eq('full_name',donorName).eq('rejection_type','دائم').eq('rejection_reason','إصابة: '+oldType).eq('is_deleted',false); rejNote=' ورُفع المنع عن المتبرع'; if(typeof cacheRejectedDonors==='function') await cacheRejectedDonors(); }
+      }
+    }
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,
+      old_values:{serology_result:oldSer,serology_type:oldType},new_values:{serology_result:ser,serology_type:serType,reason,rows:rows.length,restored:restore}});
+    G('vmModal').classList.remove('on'); _vmEditing=null;
+    toast('✅ عُدّلت نتيجة الفحص'+rejNote,'success',5000);
+    await FV.refresh('virology');
+  }catch(e){ toast('خطأ: '+(e.message||e),'error'); }
+  finally{ load(false); }
+}
 async function saveVirology(){
   const id=G('vm-id').value;
   const diseases=[...document.querySelectorAll('.vm-dis:checked')].map(c=>c.value);
   const allNeg=G('vm-allneg').checked;
   if(!allNeg && !diseases.length){ toast('يرجى تحديد All-Negative أو نوع الإصابة على الأقل','error'); return; }
+  if(_vmEditing) return saveVirologyEdit(_vmEditing, diseases.length?'Positive':'Negative', diseases.length?diseases.join(', '):null, G('vm-note').value.trim());
   load(true);
   try{
     const ser = diseases.length ? 'Positive' : 'Negative';
