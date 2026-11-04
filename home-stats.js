@@ -205,8 +205,25 @@ async function hsOpenForms(i,title){
         <span class="pill py">${fnum(cnt[f.id])} بهذه الفترة</span></div>`).join(''):'<div class="empty"><p>لا توجد استمارات لهذه الفترة</p></div>')
       +(none?`<div style="margin-top:6px;color:#6B7280;font-size:14px">${fnum(none)} سجل بدون استمارة (سجلات قديمة أو حملات)</div>`:'');
     G('hsFormsBack').style.display='none';
+    // بنقرة واحدة: استمارة واحدة تُفتح مباشرة بأسمائها، وعدد قليل من الاستمارات تُعرض كلها مع أسمائها؛ العدد الكبير يبقى قائمة تُفتح منها الاستمارة
+    if(list.length && list.length<=6){
+      window._hsListHtml=''; window._hsListTitle='';
+      const{data:mem,error:me}=await db.rpc('form_members',{p_forms:list.map(f=>f.id)}); if(me) throw me;
+      const by={}; (mem||[]).filter(m=>m.exit_reason!=='withdrawn').forEach(m=>{ (by[m.form_id]=by[m.form_id]||[]).push(m); });
+      if(list.length===1){ G('hsFormsT').innerHTML='<i class="ti ti-clipboard-list"></i> استمارة #'+list[0].form_no+' — '+(_HS_GN[list[0].form_group]||''); G('hsFormsB').innerHTML=_hsMembersHtml(by[list[0].id]||[]); return; }
+      G('hsFormsB').innerHTML=list.map(f=>`<div style="font-weight:800;margin:6px 0 8px;color:#BE123C">استمارة #${f.form_no} — ${_HS_GN[f.form_group]||''} <span style="color:#757575;font-weight:600;font-size:13.5px">${typeof bbDmy==='function'?bbDmy(f.last_name_at):''}</span></div>`+_hsMembersHtml(by[f.id]||[])).join('')
+        +(none?`<div style="margin-top:6px;color:#6B7280;font-size:14px">${fnum(none)} سجل بدون استمارة (سجلات قديمة أو حملات)</div>`:'');
+      return;
+    }
     window._hsListHtml=G('hsFormsB').innerHTML; window._hsListTitle=G('hsFormsT').innerHTML;
   }catch(e){ G('hsFormsB').innerHTML='<div style="color:#B91C1C">تعذّر التحميل: '+esc(e.message||String(e))+'</div>'; }
+}
+function _hsMembersHtml(ms){
+  const inP=window._hsPeriodIds||new Set();
+  return ms.length?ms.map(m=>`<div onclick="hsOpenName('${m.id}')" style="cursor:pointer;display:flex;align-items:center;gap:10px;border:1px solid #EEF2F6;border-radius:12px;padding:10px;margin-bottom:8px;${inP.has(m.id)?'background:#FFF7F8':''}">
+        <div style="font-size:20px;font-weight:800;color:#BE123C;min-width:62px">${esc(String(m.bottle_number||'—'))}</div>
+        <div style="flex:1"><b>${esc(m.full_name||'—')}</b><div style="font-size:13.5px;color:#757575">${esc(m.bottle_type||'')} ${m.blood_type?'— <bdi dir="ltr">'+esc(m.blood_type)+'</bdi>':''} ${m.exit_reason==='medical_reject'?'— ⛔ رفض طبي':''}</div></div>
+        <i class="ti ti-chevron-left" style="color:#9CA3AF"></i></div>`).join(''):'<div class="empty"><p>لا توجد أسماء بهذه الاستمارة</p></div>';
 }
 async function hsOpenForm(formId,no,grp){
   G('hsFormsT').innerHTML='<i class="ti ti-clipboard-list"></i> استمارة #'+no+' — '+(_HS_GN[grp]||'');
@@ -216,10 +233,7 @@ async function hsOpenForm(formId,no,grp){
     const{data,error}=await db.rpc('form_members',{p_forms:[formId]}); if(error) throw error;
     const ms=(data||[]).filter(m=>m.exit_reason!=='withdrawn');
     const inP=window._hsPeriodIds||new Set();
-    G('hsFormsB').innerHTML=ms.length?ms.map(m=>`<div onclick="hsOpenName('${m.id}')" style="cursor:pointer;display:flex;align-items:center;gap:10px;border:1px solid #EEF2F6;border-radius:12px;padding:10px;margin-bottom:8px;${inP.has(m.id)?'background:#FFF7F8':''}">
-        <div style="font-size:20px;font-weight:800;color:#BE123C;min-width:62px">${esc(String(m.bottle_number||'—'))}</div>
-        <div style="flex:1"><b>${esc(m.full_name||'—')}</b><div style="font-size:13.5px;color:#757575">${esc(m.bottle_type||'')} ${m.blood_type?'— <bdi dir="ltr">'+esc(m.blood_type)+'</bdi>':''} ${m.exit_reason==='medical_reject'?'— ⛔ رفض طبي':''}</div></div>
-        <i class="ti ti-chevron-left" style="color:#9CA3AF"></i></div>`).join(''):'<div class="empty"><p>لا توجد أسماء بهذه الاستمارة</p></div>';
+    G('hsFormsB').innerHTML=_hsMembersHtml(ms);
   }catch(e){ G('hsFormsB').innerHTML='<div style="color:#B91C1C">تعذّر التحميل: '+esc(e.message||String(e))+'</div>'; }
 }
 async function hsOpenName(id){

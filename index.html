@@ -2301,8 +2301,14 @@ function ft(t){ return t ? t.substring(0,5) : '—'; }
     const btn=document.createElement('button'); btn.type='button'; btn.className='bb-dt-btn'; btn.tabIndex=-1; btn.title='اختيار من التقويم'; btn.innerHTML='<i class="ti ti-calendar"></i>';
     btn.onclick=()=>pick(el,btn); wrap.appendChild(btn);
     el.addEventListener('input',()=>{
-      const d=(typeof normDigits==='function'?normDigits(raw(el)):raw(el)).replace(/\D/g,'').slice(0,8);
-      let out=d.slice(0,2); if(d.length>2) out+='/'+d.slice(2,4); if(d.length>4) out+='/'+d.slice(4);
+      const t=(typeof normDigits==='function'?normDigits(raw(el)):raw(el));
+      // يوم/شهر/سنة: يقبل الأرقام المتصلة (04112026) أو بفواصل (4/11/2026 أو 4-1-2026) ويكمّل الصفر تلقائياً
+      const f=['','',''], lim=[2,2,4]; let k=0;
+      for(const ch of t){
+        if(ch>='0'&&ch<='9'){ if(f[k].length>=lim[k]){ if(k<2) k++; else continue; } f[k]+=ch; }
+        else if(f[k].length>0 && k<2){ if(f[k].length===1) f[k]='0'+f[k]; k++; }
+      }
+      let out=f[0]; if(k>=1) out+='/'+f[1]; if(k>=2) out+='/'+f[2];
       if(out!==raw(el)) setRaw(el,out);
       if(check(el,false) && out.length===10) el.dispatchEvent(new Event('change',{bubbles:true}));
     });
