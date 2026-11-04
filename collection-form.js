@@ -5,7 +5,7 @@ const COLLECTION_SIZE = 10;
 const COL_GROUPS = { T:{ name:'تريما' }, R:{ name:'ريفيوس' }, B:{ name:'بقية الأنواع' }, A:{ name:'تريما وريفيوس (قديمة)' } };
 const COL_LISTS = ['T','R','B'];
 function colGroupOf(bottleType){ return bbFormGroup(bottleType); }
-let _colTab = 'T', _colBusy = false, _colPopupTimer = null;
+let _colTab = 'B', _colBusy = false, _colPopupTimer = null;
 
 const _colDate = v => (typeof bbDmy==='function' ? bbDmy(v) : '');   // DD/MM/YYYY
 async function _colRpc(fn,args){ const r=await db.rpc(fn,args||{}); if(r.error) throw r.error; return r.data; }
@@ -113,7 +113,7 @@ async function colEditMember(donationId){
 }
 
 function colTab(t){ _colTab = t; colRender(); }
-async function openCollectionModal(t){ _colTab = t||'T'; G('collectionModal').classList.add('on'); await colRender(); }
+async function openCollectionModal(t){ _colTab = t||'B'; G('collectionModal').classList.add('on'); await colRender(); }
 
 // الاستمارات تظهر كسطور (التاريخ + الرقم + عدد الأسماء)؛ الضغط على السطر يفتح الأسماء وأزرار المعاينة والطباعة بداخله.
 // الاستمارات المفتوحة بيد المستخدم تبقى مفتوحة بعد أي تحديث للقائمة (مثلاً بعد تعديل اسم).
