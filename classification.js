@@ -16,6 +16,9 @@ function openClassificationExport(){
 }
 
 // عرض الاستمارات (راجع forms-view.js): أخضر = جاهز، إطار أحمر = بانتظار السحب، رمادي ✓ = أُنجز، أحمر مظلل = خرج
+// حالات تسمح بتعديل الفصيلة (بعدها تكون المكوّنات أو التجهيز قد اعتمدت عليها)
+const CLS_EDITABLE=['pending_release','in_stock','rejected_positive'];
+let _cmEditOld=null;
 const CLS_FV = {
   unit:'classification', host:'classificationList', groups:['T','R','B'], chk:'cm-chk', onSel:'updateCmBulkBar', bigBottle:true,
   // أصل التريما يُخفى (ناتجاه يظهران كقنينة واحدة) والفحص يتم مرة واحدة للسحبة
@@ -25,9 +28,11 @@ const CLS_FV = {
     const done=!!m.blood_type;
     const note=(m.bottle_note||'').replace(/^رفض طبي:\s*/,'');
     if(m.exit_reason==='medical_reject') return {k:'excl',t:'⛔ مرفوض طبياً'+(note?': '+note:'')};
+    // قنينة مصابة (فحص موجب) بلا فصيلة: يُسمح بتصنيفها لتسجيل فصيلتها فقط (لا تتغير حالتها ولا تعود للمخزون)
+    if(!done && (m.status==='rejected_positive' || ((m.status==='damaged'||m.status==='pending_release') && m.serology_result==='Positive'))) return {k:'ready',t:'🦠 مصابة — سجّل فصيلتها فقط'};
     if(m.status==='damaged' && !done) return {k:'excl',t:'⛔ تالف'+(note?': '+note:'')};
     if(m.status==='pending_draw') return {k:'notready',t:'بانتظار السحب'};
-    if(done) return {k:'done',t:'✓ صُنّفت: '+m.blood_type};
+    if(done) return {k:'done',t:'✓ صُنّفت: '+m.blood_type+(m.status==='rejected_positive'?' — 🦠 مصابة':'')};
     if(m.status==='pending_lab') return {k:'ready',t:''};
     return {k:'done',t:'—'};
   },
@@ -41,8 +46,8 @@ const CLS_FV = {
     </div></div>`,
   actions(m,st,ctx){
     if(st.k==='ready') return `<button class="btn btn-p" onclick="openClassificationModal('${m.id}','${sq(m.full_name)}','${m.bottle_number||''}','${m.draw_date||''}')"><i class="ti ti-droplet"></i> تصنيف</button>`;
-    // الأرشيف: تعديل في نفس يوم العمل فقط وقبل تثبيتها في المخزن
-    if(ctx.canEdit && m.status==='pending_release') return `<button class="btn" onclick="openClassificationModal('${m.id}','${sq(m.full_name)}','${m.bottle_number||''}','${m.draw_date||''}')" title="تعديل (نفس يوم العمل فقط)"><i class="ti ti-edit"></i></button>`;
+    // تعديل الفصيلة: متاح ما دامت القنينة لم تُفصل ولم تُجهَّز ولم تُتلف رسمياً (قيد المخزن المؤقت، بالرصيد، أو مصابة)
+    if(st.k==='done' && m.blood_type && CLS_EDITABLE.includes(m.status)) return `<button class="btn" onclick="openClassificationModal('${m.id}','${sq(m.full_name)}','${m.bottle_number||''}','${m.draw_date||''}','${m.blood_type}')" title="تعديل الفصيلة"><i class="ti ti-edit"></i> تعديل</button>`;
     return '';
   },
   // سجلات بلا استمارة: قديمة (بأسماء) + قناني الحملات (مجلدات باسم الحملة)
@@ -101,12 +106,14 @@ async function confirmBulkClassification(){
   finally{ load(false); }
 }
 
-async function openClassificationModal(id,name,bn,drawDate){
+async function openClassificationModal(id,name,bn,drawDate,curBt){
+  _cmEditOld = curBt || null;
+  { const t=document.querySelector('#cmModal .modal-title'); if(t) t.innerHTML = curBt ? '<i class="ti ti-edit"></i> تعديل الفصيلة' : '<i class="ti ti-droplet"></i> تصنيف الفصيلة'; }
   G('cm-id').value=id;
   G('cm-donor-name').textContent=name;
   G('cm-bnum-big').textContent=bn||'—';
   G('cm-draw-date').textContent=drawDate?fd(drawDate):'—';
-  G('cm-bt').value='';
+  G('cm-bt').value=curBt||'';
   G('cmModal').classList.add('on');
 }
 
@@ -167,6 +174,9 @@ function confirmBloodTypeConflict(conflict, newBt){
 async function saveClassification(){
   const id=G('cm-id').value, bt=G('cm-bt').value;
   if(!bt){ toast('يرجى اختيار فصيلة الدم','error'); return; }
+  const editOld=_cmEditOld;
+  if(editOld && editOld===bt){ toast('الفصيلة لم تتغير','warning'); return; }
+  if(editOld && !IS_ONLINE){ toast('تعديل الفصيلة يحتاج اتصال بالإنترنت','error'); return; }
   load(true);
   try{
     if(IS_ONLINE){
@@ -198,8 +208,18 @@ async function saveClassification(){
       load(false);
       return;
     }
-    const{complete,effSer}=await applyLabUpdate(id, {blood_type:bt});
-    if(complete && effSer==='Positive'){
+    const{complete,effSer,final}=await applyLabUpdate(id, {blood_type:bt});
+    if(editOld){
+      await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,old_values:{blood_type:editOld},new_values:{blood_type:bt,note:'تعديل الفصيلة'}});
+      toast('✅ عُدّلت الفصيلة من '+editOld+' إلى '+bt,'success',4000);
+      G('cmModal').classList.remove('on');
+      _cmEditOld=null;
+      await FV.refresh('classification');
+      return;
+    }
+    if(final){
+      toast('✅ سُجّلت فصيلة القنينة: '+bt,'success',4000);
+    } else if(complete && effSer==='Positive'){
       toast('⚠️ نتيجة الفحص موجبة — تم نقل المتبرع للمرفوضين دائماً','warning',5000);
     } else if(complete){
       toast('✅ اكتمل التصنيف — القنينة أُضيفت للخزين','success',4000);
