@@ -162,8 +162,9 @@ function saRenderList(){
   window._saBookList=mine;
 }
 function saBookDetail(g){
-  const m=saMatrix(g.bottles.map(x=>({ct:x.ct,bt:x.bt||'—',n:1})),()=>true);
-  return `<div class="sa-det"><div class="sa-sc">${saTable({headers:m.heads,rows:m.rows})}</div>
+  const bl=g.bottles.map(x=>({ct:x.ct,bt:x.bt||'—',n:1}));
+  const tabs=SA_MODES.map(([md,ml])=>{ const m=saMatrix(bl,()=>true,md); return m.rows.length?`<div style="font-weight:800;margin:6px 0 4px">${saEsc(ml)}</div>`+saTable({headers:m.heads,rows:m.rows}):''; }).join('');
+  return `<div class="sa-det"><div class="sa-sc">${tabs}</div>
     ${g.batches.map(b=>`<div style="margin-top:10px;font-weight:800">عملية تجهيز بتاريخ ${saD(b.date)} — ${b.count} قنينة
       <button class="btn" style="color:#B91C1C;padding:2px 8px;margin-right:8px" onclick="saCancel('${b.batch}')"><i class="ti ti-arrow-back-up"></i> إلغاء هذه العملية</button></div>
       <table class="sa-t" style="margin-top:4px"><thead><tr><th>رقم القنينة</th><th>الفصيلة</th><th>نوع القنينة</th><th>المكوّن</th><th></th></tr></thead><tbody>${(b.bottles||[]).map(x=>`<tr><td><b>${x.num}</b></td><td>${saX(bbBt(x.bt,x.ct)||'—')}</td><td>${saEsc(x.btype||'—')}</td><td>${saEsc(saLbl(x.ct))}</td><td><button class="btn" style="color:#B91C1C;padding:2px 8px" onclick="saRemove('${x.id}','${b.batch}',${x.num})" title="إرجاع هذه القنينة للرصيد"><i class="ti ti-arrow-back-up"></i> إرجاع</button></td></tr>`).join('')}</tbody></table>`).join('')}</div>`;
@@ -286,16 +287,18 @@ function saAgg(rows,filter){
   f.forEach(r=>{ const k=bbBt(r.bt,r.ct); (bt[r.ct]=bt[r.ct]||{}); bt[r.ct][k]=(bt[r.ct][k]||0)+r.n; tot.n+=r.n; });
   return {map:bt,total:tot.n};
 }
-function saMatrix(rows,filter){
-  const a=saAgg(rows,filter); const cts=SA_CT.filter(c=>a.map[c]);
-  const hasAbo=cts.some(c=>bbNoSign(c));
-  const heads=['المكوّن',...SA_BT,...(hasAbo?PLASMA_ABO.map(x=>x+' (بلا إشارة)'):[]),'المجموع'];
-  const trs=cts.map(c=>{ const m=a.map[c], ns=bbNoSign(c);
-    return [saLbl(c),...SA_BT.map(b=>ns?0:(m[b]||0)),...(hasAbo?PLASMA_ABO.map(b=>ns?(m[b]||0):0):[]),Object.values(m).reduce((s,x)=>s+x,0)]; });
-  if(trs.length){ const w=heads.length-2; trs.push(['المجموع',...Array.from({length:w},(_,i)=>trs.reduce((s,r)=>s+r[i+1],0)),a.total]); }
-  const extra=[...new Set(Object.values(a.map).flatMap(m=>Object.keys(m)))].filter(x=>!SA_BT.includes(x)&&!PLASMA_ABO.includes(x));
-  return {heads,rows:trs,total:a.total,extra};
+// جدولان منفصلان: «الدم» (كامل/مفلتر/مضغوط بالفصيلة مع الإشارة) و«مكونات الدم» (بلازما/كرايو/صفيحات بالفصيلة بدون إشارة)
+const SA_BLOOD_CT=['دم كامل','دم مفلتر','دم مضغوط'], SA_COMP_CT=['بلازما','بروتين بارد','صفائح دموية'];
+function saMatrix(rows,filter,mode){
+  const a=saAgg(rows,filter), blood=mode!=='comp';
+  const cts=(blood?SA_BLOOD_CT:SA_COMP_CT).filter(c=>a.map[c]);
+  const cols=blood?SA_BT:PLASMA_ABO;
+  const heads=['المكوّن',...cols,'المجموع'];
+  const trs=cts.map(c=>{ const m=a.map[c]; return [saLbl(c),...cols.map(b=>m[b]||0),Object.values(m).reduce((s,x)=>s+x,0)]; });
+  if(trs.length){ const w=heads.length-2; trs.push(['المجموع',...Array.from({length:w},(_,i)=>trs.reduce((s,r)=>s+r[i+1],0)),trs.reduce((s,r)=>s+r[heads.length-1],0)]); }
+  return {heads,rows:trs};
 }
+const SA_MODES=[['blood','الدم (حسب الفصيلة)'],['comp','مكونات الدم (حسب الفصيلة)']];
 function saBuildStats(){
   const S=_saStats||{rows:[],batches:[]}, R=S.rows, B=S.batches;
   const sum=(arr,f)=>arr.filter(f).reduce((s,x)=>s+x.n,0);
@@ -309,13 +312,13 @@ function saBuildStats(){
     rows:hosps.map(h=>{ const a=sum(R,r=>r.hospital===h&&r.kind==='hospital'), d=sum(R,r=>r.hospital===h&&r.kind==='hand'); return [h,a,d,a+d]; })
       .concat(hosps.length?[['المجموع',tH,tD,tH+tD]]:[])});
   // 2) مصفوفات الإجمالي
-  [['كل التجهيز — الفصيلة × المكوّن',()=>true],['تجهيز المستشفيات — الفصيلة × المكوّن',r=>r.kind==='hospital'],['تجهيز الباي هاند — الفصيلة × المكوّن',r=>r.kind==='hand']].forEach(([t,f])=>{
-    const m=saMatrix(R,f); if(m.rows.length) out.sections.push({title:t,headers:m.heads,rows:m.rows});
+  [['كل التجهيز',()=>true],['تجهيز المستشفيات',r=>r.kind==='hospital'],['تجهيز الباي هاند',r=>r.kind==='hand']].forEach(([t,f])=>{
+    SA_MODES.forEach(([md,ml])=>{ const m=saMatrix(R,f,md); if(m.rows.length) out.sections.push({title:t+' — '+ml,headers:m.heads,rows:m.rows}); });
   });
   // 3) تفصيل كل مستشفى
   hosps.forEach(h=>{
     [['hospital','عن طريق كتاب'],['hand','عن طريق باي هاند']].forEach(([k,l])=>{
-      const m=saMatrix(R,r=>r.hospital===h&&r.kind===k); if(m.rows.length) out.sections.push({title:h+' — '+l,headers:m.heads,rows:m.rows,detail:true});
+      SA_MODES.forEach(([md,ml])=>{ const m=saMatrix(R,r=>r.hospital===h&&r.kind===k,md); if(m.rows.length) out.sections.push({title:h+' — '+l+' — '+ml,headers:m.heads,rows:m.rows,detail:true}); });
     });
   });
   // 3.5) كتب المستشفيات (تظهر كلها، وعند البحث برقم الكتاب أو المستشفى تُفلتر)
