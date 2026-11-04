@@ -173,7 +173,7 @@ window._hsSrc=window._hsSrc||[];
 const _HS_GN={T:'تريما',R:'ريفيوس',B:'بقية الأنواع',A:'قديمة'};
 function _hsOv(){
   let o=G('hsFormsOv'); if(o) o.remove();
-  o=document.createElement('div'); o.className='overlay on'; o.id='hsFormsOv'; o.style.zIndex=7600;
+  o=document.createElement('div'); o.className='overlay on'; o.id='hsFormsOv'; o.style.zIndex=7695;
   o.innerHTML='<div class="modal" style="width:min(640px,96vw);max-height:92vh;display:flex;flex-direction:column"><div class="modal-title" id="hsFormsT"></div><div class="modal-body" id="hsFormsB" style="overflow:auto;flex:1"></div><div class="modal-foot"><button class="btn" id="hsFormsBack" style="display:none"><i class="ti ti-arrow-right"></i> رجوع</button><button class="btn" onclick="G(\'hsFormsOv\').remove()">إغلاق</button></div></div>';
   document.body.appendChild(o); return o;
 }
