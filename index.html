@@ -64,6 +64,10 @@ html{-webkit-text-size-adjust:100%}
 .bb-back-bar{display:flex;margin-bottom:10px}
 .sec-popup-back{border:1.5px solid #E5E7EB;background:#F9FAFB;color:#374151;border-radius:10px;padding:5px 12px;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-inline-end:10px}
 .sec-popup-back:hover{background:#FCE7F3;color:#9D174D}
+#addSeqModal .fgrid,#editSeqModal .fgrid{grid-template-columns:repeat(2,minmax(0,1fr)) !important}
+#addSeqModal .fgrp,#editSeqModal .fgrp{min-width:0}
+#addSeqModal select,#addSeqModal input,#editSeqModal input{max-width:100%;min-width:0;box-sizing:border-box}
+#addSeqModal .modal,#editSeqModal .modal{overflow-x:hidden}
 .modal{background:#fff;border-radius:12px;padding:22px;width:500px;max-width:96vw;max-height:90vh;overflow-y:auto}
 .modal-title{font-size:17px;font-weight:700;color:#1a1a1a;margin-bottom:14px;display:flex;align-items:center;gap:7px}
 .modal-title i{color:#BE123C}
@@ -5405,7 +5409,7 @@ if('serviceWorker' in navigator){
             <option value="تسلسل (أحادي، ثنائي، رباعي، رباعي SAG، مفلتر)">تسلسل (أحادي، ثنائي، رباعي، رباعي SAG، مفلتر)</option>
             <option value="ريفيوس">ريفيوس</option>
             <option value="تريما">تريما (سحب آلي)</option>
-            <option value="الحملات">الحملات (تسلسل مستقل — لا يتداخل مع الاستقبال)</option>
+            <option value="الحملات">الحملات</option>
 </select>
         </div>
         <div class="fgrp"><label>من رقم *</label><input type="text" inputmode="numeric" id="sq-from" placeholder="21928" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
