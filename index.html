@@ -4084,18 +4084,27 @@ function humanizeAuditValues(v){
 function seqRung(rem){ return rem<=0 ? 0 : Math.ceil(rem/10)*10; }
 function _seqSeenGet(){ try{ return JSON.parse(localStorage.getItem('bb_seq_seen')||'{}'); }catch(e){ return {}; } }
 function _seqSeenSet(o){ try{ localStorage.setItem('bb_seq_seen', JSON.stringify(o)); }catch(e){} }
+// تسلسل الحملات: الباقي = أرقام المدى التي لم تُحجز بعد لأي حملة
+const SEQ_CAMP='الحملات';
+async function campReservedCount(from,to){
+  const r=await db.from('campaign_slots').select('bottle_number',{count:'exact',head:true}).gte('bottle_number',from).lte('bottle_number',to);
+  return r.count||0;
+}
 async function computeSeqAlerts(){
-  const{data:seqs}=await db.from('bottle_sequences').select('bottle_type,current_number,end_number,is_active,created_at');
+  const{data:seqs}=await db.from('bottle_sequences').select('bottle_type,current_number,start_number,end_number,is_active,created_at');
   const{data:pool}=await db.from('bottle_number_pool').select('bottle_type');
   const poolCnt={}; (pool||[]).forEach(p=>{ poolCnt[p.bottle_type]=(poolCnt[p.bottle_type]||0)+1; });
   const byType={};
   (seqs||[]).forEach(s=>{ (byType[s.bottle_type]=byType[s.bottle_type]||[]).push(s); });
   const out=[];
+  const campLeft={};
+  for(const cs of (seqs||[]).filter(x=>x.bottle_type===SEQ_CAMP && x.is_active)){ campLeft[cs.created_at]=await campReservedCount(cs.start_number,cs.end_number); }
   Object.entries(byType).forEach(([type,list])=>{
     if(seqKey(type)!==type) return;   // الأنواع الخمسة تُحسب على التسلسل المشترك فقط
     // same pick as reception: the newest ACTIVE sequence of that type
     const cur=list.filter(s=>s.is_active).sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)))[0];
-    const left=cur ? Math.max(0, cur.end_number-cur.current_number+1) : 0;
+    let left=cur ? Math.max(0, cur.end_number-cur.current_number+1) : 0;
+    if(type===SEQ_CAMP && cur){ left=Math.max(0, (cur.end_number-cur.start_number+1) - (campLeft[cur.created_at]||0)); }
     const rem=left+(poolCnt[type]||0);
     if(rem<=50) out.push({type, remaining:rem, rung:seqRung(rem)});
   });
@@ -5337,6 +5346,7 @@ if('serviceWorker' in navigator){
             <option value="تسلسل (أحادي، ثنائي، رباعي، رباعي SAG، مفلتر)">تسلسل (أحادي، ثنائي، رباعي، رباعي SAG، مفلتر)</option>
             <option value="ريفيوس">ريفيوس</option>
             <option value="تريما">تريما (سحب آلي)</option>
+            <option value="الحملات">الحملات (تسلسل مستقل — لا يتداخل مع الاستقبال)</option>
 </select>
         </div>
         <div class="fgrp"><label>من رقم *</label><input type="text" inputmode="numeric" id="sq-from" placeholder="21928" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>

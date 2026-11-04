@@ -15,19 +15,23 @@ async function loadSeqGrid(){
     const c=inUse[s.bottle_type];
     if(!c || String(s.created_at)>String(c.created_at)) inUse[s.bottle_type]=s;
   });
+  const campRes={};
+  for(const s of data.filter(x=>x.bottle_type===SEQ_CAMP)) campRes[s.id]=await campReservedCount(s.start_number,s.end_number);
   grid.innerHTML = data.map(s=>{
-    const remain = Math.max(0, s.end_number - s.current_number + 1);   // current_number is the NEXT unused number
+    const isCamp = s.bottle_type===SEQ_CAMP;
+    const remain = isCamp ? Math.max(0,(s.end_number-s.start_number+1)-(campRes[s.id]||0)) : Math.max(0, s.end_number - s.current_number + 1);   // current_number is the NEXT unused number
     const span = s.end_number - s.start_number;
-    const pct = span>0 ? Math.min(100, Math.max(0, (s.current_number - s.start_number)/span*100)).toFixed(0) : '0';
+    const pct = isCamp ? ((s.end_number-s.start_number+1)>0 ? Math.min(100,(campRes[s.id]||0)/(s.end_number-s.start_number+1)*100).toFixed(0) : '0') : span>0 ? Math.min(100, Math.max(0, (s.current_number - s.start_number)/span*100)).toFixed(0) : '0';
     const cls = remain > 500 ? 'ok' : remain > 100 ? 'warn' : 'danger';
     const retired = SEQ_SHARED.includes(s.bottle_type);   // تسلسل قديم لنوع صار ضمن التسلسل المشترك
     const ignored = !retired && s.is_active && inUse[s.bottle_type] && inUse[s.bottle_type].id!==s.id;
     return `<div class="seq-card ${s.is_active?'active':''}">
       <button class="seq-edit" onclick="openEditSeq('${s.id}','${s.bottle_type}',${s.current_number},${s.end_number},${s.start_number})">تعديل</button>
       <div class="seq-type">${s.bottle_type}</div>
-      <div class="seq-num">${s.current_number}</div>
+      <div class="seq-num">${isCamp ? (campRes[s.id]||0) : s.current_number}</div>
+      ${isCamp?'<div style="font-size:13.5px;color:#6B7280;font-weight:700">محجوز لحملات</div>':''}
       <div class="seq-range">${s.start_number} ← ${s.end_number}</div>
-      <div class="seq-remain ${cls}">متبقي: ${remain} قنينة (${pct}%)</div>
+      <div class="seq-remain ${cls}">${isCamp?'غير محجوز':'متبقي'}: ${remain} قنينة (${pct}%${isCamp?' محجوز':''})</div>
       ${retired?'<div style="margin-top:6px;font-size:13.5px;font-weight:700;color:#6B7280">متوقف — النوع صار ضمن «'+SEQ_SHARED_KEY+'» (يمكن حذفه)</div>':''}
       ${ignored?'<div style="margin-top:6px;font-size:13.5px;font-weight:700;color:#B45309">⚠ غير مستخدم — يوجد تسلسل أحدث لنفس النوع (احذفه من «تعديل»)</div>':''}
     </div>`;
