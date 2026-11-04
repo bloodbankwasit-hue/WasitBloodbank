@@ -344,6 +344,7 @@ function campExpandRanges(rows){
   return Object.entries(by).map(([type,s])=>({type, numbers:[...s].sort((x,y)=>x-y)}));
 }
 
+const CAMP_DMG_REASON='تلف أثناء الحملة';
 let _campPlan=null;
 function campPreviewReset(){
   _campPlan=null;
@@ -438,25 +439,28 @@ async function saveCampaign(){
       if(r.error) throw r.error;
       slots.push(...r.data);
     }
-    // 2) the non-damaged ones become real bottles (pending_lab) — same row shape as a normal campaign draw
-    const toDraw=slots.filter(s=>s.status==='reserved');
-    let done=0;
-    for(let i=0;i<toDraw.length;i+=200){
-      const chunk=toDraw.slice(i,i+200);
+    // 2) every bottle becomes a real row: non-damaged → pending_lab (same as after a normal draw),
+    //    damaged → status 'damaged' so it shows in the damaged store with a note that it came from a campaign
+    let done=0, dmgDone=0;
+    for(let i=0;i<slots.length;i+=200){
+      const chunk=slots.slice(i,i+200);
       const dRows=chunk.map(s=>{
         const days=WHOLE_BLOOD_DAYS[s.bottle_type] ?? 45;
         const e=new Date(P.date); e.setDate(e.getDate()+days);
-        return {donor_id:null, bottle_type:s.bottle_type, bottle_number:s.bottle_number, donation_type:'طوعي',
+        const base={donor_id:null, bottle_type:s.bottle_type, bottle_number:s.bottle_number, donation_type:'طوعي',
           campaign_name:P.name, campaign_date:P.date, campaign_location:P.location||null, draw_date:P.date,
-          donation_date:P.date, expiry_date:e.toISOString().split('T')[0], status:'pending_lab', created_by:SES?.user?.id};
+          donation_date:P.date, expiry_date:e.toISOString().split('T')[0], created_by:SES?.user?.id};
+        return s.status==='damaged'
+          ? {...base, status:'damaged', damage_reason:CAMP_DMG_REASON, damaged_date:P.date, bottle_note:'تالفة من الحملة «'+P.name+'»'}
+          : {...base, status:'pending_lab'};
       });
       const dr=await db.from('blood_donations').insert(dRows).select('id,bottle_type,bottle_number');
       if(dr.error) throw new Error('تعذّر تسجيل القناني ('+dr.error.message+'). الحملة محفوظة وما تم تسجيله يظهر بصفحتها');
       const idBy={}; dr.data.forEach(d=>{ idBy[d.bottle_type+'|'+d.bottle_number]=d.id; });
-      const up=chunk.map(s=>({id:s.id,campaign_id:camp.id,bottle_type:s.bottle_type,bottle_number:s.bottle_number,status:'drawn',donation_id:idBy[s.bottle_type+'|'+s.bottle_number]}));
+      const up=chunk.map(s=>({id:s.id,campaign_id:camp.id,bottle_type:s.bottle_type,bottle_number:s.bottle_number,status:s.status==='damaged'?'damaged':'drawn',donation_id:idBy[s.bottle_type+'|'+s.bottle_number]}));
       const ur=await db.from('campaign_slots').upsert(up,{onConflict:'id'});
       if(ur.error) throw new Error('سُجّلت القناني لكن تعذّر تحديث حالة أرقام الحملة: '+ur.error.message);
-      done+=chunk.length;
+      chunk.forEach(s=>{ if(s.status==='damaged') dmgDone++; else done++; });
     }
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'INSERT',table_name:'campaigns',record_id:camp.id,new_values:{name:P.name,range:P.tf+'-'+P.tt,total:items.length,drawn:done,damaged:nd}});
     toast('✅ تم إنشاء الحملة: '+done+' مسحوبة و'+nd+' تالفة','success',5000);
@@ -562,20 +566,28 @@ async function resolveCampSlots(slotIds, outcome){
   load(true);
   try{
     const{data:campaign}=await db.from('campaigns').select('name,campaign_date,location').eq('id',_currentCampaignId).single();
-    const failed=[];
+    const failed=[], blocked=[];
+    const days=t=>WHOLE_BLOOD_DAYS[t] ?? 45;
+    const expOf=t=>{ const e=new Date(campaign.campaign_date); e.setDate(e.getDate()+days(t)); return e.toISOString().split('T')[0]; };
+    const base=slot=>({donor_id:null, bottle_type:slot.bottle_type, bottle_number:slot.bottle_number,
+      donation_type:'طوعي', campaign_name:campaign.name, campaign_date:campaign.campaign_date,
+      campaign_location:campaign.location, draw_date:campaign.campaign_date,
+      donation_date:campaign.campaign_date, expiry_date:expOf(slot.bottle_type), created_by:SES?.user?.id});
     for(const id of slotIds){
       const{data:slot}=await db.from('campaign_slots').select('*').eq('id',id).single();
-      if(!slot || !(slot.status==='reserved' || (outcome==='drawn' && slot.status==='damaged'))) continue;
+      if(!slot) continue;
+      if(outcome==='drawn' && slot.status==='damaged' && slot.donation_id){
+        // put a damaged bottle back: only if it is still sitting in the damaged store (not already in a destruction report)
+        const{data:d0}=await db.from('blood_donations').select('id,status,destruction_report_id').eq('id',slot.donation_id).single();
+        if(!d0 || d0.status!=='damaged' || d0.destruction_report_id){ blocked.push(slot.bottle_number); continue; }
+        const{error:ue}=await db.from('blood_donations').update({status:'pending_lab',damage_reason:null,damaged_date:null,bottle_note:null}).eq('id',slot.donation_id);
+        if(ue) throw ue;
+        { const{error:se}=await db.from('campaign_slots').update({status:'drawn'}).eq('id',id); if(se) throw se; }
+        continue;
+      }
+      if(slot.status!=='reserved' && !(outcome==='drawn' && slot.status==='damaged')) continue;
       if(outcome==='drawn'){
-        const days=WHOLE_BLOOD_DAYS[slot.bottle_type] ?? 45;
-        const e=new Date(campaign.campaign_date); e.setDate(e.getDate()+days);
-        const{data:don,error:de}=await db.from('blood_donations').insert({
-          donor_id:null, bottle_type:slot.bottle_type, bottle_number:slot.bottle_number,
-          donation_type:'طوعي', campaign_name:campaign.name, campaign_date:campaign.campaign_date,
-          campaign_location:campaign.location, draw_date:campaign.campaign_date,
-          donation_date:campaign.campaign_date, expiry_date:e.toISOString().split('T')[0],
-          status:'pending_lab', created_by:SES?.user?.id
-        }).select().single();
+        const{data:don,error:de}=await db.from('blood_donations').insert({...base(slot), status:'pending_lab'}).select().single();
         if(de){
           if(/duplicate key|bottle_number/i.test(de.message||'')){ failed.push(slot.bottle_number); continue; }
           throw de;
@@ -583,11 +595,17 @@ async function resolveCampSlots(slotIds, outcome){
         { const{error:se2}=await db.from('campaign_slots').update({status:'drawn', donation_id:don.id}).eq('id',id);
           if(se2) throw new Error('سُجّلت القنينة '+slot.bottle_number+' لكن تعذّر تحديث حالة الرقم المحجوز: '+se2.message); }
       } else if(outcome==='damaged'){
-        { const{error:se3}=await db.from('campaign_slots').update({status:'damaged'}).eq('id',id); if(se3) throw se3; }
+        const{data:don,error:de}=await db.from('blood_donations').insert({...base(slot), status:'damaged', damage_reason:CAMP_DMG_REASON, damaged_date:campaign.campaign_date, bottle_note:'تالفة من الحملة «'+campaign.name+'»'}).select().single();
+        if(de){
+          if(/duplicate key|bottle_number/i.test(de.message||'')){ failed.push(slot.bottle_number); continue; }
+          throw de;
+        }
+        { const{error:se3}=await db.from('campaign_slots').update({status:'damaged', donation_id:don.id}).eq('id',id); if(se3) throw se3; }
       }
     }
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'campaign_slots',record_id:slotIds[0],new_values:{outcome,count:slotIds.length}});
-    if(failed.length) toast('⛔ لم تُسجَّل '+failed.length+' قنينة لأن رقمها مستخدم مسبقاً بقنينة أخرى ('+failed.slice(0,6).join('، ')+'). عدّل تسلسل الحملة','error',9000);
+    if(failed.length) toast('⛔ لم تُسجَّل '+failed.length+' قنينة لأن رقمها مستخدم مسبقاً بقنينة أخرى ('+failed.slice(0,6).join('، ')+')','error',9000);
+    else if(blocked.length) toast('⛔ لا يمكن إرجاع القنينة '+blocked.slice(0,6).join('، ')+': لم تعد بمخزن التالفة (أُتلفت رسمياً أو تغيّرت حالتها)','error',9000);
     else toast('✅ تم تحديث '+slotIds.length+' رقم','success',3500);
     await refreshCampaignSlots();
   }catch(e){ toast('خطأ: '+e.message,'error'); }
