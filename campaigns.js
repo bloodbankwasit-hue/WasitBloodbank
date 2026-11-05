@@ -122,7 +122,7 @@ function _prShowLevel(n){
 async function loadPendingRelease(){
   load(true);
   const nonSeparableTypes=Object.keys(WHOLE_BLOOD_DAYS).filter(t=>!COMPONENT_RULES[t]);
-  const sel='id,bottle_number,bottle_type,blood_type,component_type,status,draw_date,serology_result,serology_type,bottle_note,donors(full_name)';
+  const sel='id,bottle_number,bottle_type,blood_type,component_type,status,draw_date,serology_result,serology_type,bottle_note,pool_numbers,donors(full_name)';
   // (1) fully complete — either outcome, any type/component
   const d1=await bbFetchAll(()=>db.from('blood_donations').select('id,'+sel)
     .in('status',['pending_release','rejected_positive']).eq('is_deleted',false));
@@ -192,8 +192,8 @@ function loadPendingReleaseList(cat){
       ${(infected||!complete)?'<span style="width:18px"></span>':`<input type="checkbox" class="pr-chk" value="${r.id}" onclick="updatePrBulkBar()" style="width:18px;height:18px;flex-shrink:0">`}
       <div class="fc-av">${infected?'⛔':complete?'⏳':'🕓'}</div>
       <div style="flex:1">
-        <div class="fc-name fc-bn">${r.bottle_number||'—'}</div>
-        <div class="fc-sub fc-dn">${name} | ${r.bottle_type||'—'} | ${r.component_type||'دم كامل'} | ${btTag} | ${fd(r.draw_date)}</div>
+        <div class="fc-name fc-bn">${bbBnLabel(r)}</div>
+        <div class="fc-sub fc-dn">${r.pool_numbers?'القناني: '+esc(r.pool_numbers)+' | ':name+' | '+(r.bottle_type||'—')+' | '}${r.component_type||'دم كامل'} | ${btTag} | ${fd(r.draw_date)}</div>
         <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">
           ${!complete ? `<span class="pill py">${serTag}</span>` : ''}
           ${complete && !infected ? `<span class="pill py">⏳ بانتظار التأكيد</span>` : ''}
@@ -205,7 +205,7 @@ function loadPendingReleaseList(cat){
         ${canSeparate?`<button class="btn" style="font-size:15px;padding:8px 10px;border-color:#0369A1;color:#0369A1" onclick="openSeparateModalBulk(['${r.id}'],'${r.bottle_type}','${r.bottle_number}')"><i class="ti ti-git-fork"></i> فصل</button>`:''}
         ${infected
           ? `<button class="btn" style="font-size:15px;padding:8px 10px;border-color:#7F1D1D;color:#7F1D1D" onclick="openDamageModal(['${r.id}'])"><i class="ti ti-trash"></i> تلف</button>`
-          : complete ? `<button class="btn btn-p" style="font-size:15px;padding:8px 10px" onclick="confirmRelease('${r.id}')"><i class="ti ti-check"></i> تأكيد</button>` : ''}
+          : complete ? `<button class="btn" style="font-size:15px;padding:8px 10px;border-color:#7F1D1D;color:#7F1D1D" onclick="openDamageModal(['${r.id}'])"><i class="ti ti-trash"></i> تلف</button><button class="btn btn-p" style="font-size:15px;padding:8px 10px" onclick="confirmRelease('${r.id}')"><i class="ti ti-check"></i> تأكيد</button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -227,6 +227,50 @@ function updatePrBulkBar(){
   const bar=G('prBulkBar'); if(!bar) return;
   bar.style.display=n?'flex':'none';
   if(n) G('prBulkCount').textContent=n+' محدد';
+  const pb=G('prPoolBtn'); if(pb) pb.style.display = (_prSelectedCat==='صفائح دموية') ? '' : 'none';
+}
+function prBulkDamage(){
+  const ids=[...document.querySelectorAll('.pr-chk:checked')].map(c=>c.value);
+  if(!ids.length){ toast('يرجى تحديد قنينة واحدة على الأقل','error'); return; }
+  openDamageModal(ids);
+}
+
+// دمج صفيحات (Bolling): عدة أكياس صفيحات من الفصل تُجمع بقنينة واحدة تُجهَّز كقنينة واحدة.
+// الشروط: صفيحات سليمة بالمخزن المؤقت، من غير التريما، بنفس الفصيلة (A/B/AB/O). الإكسباير = أقرب إكسباير بين المجمّعة.
+// المجمَّعة الأصلية تصير «separated» (خرجت من الرصيد) وتبقى مربوطة بالقنينة الجديدة (pooled_into).
+async function prBulkPool(){
+  const ids=[...document.querySelectorAll('.pr-chk:checked')].map(c=>c.value);
+  if(ids.length<2){ toast('اختر قنينتين صفيحات على الأقل للدمج','error'); return; }
+  if(!IS_ONLINE){ toast('الدمج يحتاج اتصالاً بالإنترنت','warning'); return; }
+  const rows=_prAllRows.filter(r=>ids.includes(r.id));
+  if(rows.length!==ids.length){ toast('تعذّر قراءة المحدد، حدّث الصفحة','error'); return; }
+  if(rows.some(r=>r.component_type!=='صفائح دموية'||r.status!=='pending_release'||r.bottle_type==='تريما'||r.pool_numbers)){ toast('الدمج لصفيحات سليمة بالمخزن المؤقت فقط (غير التريما وغير المدموجة سابقاً)','error',6000); return; }
+  const abo=x=>String(x||'').replace(/[+-]/g,'');
+  if(rows.some(r=>!r.blood_type)){ toast('بعض الصفيحات بلا فصيلة','error'); return; }
+  if(new Set(rows.map(r=>abo(r.blood_type))).size>1){ toast('⛔ لازم تكون كل الصفيحات من نفس الفصيلة (A / B / AB / O)','error',6000); return; }
+  const nums=rows.map(r=>r.bottle_number).sort((a,b)=>a-b);
+  if(!(await bbConfirm('دمج '+rows.length+' صفيحات ('+nums.join('، ')+') بقنينة واحدة باسم '+POOL_NAME+'؟ لا يمكن التراجع من التطبيق.'))) return;
+  load(true);
+  let poolId=null;
+  try{
+    const{data:full,error:fe}=await db.from('blood_donations').select('id,bottle_number,bottle_type,blood_type,donation_type,draw_date,expiry_date').in('id',ids);
+    if(fe) throw fe;
+    const bts=new Set(full.map(r=>r.blood_type)); const bt = bts.size===1 ? [...bts][0] : abo(full[0].blood_type);
+    const draws=full.map(r=>r.draw_date).filter(Boolean).sort(), exps=full.map(r=>r.expiry_date).filter(Boolean).sort();
+    const first=full.slice().sort((a,b)=>a.bottle_number-b.bottle_number)[0];
+    const row={donor_id:null,bottle_number:first.bottle_number,bottle_type:first.bottle_type,blood_type:bt,donation_type:first.donation_type,component_type:'صفائح دموية',
+      draw_date:draws[0]||null,donation_date:draws[0]||null,expiry_date:exps[0]||null,serology_result:'Negative',serology_type:null,status:'pending_release',
+      pool_numbers:nums.join('، '),created_by:SES?.user?.id};
+    const ins=await db.from('blood_donations').insert(row).select('id').single();
+    if(ins.error) throw ins.error;
+    poolId=ins.data.id;
+    const up=await db.from('blood_donations').update({status:'separated',pooled_into:poolId}).in('id',ids);
+    if(up.error){ await db.from('blood_donations').update({is_deleted:true}).eq('id',poolId); throw up.error; }
+    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'INSERT',table_name:'blood_donations',record_id:poolId,new_values:{pool:POOL_NAME,members:nums,blood_type:bt,expiry:row.expiry_date}});
+    toast('✅ تم الدمج: '+POOL_NAME+' ('+nums.join('، ')+') — بانتظار التأكيد','success',5000);
+    await withScrollPreserved(_prRefreshCurrentLevel);
+  }catch(e){ toast('خطأ: '+(e.message||e)+(/pool_numbers|pooled_into|column/i.test(e.message||'')?' — شغّل SQL الدمج في Supabase':''),'error',9000); }
+  finally{ load(false); }
 }
 
 async function confirmRelease(id){

@@ -1510,6 +1510,8 @@ tbody tr:hover td{background:#fafafa}
           <span id="prBulkCount">0 محدد</span>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn" style="background:#166534;color:#fff;border:none" onclick="bulkConfirmRelease()"><i class="ti ti-check"></i> تأكيد المحدد</button>
+            <button id="prPoolBtn" class="btn" style="display:none;background:#B45309;color:#fff;border:none" onclick="prBulkPool()"><i class="ti ti-layers-union"></i> دمج صفيحات (Bolling)</button>
+            <button class="btn" style="background:#7F1D1D;color:#fff;border:none" onclick="prBulkDamage()"><i class="ti ti-trash"></i> تلف المحدد</button>
             <button class="btn" style="background:#374151;color:#fff;border:none" onclick="document.querySelectorAll('.pr-chk').forEach(c=>c.checked=false);updatePrBulkBar()">إلغاء التحديد</button>
           </div>
         </div>
@@ -4592,6 +4594,9 @@ function bottleLiquidColor(componentType){
 // Renders one bottle-detail card shaped like an actual blood bag, filled with the expiry
 // color, with the key data (number, blood type, draw/expiry dates) printed below it so text
 // stays readable regardless of how dark or pale the fill color is.
+// صفيحات مدموجة (Bolling): تُعرض باسم Bolling وتحتها أرقام القناني المجمّعة
+const POOL_NAME='Bolling';
+function bbBnLabel(r){ return r&&r.pool_numbers ? POOL_NAME : (r?.bottle_number||'—'); }
 function bloodBagCard(r, onclickJs){
   const color=bottleExpiryColor(r.draw_date, r.expiry_date);   // halo (glass frame): expiry status
   const liquid=bottleLiquidColor(r.component_type);             // contents: component type
@@ -4599,7 +4604,7 @@ function bloodBagCard(r, onclickJs){
     <input type="checkbox" class="sup-chk" value="${r.id}" data-bt="${r.bottle_type}" onclick="event.stopPropagation();updateSupplyBulkBar()">
     <div class="bb-card" onclick="${onclickJs}">
       <svg viewBox="68 34 228 298" class="bb-svg"><use href="#bb-halo" fill="${color}" stroke="${color}"/><use href="#bb-sep"/><use href="#bb-liquid" fill="${liquid}"/><use href="#bb-label"/></svg>
-      <div class="bb-num">${r.bottle_number||'—'}</div>
+      <div class="bb-num">${bbBnLabel(r)}</div>${r.pool_numbers?`<div style="font-size:12.5px;color:#475569;line-height:1.3;word-break:break-word">${esc(r.pool_numbers)}</div>`:''}
       <div class="bb-bt">${bbBt(r.blood_type,r.component_type)||'—'} ${r.component_type&&r.component_type!=='دم كامل'?'· '+r.component_type:''}</div>
       <div class="bb-dates">
         <span>سحب: ${fd(r.draw_date)}</span>
@@ -4612,7 +4617,7 @@ function bloodBagCard(r, onclickJs){
 async function loadSupplyList(bt){
   _supplySelectedBT = bt;
   const ct=_supplySelectedComponent||'دم كامل';
-  let data=[]; try{ data=await bbFetchAll(()=>db.from('blood_donations').select('id,bottle_number,bottle_type,blood_type,component_type,draw_date,expiry_date,donors(full_name)').eq('status','in_stock').in('blood_type',bbNoSign(ct)?[bt,bt+'+',bt+'-']:[bt]).eq('component_type',ct).eq('is_deleted',false)); data.sort((a,b)=>String(a.expiry_date||'').localeCompare(String(b.expiry_date||''))); }catch(e){ toast('تعذر تحميل القائمة: '+e.message,'error'); }
+  let data=[]; try{ data=await bbFetchAll(()=>db.from('blood_donations').select('id,bottle_number,bottle_type,blood_type,component_type,draw_date,expiry_date,pool_numbers,donors(full_name)').eq('status','in_stock').in('blood_type',bbNoSign(ct)?[bt,bt+'+',bt+'-']:[bt]).eq('component_type',ct).eq('is_deleted',false)); data.sort((a,b)=>String(a.expiry_date||'').localeCompare(String(b.expiry_date||''))); }catch(e){ toast('تعذر تحميل القائمة: '+e.message,'error'); }
   const titleBar=`<div style="font-size:18px;font-weight:700;color:#BE123C;margin-bottom:10px">${ct} — فصيلة ${bt} — ${(data||[]).length} قنينة</div>`;
   if(data&&data.length){
     const bar=`<div id="supplyBulkBar" style="display:none;position:sticky;top:0;z-index:5;background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
@@ -4693,6 +4698,7 @@ function openSeparateModalBulk(ids, bt, singleLabel){
       <input type="checkbox" class="sep-comp" value="${c.type}" data-days="${c.days}" checked style="width:18px;height:18px">
       <span style="font-weight:700">${c.type}</span>
       <span style="color:#757575;font-size:15px;margin-right:auto">إكسباير ${c.days==365?'سنة':c.days+' يوم'}</span>
+      <label style="display:flex;align-items:center;gap:4px;color:#7F1D1D;font-weight:700;font-size:14px;cursor:pointer" onclick="event.stopPropagation()"><input type="checkbox" class="sep-dmg" value="${c.type}" style="width:17px;height:17px"> تالف</label>
     </label>`).join('');
   G('bottleDetailModal').classList.remove('on');
   G('separateModal').classList.add('on');
@@ -4716,21 +4722,25 @@ async function confirmSeparate(){
       // when the parent was already 'in_stock': a freshly-split component is a NEW unconfirmed
       // item and must go back through المخزن المؤقت for its own review, never skip straight to
       // in_stock just because its parent had already been confirmed.
+      const dmgTypes=new Set([...document.querySelectorAll('.sep-dmg:checked')].map(x=>x.value));
+      const todayYmd=new Date().toISOString().split('T')[0];
       const rows=checked.map(c=>{
         const e=new Date(parent.draw_date); e.setDate(e.getDate()+parseInt(c.dataset.days));
+        const isDmg=dmgTypes.has(c.value);
         return {
+          ...(isDmg?{damage_reason:'تلف أثناء الفصل',damaged_date:todayYmd}:{}),
           donor_id:parent.donor_id, bottle_number:parent.bottle_number, bottle_type:parent.bottle_type,
           blood_type:parent.blood_type, donation_type:parent.donation_type, component_type:c.value,
           parent_donation_id:id, draw_date:parent.draw_date, donation_date:parent.draw_date, expiry_date:e.toISOString().split('T')[0],
           serology_result:parent.serology_result, serology_type:parent.serology_type,
-          status: parent.status==='in_stock' ? 'pending_release' : parent.status, created_by:SES?.user?.id
+          status: isDmg ? 'damaged' : (parent.status==='in_stock' ? 'pending_release' : parent.status), created_by:SES?.user?.id
         };
       });
       const{error:ie}=await db.from('blood_donations').insert(rows);
       if(ie) throw ie;
       const{error:ue}=await db.from('blood_donations').update({status:'separated'}).eq('id',id);
       if(ue) throw ue;
-      await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'separated',components:rows.map(r=>r.component_type).join(', ')}});
+      await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'separated',components:rows.map(r=>r.component_type+(r.status==='damaged'?' (تالف)':'')).join(', ')}});
       totalRows+=rows.length;
     }
     toast('✅ تم فصل '+ids.length+' قنينة إلى '+totalRows+' مكوّن بنجاح','success',4500);
@@ -4822,7 +4832,7 @@ async function openPltStock(keep){
   if(!m){ m=document.createElement('div'); m.className='overlay'; m.id='pltStockModal'; document.body.appendChild(m); }
   if(!keep) m.innerHTML='<div class="modal" style="width:min(640px,96vw)"><div class="modal-body"><div class="empty"><p>جاري التحميل...</p></div></div></div>';
   m.classList.add('on');
-  let rows=[]; try{ rows=await bbFetchAll(()=>db.from('blood_donations').select('id,bottle_number,blood_type,draw_date,expiry_date').eq('status','in_stock').eq('component_type','صفائح دموية').eq('is_deleted',false)); }catch(e){ toast('تعذر تحميل الصفيحات: '+e.message,'error'); }
+  let rows=[]; try{ rows=await bbFetchAll(()=>db.from('blood_donations').select('id,bottle_number,blood_type,draw_date,expiry_date,pool_numbers').eq('status','in_stock').eq('component_type','صفائح دموية').eq('is_deleted',false)); }catch(e){ toast('تعذر تحميل الصفيحات: '+e.message,'error'); }
   rows.sort((a,b)=>String(a.expiry_date||'').localeCompare(String(b.expiry_date||'')));
   const by={}; rows.forEach(r=>{ const k=bbBt(r.blood_type,'صفائح دموية')||'—'; by[k]=(by[k]||0)+1; });
   const today=new Date(); today.setHours(0,0,0,0);
@@ -4833,7 +4843,7 @@ async function openPltStock(keep){
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${['A','B','AB','O'].map(k=>`<div style="flex:1;min-width:70px;text-align:center;border:1.5px solid #FDE68A;background:#FFFBEB;border-radius:10px;padding:8px"><div style="font-weight:800;color:#92400E">${k}</div><div style="font-size:20px;font-weight:800">${by[k]||0}</div></div>`).join('')}</div>
       ${rows.length?`${can?`<div style="display:flex;gap:8px;margin-bottom:8px"><button class="btn" style="border-color:#7F1D1D;color:#7F1D1D" onclick="pltDamageSel()"><i class="ti ti-trash"></i> تلف المحدد</button></div>`:''}
       <div style="max-height:52vh;overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>${can?'<th></th>':''}<th style="text-align:right;padding:6px">رقم القنينة</th><th style="padding:6px">الفصيلة</th><th style="padding:6px">تاريخ النفاد</th><th style="padding:6px">المتبقي</th></tr></thead><tbody>
-      ${rows.map(r=>`<tr style="border-top:1px solid #F1F5F9">${can?`<td style="padding:6px"><input type="checkbox" class="plt-chk" value="${r.id}" style="width:18px;height:18px"></td>`:''}<td style="padding:6px;font-weight:800">${r.bottle_number}</td><td style="padding:6px;text-align:center">${bbBt(r.blood_type,'صفائح دموية')||'—'}</td><td style="padding:6px;text-align:center">${fd(r.expiry_date)}</td><td style="padding:6px;text-align:center">${dl(r)}</td></tr>`).join('')}
+      ${rows.map(r=>`<tr style="border-top:1px solid #F1F5F9">${can?`<td style="padding:6px"><input type="checkbox" class="plt-chk" value="${r.id}" style="width:18px;height:18px"></td>`:''}<td style="padding:6px;font-weight:800">${bbBnLabel(r)}${r.pool_numbers?`<div style="font-size:12px;font-weight:600;color:#475569">${esc(r.pool_numbers)}</div>`:''}</td><td style="padding:6px;text-align:center">${bbBt(r.blood_type,'صفائح دموية')||'—'}</td><td style="padding:6px;text-align:center">${fd(r.expiry_date)}</td><td style="padding:6px;text-align:center">${dl(r)}</td></tr>`).join('')}
       </tbody></table></div>`:'<div class="empty"><p>لا توجد صفيحات بالرصيد</p></div>'}
     </div><div class="modal-foot"><button class="btn" onclick="G('pltStockModal').classList.remove('on')">إغلاق</button></div></div>`;
   refreshPltBox();
