@@ -4,8 +4,8 @@
 //  • من نافذة «الدفعات» يمكن السحب من دفعة محددة (مثلاً لإتلاف دفعة منتهية).
 // الجداول: store_items, store_lots, store_moves — والدوال: store_add / store_withdraw (SQL المخزن).
 // ================================================================
-let _stTab='items', _stItems=[], _stLots=[], _stQ='';
-let _stKind='month', _stAnchor=null, _stFrom='', _stTo='', _stItemF='', _stArc=null;
+let _stTab='items', _stGrp='material', _stItems=[], _stLots=[], _stQ='';
+let _stArcKind='', _stKind='month', _stAnchor=null, _stFrom='', _stTo='', _stItemF='', _stArc=null;
 const _ST_KINDS=[['day','يومي'],['week','أسبوعي'],['month','شهري'],['half','نصف سنوي'],['year','سنوي'],['custom','مخصص']];
 
 function stCan(){ return UPROF?.role==='admin' || (typeof hasPermission==='function' && hasPermission('store')); }
@@ -42,17 +42,18 @@ async function loadStore(){
   return stTab(_stTab);
 }
 function stTab(t){
-  _stTab=t;
+  _stTab=t; if(t==='items') _stGrp='material'; else if(t==='devices') _stGrp='device';
   document.querySelectorAll('#stTabs .tab').forEach(x=>x.classList.toggle('on',x.dataset.t===t));
-  return t==='items' ? stRenderItems() : stRenderArchive();
+  _stQ='';
+  return t==='archive' ? stRenderArchive() : stRenderItems();
 }
 async function stLoad(){
-  const it=await db.from('store_items').select('id,name').order('name'); if(it.error) throw it.error;
+  const it=await db.from('store_items').select('id,name,kind').order('name'); if(it.error) throw it.error;
   const lt=await bbFetchAll(()=>db.from('store_lots').select('id,item_id,qty_left,expiry_date,received_date,qty_in,note').gt('qty_left',0));
   _stItems=it.data||[]; _stLots=lt||[];
 }
 function _stSummary(){
-  return _stItems.map(i=>{
+  return _stItems.filter(i=>(i.kind||'material')===_stGrp).map(i=>{
     const lots=_stLots.filter(l=>l.item_id===i.id);
     const qty=lots.reduce((s,l)=>s+l.qty_left,0);
     const exps=lots.map(l=>l.expiry_date).filter(Boolean).sort();
@@ -68,15 +69,15 @@ function stDrawItems(){
   const B=G('storeBody'); const q=_stQ.trim().toLowerCase();
   const rows=_stSummary().filter(r=>!q||r.name.toLowerCase().includes(q));
   B.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
-      <button class="btn btn-p" onclick="stAddOpen()"><i class="ti ti-plus"></i> إضافة مواد</button>
-      <button class="btn" style="border-color:#7F1D1D;color:#7F1D1D" onclick="stOutOpen()"><i class="ti ti-minus"></i> سحب مواد</button>
-      <input id="stSearch" placeholder="🔍 بحث باسم المادة" value="${esc(_stQ)}" oninput="_stQ=this.value;stDrawItems();setTimeout(()=>{const i=G('stSearch');if(i){i.focus();i.setSelectionRange(99,99)}},0)" style="flex:1;min-width:160px;padding:9px;border:1.5px solid #E5E7EB;border-radius:10px;font-size:16px"></div>`
-   +(rows.length?`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:16px"><thead><tr style="background:#F3F4F6"><th style="padding:8px;text-align:right">المادة</th><th>العدد</th><th>أقرب إكسباير</th><th></th></tr></thead><tbody>`
-    +rows.map(r=>`<tr style="border-top:1px solid #F1F5F9;text-align:center"><td style="padding:8px;text-align:right;font-weight:800">${esc(r.name)}</td><td style="font-size:20px;font-weight:900;color:${r.qty>0?'#166534':'#B91C1C'}">${fnum(r.qty)}</td><td>${_stExpTag(r.exp)}</td>
+      <button class="btn btn-p" onclick="stAddOpen()"><i class="ti ti-plus"></i> ${_stGrp==='device'?'إضافة أجهزة':'إضافة مواد'}</button>
+      <button class="btn" style="border-color:#7F1D1D;color:#7F1D1D" onclick="stOutOpen()"><i class="ti ti-minus"></i> ${_stGrp==='device'?'سحب أجهزة':'سحب مواد'}</button>
+      <input id="stSearch" placeholder="🔍 ${_stGrp==='device'?'بحث باسم الجهاز':'بحث باسم المادة'}" value="${esc(_stQ)}" oninput="_stQ=this.value;stDrawItems();setTimeout(()=>{const i=G('stSearch');if(i){i.focus();i.setSelectionRange(99,99)}},0)" style="flex:1;min-width:160px;padding:9px;border:1.5px solid #E5E7EB;border-radius:10px;font-size:16px"></div>`
+   +(rows.length?`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:16px"><thead><tr style="background:#F3F4F6"><th style="padding:8px;text-align:right">${_stGrp==='device'?'الجهاز':'المادة'}</th><th>العدد</th>${_stGrp==='device'?'':'<th>أقرب إكسباير</th>'}<th></th></tr></thead><tbody>`
+    +rows.map(r=>`<tr style="border-top:1px solid #F1F5F9;text-align:center"><td style="padding:8px;text-align:right;font-weight:800">${esc(r.name)}</td><td style="font-size:20px;font-weight:900;color:${r.qty>0?'#166534':'#B91C1C'}">${fnum(r.qty)}</td>${_stGrp==='device'?'':`<td>${_stExpTag(r.exp)}</td>`}
       <td style="white-space:nowrap"><button class="btn" style="padding:6px 9px" onclick="stAddOpen('${r.id}')" title="إضافة"><i class="ti ti-plus"></i></button>
       <button class="btn" style="padding:6px 9px;color:#7F1D1D;border-color:#7F1D1D" onclick="stOutOpen('${r.id}')" title="سحب"><i class="ti ti-minus"></i></button>
-      <button class="btn" style="padding:6px 9px" onclick="stLots('${r.id}')" title="الدفعات"><i class="ti ti-list-details"></i></button></td></tr>`).join('')+'</tbody></table></div>'
-    :'<div class="empty"><i class="ti ti-building-warehouse"></i><p>'+(q?'لا نتائج':'لا توجد مواد بعد — اضغط «إضافة مواد»')+'</p></div>');
+      ${_stGrp==='device'?'':`<button class="btn" style="padding:6px 9px" onclick="stLots('${r.id}')" title="الدفعات"><i class="ti ti-list-details"></i></button>`}</td></tr>`).join('')+'</tbody></table></div>'
+    :'<div class="empty"><i class="ti ti-building-warehouse"></i><p>'+(q?'لا نتائج':(_stGrp==='device'?'لا توجد أجهزة بعد — اضغط «إضافة أجهزة»':'لا توجد مواد بعد — اضغط «إضافة مواد»'))+'</p></div>');
 }
 function stForm(title,inner,okFn,okLabel){
   let f=G('stFormOv'); if(f) f.remove();
@@ -88,50 +89,50 @@ const _stNumIn=(id,label)=>`<div class="fgrp"><label>${label}</label><input type
 const _stByName=()=>UPROF?.full_name||'';
 
 function stAddOpen(itemId){
-  const it=_stItems.find(x=>x.id===itemId);
-  stForm('<i class="ti ti-plus"></i> إضافة مواد',
-    `<div class="fgrp"><label>اسم المادة *</label><input type="text" id="st-name" list="st-names" value="${esc(it?.name||'')}" ${it?'readonly':''} autocomplete="off" placeholder="اختر مادة موجودة أو اكتب اسم مادة جديدة"><datalist id="st-names">${_stItems.map(i=>`<option value="${esc(i.name)}">`).join('')}</datalist></div>`
+  const it=_stItems.find(x=>x.id===itemId), dev=_stGrp==='device';
+  stForm('<i class="ti ti-plus"></i> '+(dev?'إضافة أجهزة':'إضافة مواد'),
+    `<div class="fgrp"><label>${dev?'اسم الجهاز *':'اسم المادة *'}</label><input type="text" id="st-name" list="st-names" value="${esc(it?.name||'')}" ${it?'readonly':''} autocomplete="off" placeholder="${dev?'اختر جهازاً موجوداً أو اكتب اسم جهاز جديد':'اختر مادة موجودة أو اكتب اسم مادة جديدة'}"><datalist id="st-names">${_stItems.filter(i=>(i.kind||'material')===_stGrp).map(i=>`<option value="${esc(i.name)}">`).join('')}</datalist></div>`
     +_stNumIn('st-qty','العدد المضاف *')
-    +`<div class="fgrp"><label>الإكسباير (إن وُجد)</label><input type="date" id="st-exp"></div>
+    +`${dev?'':'<div class="fgrp"><label>الإكسباير (إن وُجد)</label><input type="date" id="st-exp"></div>'}
       <div class="fgrp"><label>تاريخ الإضافة</label><input type="date" id="st-date" value="${_stToday()}"></div>
-      <div class="fgrp"><label>ملاحظة (اختياري)</label><input type="text" id="st-note" placeholder="مثلاً: وصلت من المخزن المركزي"></div>`,'stAddSave()');
+      <div class="fgrp"><label>ملاحظة (اختياري)</label><input type="text" id="st-note" placeholder="${dev?'مثلاً: رقم تسلسلي أو مصدر الجهاز':'مثلاً: وصلت من المخزن المركزي'}"></div>`,'stAddSave()');
 }
 async function stAddSave(){
   if(!stCan()) return; if(!IS_ONLINE){ toast('يحتاج اتصالاً بالإنترنت','warning'); return; }
-  const name=(G('st-name').value||'').trim().replace(/\s+/g,' '), qty=_stN('st-qty'), exp=G('st-exp').value||null, date=G('st-date').value||_stToday(), note=(G('st-note').value||'').trim()||null;
+  const name=(G('st-name').value||'').trim().replace(/\s+/g,' '), qty=_stN('st-qty'), exp=G('st-exp')?.value||null, date=G('st-date').value||_stToday(), note=(G('st-note').value||'').trim()||null;
   if(!name){ toast('اكتب اسم المادة','error'); return; }
   if(!Number.isInteger(qty)||qty<1){ toast('اكتب عدداً صحيحاً أكبر من صفر','error'); return; }
   load(true);
   try{
-    let item=_stItems.find(i=>i.name.toLowerCase()===name.toLowerCase());
+    let item=_stItems.find(i=>i.name.toLowerCase()===name.toLowerCase()&&(i.kind||'material')===_stGrp);
     if(!item){
-      const r=await db.from('store_items').insert({name}).select('id,name').single();
+      const r=await db.from('store_items').insert({name,kind:_stGrp}).select('id,name,kind').single();
       if(r.error) throw r.error; item=r.data;
     }
     const r=await db.rpc('store_add',{p_item:item.id,p_qty:qty,p_expiry:exp,p_date:date,p_note:note,p_by:_stByName()});
     if(r.error) throw r.error;
-    G('stFormOv')?.remove(); toast('✅ أُضيفت '+fnum(qty)+' من «'+name+'»','success',3500);
+    G('stFormOv')?.remove(); toast('✅ أُضيف '+fnum(qty)+' من «'+name+'»','success',3500);
     await stRenderItems();
-  }catch(e){ toast(/duplicate|unique/i.test(e.message||'')?'⛔ هذه المادة موجودة مسبقاً':('خطأ: '+(e.message||e)),'error',8000); }
+  }catch(e){ toast(/duplicate|unique/i.test(e.message||'')?'⛔ هذا الاسم موجود مسبقاً (ربما بقسم المواد أو الأجهزة الآخر)':('خطأ: '+(e.message||e)),'error',8000); }
   finally{ load(false); }
 }
 
 function stOutOpen(itemId,lotId){
-  const rows=_stSummary().filter(r=>r.qty>0);
-  if(!rows.length){ toast('لا توجد مواد بالمخزن للسحب','warning'); return; }
+  const dev=_stGrp==='device', rows=_stSummary().filter(r=>r.qty>0);
+  if(!rows.length){ toast(dev?'لا توجد أجهزة بالمخزن للسحب':'لا توجد مواد بالمخزن للسحب','warning'); return; }
   const lot=lotId?_stLots.find(l=>l.id===lotId):null;
   const sel=itemId||(lot&&lot.item_id)||'';
-  stForm('<i class="ti ti-minus"></i> سحب مواد',
-    `<div class="fgrp"><label>المادة *</label><select id="st-item" ${lot?'disabled':''} onchange="stOutInfo()">${rows.map(r=>`<option value="${r.id}" ${r.id===sel?'selected':''}>${esc(r.name)} — المتوفر ${fnum(r.qty)}</option>`).join('')}</select></div>
+  stForm('<i class="ti ti-minus"></i> '+(dev?'سحب أجهزة':'سحب مواد'),
+    `<div class="fgrp"><label>${dev?'الجهاز *':'المادة *'}</label><select id="st-item" ${lot?'disabled':''} onchange="stOutInfo()">${rows.map(r=>`<option value="${r.id}" ${r.id===sel?'selected':''}>${esc(r.name)} — المتوفر ${fnum(r.qty)}</option>`).join('')}</select></div>
      ${lot?`<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:8px;margin-bottom:8px;font-size:14.5px">السحب من دفعة محددة: المتبقي <b>${fnum(lot.qty_left)}</b> — إكسباير ${lot.expiry_date?fd(lot.expiry_date):'—'}<input type="hidden" id="st-lot" value="${lot.id}"></div>`:'<div id="st-info" style="font-size:14px;color:#6B7280;margin-bottom:8px"></div>'}`
     +_stNumIn('st-qty','العدد المسحوب *')
     +`<div class="fgrp"><label>تاريخ السحب</label><input type="date" id="st-date" value="${_stToday()}"></div>
-      <div class="fgrp"><label>ملاحظة (لمن / السبب)</label><input type="text" id="st-note" placeholder="مثلاً: لوحدة الفيروسات"></div>`,'stOutSave()','سحب');
+      <div class="fgrp"><label>ملاحظة (لمن / السبب)</label><input type="text" id="st-note" placeholder="${dev?'مثلاً: إلى قسم الفحص / للصيانة':'مثلاً: لوحدة الفيروسات'}"></div>`,'stOutSave()','سحب');
   stOutInfo();
 }
 function stOutInfo(){
   const el=G('st-info'); if(!el) return; const r=_stSummary().find(x=>x.id===G('st-item').value);
-  el.innerHTML = r ? 'يُسحب من أقرب إكسباير أولاً (المنتهي لا يُسحب تلقائياً). أقرب إكسباير: '+(r.exp?fd(r.exp):'—') : '';
+  el.innerHTML = r ? (_stGrp==='device'?'':'يُسحب من أقرب إكسباير أولاً (المنتهي لا يُسحب تلقائياً). أقرب إكسباير: '+(r.exp?fd(r.exp):'—')) : '';
 }
 async function stOutSave(){
   if(!stCan()) return; if(!IS_ONLINE){ toast('يحتاج اتصالاً بالإنترنت','warning'); return; }
@@ -174,13 +175,13 @@ async function stRenderArchive(){
   if(r.open){ G('stArcBody').innerHTML='<div class="empty"><i class="ti ti-calendar"></i><p>اختر تاريخ البداية والنهاية</p></div>'; return; }
   G('stArcBody').innerHTML='<div class="empty"><p>جاري التحميل...</p></div>';
   try{
-    const mv=await bbFetchAll(()=>db.from('store_moves').select('id,item_id,kind,qty,move_date,expiry_date,note,created_by_name,created_at,store_items(name)').gte('move_date',r.from).lte('move_date',r.to));
+    const mv=await bbFetchAll(()=>db.from('store_moves').select('id,item_id,kind,qty,move_date,expiry_date,note,created_by_name,created_at,store_items(name,kind)').gte('move_date',r.from).lte('move_date',r.to));
     _stArc={rows:mv,range:r}; stDrawArchive();
   }catch(e){ G('stArcBody').innerHTML='<div style="color:#B91C1C;font-weight:700">تعذّر التحميل: '+esc(e.message||e)+'</div>'; }
 }
 function stCustom(){ _stFrom=G('st-from').value; _stTo=G('st-to').value; if(_stFrom&&_stTo&&_stFrom>_stTo){ toast('تاريخ «من» أكبر من «إلى»','error'); return; } if(_stFrom&&_stTo) stRenderArchive(); }
 function _stArcData(){
-  const all=_stArc.rows, names=[...new Set(all.map(m=>m.store_items?.name||''))].sort();
+  const all=_stArc.rows.filter(m=>!_stArcKind||((m.store_items?.kind||'material')===_stArcKind)), names=[...new Set(all.map(m=>m.store_items?.name||''))].sort();
   const rows=all.filter(m=>!_stItemF||(m.store_items?.name===_stItemF)).sort((a,b)=>String(b.move_date).localeCompare(String(a.move_date))||String(b.created_at).localeCompare(String(a.created_at)));
   const sum={}; rows.forEach(m=>{ const n=m.store_items?.name||'—'; (sum[n]=sum[n]||{in:0,out:0})[m.kind]+=m.qty; });
   return {names,rows,sum};
@@ -189,7 +190,8 @@ function stDrawArchive(){
   const {names,rows,sum}=_stArcData();
   const tin=rows.filter(m=>m.kind==='in').reduce((s,m)=>s+m.qty,0), tout=rows.filter(m=>m.kind==='out').reduce((s,m)=>s+m.qty,0);
   G('stArcBody').innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
-      <select onchange="_stItemF=this.value;stDrawArchive()" style="padding:8px;border:1.5px solid #E5E7EB;border-radius:10px;font-size:15px"><option value="">كل المواد</option>${names.map(n=>`<option ${n===_stItemF?'selected':''}>${esc(n)}</option>`).join('')}</select>
+ <select onchange="_stArcKind=this.value;_stItemF='';stDrawArchive()" style="padding:8px;border:1.5px solid #E5E7EB;border-radius:10px;font-size:15px"><option value="">مواد وأجهزة</option><option value="material" ${_stArcKind==='material'?'selected':''}>المواد فقط</option><option value="device" ${_stArcKind==='device'?'selected':''}>الأجهزة فقط</option></select>
+      <select onchange="_stItemF=this.value;stDrawArchive()" style="padding:8px;border:1.5px solid #E5E7EB;border-radius:10px;font-size:15px"><option value="">${_stArcKind==='device'?'كل الأجهزة':_stArcKind==='material'?'كل المواد':'الكل'}</option>${names.map(n=>`<option ${n===_stItemF?'selected':''}>${esc(n)}</option>`).join('')}</select>
       <button class="btn" onclick="stExport('xls')"><i class="ti ti-file-spreadsheet"></i> Excel</button><button class="btn" onclick="stExport('pdf')"><i class="ti ti-file-type-pdf"></i> PDF</button></div>
     <div style="display:flex;gap:10px;margin-bottom:12px"><div style="flex:1;text-align:center;border:1.5px solid #BBF7D0;background:#F0FDF4;border-radius:12px;padding:10px"><div style="font-size:26px;font-weight:900;color:#166534">${fnum(tin)}</div><div style="color:#166534;font-weight:700">إجمالي المُضاف</div></div>
       <div style="flex:1;text-align:center;border:1.5px solid #FECACA;background:#FEF2F2;border-radius:12px;padding:10px"><div style="font-size:26px;font-weight:900;color:#B91C1C">${fnum(tout)}</div><div style="color:#B91C1C;font-weight:700">إجمالي المسحوب</div></div></div>`
