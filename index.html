@@ -1410,11 +1410,6 @@ tbody tr:hover td{background:#fafafa}
         <div style="height:1px;background:#EEF2F6;margin:16px 0"></div>
         <div class="sh"><div class="sh-t">⚙️ إعدادات النظام</div></div>
         <div class="setg">
-          <div class="setc" onclick="openReagents()">
-            <div class="setc-ico"><i class="ti ti-flask"></i></div>
-            <div class="setc-t">مواد فحص الفيروسات</div>
-            <div class="setc-d">الرصيد المتبقي من HIV وHBcore وHBsAg وHCV وSyphilis، وإضافة كميات جديدة وتنبيه قرب النفاد</div>
-          </div>
           <div class="setc" onclick="openExpiryCfg()">
             <div class="setc-ico"><i class="ti ti-clock-hour-4"></i></div>
             <div class="setc-t">مدة الصلاحية (الإكسباير) لكل نوع</div>
@@ -1741,7 +1736,8 @@ tbody tr:hover td{background:#fafafa}
       <!-- ========== LAB ========== -->
       <div class="sc" id="s-virology">
         <div class="sh"><div class="sh-t"><i class="ti ti-microscope"></i> وحدة الفيروسات — عينات بانتظار الفحص</div>
-          <button class="btn" style="font-size:13px;padding:7px 12px" onclick="openVirologyExport()"><i class="ti ti-file-export"></i> تصدير متقدم</button>
+          <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-p" style="font-size:13px;padding:7px 12px" onclick="openReagents()"><i class="ti ti-flask"></i> مواد الفحص</button>
+          <button class="btn" style="font-size:13px;padding:7px 12px" onclick="openVirologyExport()"><i class="ti ti-file-export"></i> تصدير متقدم</button></div>
         </div>
         <div id="virologyList"><div class="empty"><i class="ti ti-microscope"></i><p>جاري التحميل...</p></div></div>
       </div>
