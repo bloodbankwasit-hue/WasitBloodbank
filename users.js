@@ -8,6 +8,7 @@ const ALL_PERMS = [
   {key:'draw',       label:'💉 السحب'},
   {key:'trima',      label:'🩸 وحدة التريما'},
   {key:'damaged_store', label:'🗑️ مخزن القناني التالفة'},
+  {key:'store',      label:'🏬 المخزن (مواد المصرف)'},
   {key:'virology',   label:'🧪 وحدة الفيروسات'},
   {key:'classification', label:'🩸 وحدة التصنيف'},
   {key:'separation', label:'🧬 الفصل'},
@@ -171,7 +172,7 @@ async function saveUserEdit(){
 
 async function toggleUserActive(id,cur){
   const act=cur?'تعطيل':'تفعيل';
-  if(!confirm('هل تريد '+act+' هذا الحساب؟')) return;
+  if(!(await bbConfirm('هل تريد '+act+' هذا الحساب؟'))) return;
   load(true);
   const{error}=await db.from('user_profiles').update({is_active:!cur}).eq('id',id);
   load(false);

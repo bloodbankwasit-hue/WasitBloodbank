@@ -1002,6 +1002,7 @@ tbody tr:hover td{background:#fafafa}
       <div class="nb"><div class="nl">الحالات</div>
         <div class="ni" id="navInfected" onclick="nav('infected',this)"><i class="ti ti-virus"></i> المصابون والمرفوضون <span class="nbadge" id="infBadge" style="display:none">!</span></div>
         <div class="ni" id="navRare" onclick="nav('rare',this)"><i class="ti ti-droplet-half"></i> الفصائل النادرة</div>
+        <div class="ni" id="navStore" onclick="nav('store',this)"><i class="ti ti-building-warehouse"></i> المخزن</div>
       </div>
       <div class="nb"><div class="nl">الإدارة</div>
         <div class="ni" id="navStats" onclick="nav('stats',this)"><i class="ti ti-chart-bar"></i> الإحصائيات</div>
@@ -1304,6 +1305,15 @@ tbody tr:hover td{background:#fafafa}
       <div class="sc" id="s-trima">
         <div class="sh"><div class="sh-t">🩸 وحدة التريما — قائمة الانتظار</div></div>
         <div id="trimaList"><div class="empty"><i class="ti ti-clock"></i><p>جاري التحميل...</p></div></div>
+      </div>
+
+      <!-- المخزن (مواد المصرف) -->
+      <div class="sc" id="s-store">
+        <div class="tabs" id="stTabs" style="margin-bottom:10px">
+          <div class="tab on" data-t="items" onclick="stTab('items')">📦 المواد</div>
+          <div class="tab" data-t="archive" onclick="stTab('archive')">🗄️ الأرشيف</div>
+        </div>
+        <div id="storeBody"></div>
       </div>
 
       <!-- DAMAGED STORE -->
@@ -1942,7 +1952,7 @@ const PS = 20;
 const TITLES = {
   dashboard:'لوحة التحكم', add:'إضافة متبرع جديد', donors:'سجل المتبرعين',
   search:'بحث متقدم', globalsearch:'الأرشيف الشامل', campaigns:'حملات التبرع', separation:'الفصل', pending_release:'المخزن المؤقت', barcode:'الباركود والطباعة', infected:'المصابون',
-  rejected:'المرفوضون', rare:'الفصائل النادرة', damaged_store:'مخزن القناني التالفة', trima:'وحدة التريما',
+  rejected:'المرفوضون', rare:'الفصائل النادرة', damaged_store:'مخزن القناني التالفة', store:'المخزن', trima:'وحدة التريما',
   stats:'الإحصائيات', audit:'سجل التتبع', settings:'الإعدادات', dthome:'الرئيسية'
 };
 
@@ -1997,6 +2007,7 @@ const SECTION_SCRIPTS = {
   infected: 'infected-rejected.js',
   rare: 'rare.js',
   damaged_store: 'damaged-store.js',
+  store: 'store.js',
   audit: 'audit.js',
   settings: ['sequences.js', 'settings.js', 'backup.js'],
   users: 'users.js',
@@ -3311,6 +3322,7 @@ const PERM_NAV = {
   globalsearch: 'navSearch',
   infected:   'navInfected',
   rare:       'navRare',
+  store:      'navStore',
   stats:      'navStats',
   audit:      'navAudit',
   settings:   'navSettings',
@@ -3321,7 +3333,7 @@ const PERM_SCREEN = {
   dashboard:'dashboard', reception:'reception', draw:'draw',
   virology:'virology', classification:'classification', supply:'supply', donors:'donors', globalsearch:'globalsearch',
   barcode:'barcode', infected:'infected',
-  rare:'rare', stats:'stats', audit:'audit', settings:'settings', users:'users'
+  rare:'rare', store:'store', stats:'stats', audit:'audit', settings:'settings', users:'users'
 };
 
 // Per-account option "hide bottle stock on the home screen" (set in إدارة الحسابات). It is a flag
@@ -3527,6 +3539,7 @@ async function nav(name, el){
       break;
     case 'rare':    await loadRareGrid(); break;
     case 'damaged_store': await loadDamagedStore(); break;
+    case 'store': await loadStore(); break;
     case 'add':     await loadNextBN(); break;
     case 'audit':    await loadAudit(); break;
     case 'settings':  await loadSeqGrid(); break;
@@ -4966,6 +4979,7 @@ const WORK_CARDS = [
   {key:'infected',  icon:'⚠️', name:'المصابون والمرفوضون', desc:'الحالات الإيجابية والمرفوضون مؤقتاً ودائماً'},
   {key:'rare',      icon:'💎', name:'الفصائل النادرة', desc:'O− و AB−'},
   {key:'damaged_store', icon:'🗑️', name:'مخزن القناني التالفة', desc:'استلام التالف وإتلافه بمحضر وأرشيفه'},
+  {key:'store',     icon:'🏬', name:'المخزن',        desc:'مواد المصرف: إضافة وسحب وأرشيف'},
   {key:'stats',     icon:'📈', name:'الإحصائيات',  desc:'تقارير وطباعة'},
   {key:'backup',    icon:'💾', name:'النسخ الاحتياطي', desc:'تلقائي كل 3 أيام على هذه الحاسبة'},
 ];

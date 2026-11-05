@@ -8,11 +8,19 @@ const BACKUP_TABLES = [
   'donors','blood_donations','rejected_donors','campaigns','campaign_slots',
   'bottle_sequences','bottle_number_pool','user_profiles','audit_log'
 ];
+// جداول أُضيفت لاحقاً: تُضمَّن بالنسخة فقط إن كانت موجودة بقاعدة البيانات (لا تكسر النسخة لو لم يُشغَّل SQLها بعد)
+const BACKUP_OPTIONAL = ['destruction_reports','dispatch_book_records','lab_reagents','lab_reagent_log','store_items','store_lots','store_moves'];
+async function bbBackupTables(){
+  const ok=[];
+  for(const t of BACKUP_OPTIONAL){ try{ const r=await db.from(t).select('id').limit(1); if(!r.error) ok.push(t); }catch(e){} }
+  return [...BACKUP_TABLES,...ok];
+}
 // Tables are restored in this order so foreign-key references (e.g. a donation
 // pointing at a donor) always land after the row they point to.
 const BACKUP_RESTORE_ORDER = [
-  'user_profiles','donors','bottle_sequences','campaigns',
-  'blood_donations','campaign_slots','rejected_donors','bottle_number_pool','audit_log'
+  'user_profiles','donors','bottle_sequences','campaigns','destruction_reports',
+  'blood_donations','campaign_slots','dispatch_book_records','rejected_donors','bottle_number_pool',
+  'lab_reagents','lab_reagent_log','store_items','store_lots','store_moves','audit_log'
 ];
 
 async function exportFullBackup(){
@@ -21,7 +29,7 @@ async function exportFullBackup(){
   load(true);
   try{
     const backup = { exported_at: new Date().toISOString(), app: 'WasitBloodbank', version: 1, tables: {} };
-    for(const t of BACKUP_TABLES){
+    for(const t of await bbBackupTables()){
       let all=[], from=0, pageSize=1000, hasMore=true;
       while(hasMore){
         // A stable order is REQUIRED for range-based pagination to be correct — without it,

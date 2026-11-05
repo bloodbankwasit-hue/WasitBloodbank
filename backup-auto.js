@@ -95,7 +95,8 @@ async function _bbaJson(day){
   try{
     await sink.write('{"exported_at":'+JSON.stringify(new Date().toISOString())+',"app":"WasitBloodbank","version":1,"tables":{');
     let ti=0;
-    for(const t of BBA_TABLES){
+    const _optT=[]; for(const t of ['destruction_reports','dispatch_book_records','lab_reagents','lab_reagent_log','store_items','store_lots','store_moves']){ try{ const r=await db.from(t).select('id').limit(1); if(!r.error) _optT.push(t); }catch(e){} }
+    for(const t of [...BBA_TABLES,..._optT]){
       await sink.write((ti++?',':'')+JSON.stringify(t)+':[');
       let first=true;
       await _bbaFetchPages(t,q=>q.select('*'),async rows=>{
