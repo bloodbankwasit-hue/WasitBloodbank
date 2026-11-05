@@ -5,7 +5,7 @@
 // الجداول: store_items, store_lots, store_moves — والدوال: store_add / store_withdraw (SQL المخزن).
 // ================================================================
 let _stTab='items', _stGrp='material', _stItems=[], _stLots=[], _stQ='';
-let _stArcKind='', _stKind='month', _stAnchor=null, _stFrom='', _stTo='', _stItemF='', _stArc=null;
+let _stArcKind='material', _stKind='month', _stAnchor=null, _stFrom='', _stTo='', _stItemF='', _stArc=null;
 const _ST_KINDS=[['day','يومي'],['week','أسبوعي'],['month','شهري'],['half','نصف سنوي'],['year','سنوي'],['custom','مخصص']];
 
 function stCan(){ return UPROF?.role==='admin' || (typeof hasPermission==='function' && hasPermission('store')); }
@@ -42,6 +42,7 @@ async function loadStore(){
   return stTab(_stTab);
 }
 function stTab(t){
+  if(t==='archive'&&_stTab!=='archive') _stArcKind=_stGrp==='device'?'device':'material';
   _stTab=t; if(t==='items') _stGrp='material'; else if(t==='devices') _stGrp='device';
   document.querySelectorAll('#stTabs .tab').forEach(x=>x.classList.toggle('on',x.dataset.t===t));
   _stQ='';
@@ -196,14 +197,14 @@ function stDrawArchive(){
   const {names,rows,sum}=_stArcData();
   const tin=rows.filter(m=>m._k==='in').reduce((s,m)=>s+m.qty,0), tout=rows.filter(m=>m._k==='out').reduce((s,m)=>s+m.qty,0), tscr=rows.filter(m=>m._k==='scrap').reduce((s,m)=>s+m.qty,0);
   G('stArcBody').innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
- <select onchange="_stArcKind=this.value;_stItemF='';stDrawArchive()" style="padding:8px;border:1.5px solid #E5E7EB;border-radius:10px;font-size:15px"><option value="">مواد وأجهزة</option><option value="material" ${_stArcKind==='material'?'selected':''}>المواد فقط</option><option value="device" ${_stArcKind==='device'?'selected':''}>الأجهزة فقط</option></select>
-      <select onchange="_stItemF=this.value;stDrawArchive()" style="padding:8px;border:1.5px solid #E5E7EB;border-radius:10px;font-size:15px"><option value="">${_stArcKind==='device'?'كل الأجهزة':_stArcKind==='material'?'كل المواد':'الكل'}</option>${names.map(n=>`<option ${n===_stItemF?'selected':''}>${esc(n)}</option>`).join('')}</select>
+ <div style="display:flex;gap:6px"><button class="btn${_stArcKind==='material'?' btn-p':''}" onclick="_stArcKind='material';_stItemF='';stDrawArchive()">📦 أرشيف المواد</button><button class="btn${_stArcKind==='device'?' btn-p':''}" onclick="_stArcKind='device';_stItemF='';stDrawArchive()">🩺 أرشيف الأجهزة</button></div>
+      <select onchange="_stItemF=this.value;stDrawArchive()" style="padding:8px;border:1.5px solid #E5E7EB;border-radius:10px;font-size:15px"><option value="">${_stArcKind==='device'?'كل الأجهزة':'كل المواد'}</option>${names.map(n=>`<option ${n===_stItemF?'selected':''}>${esc(n)}</option>`).join('')}</select>
       <button class="btn" onclick="stExport('xls')"><i class="ti ti-file-spreadsheet"></i> Excel</button><button class="btn" onclick="stExport('pdf')"><i class="ti ti-file-type-pdf"></i> PDF</button></div>
     <div style="display:flex;gap:10px;margin-bottom:12px"><div style="flex:1;text-align:center;border:1.5px solid #BBF7D0;background:#F0FDF4;border-radius:12px;padding:10px"><div style="font-size:26px;font-weight:900;color:#166534">${fnum(tin)}</div><div style="color:#166534;font-weight:700">إجمالي المُضاف</div></div>
       <div style="flex:1;text-align:center;border:1.5px solid #FECACA;background:#FEF2F2;border-radius:12px;padding:10px"><div style="font-size:26px;font-weight:900;color:#B91C1C">${fnum(tout)}</div><div style="color:#B91C1C;font-weight:700">إجمالي المسحوب</div></div>
-      ${tscr||_stArcKind==='device'?`<div style="flex:1;text-align:center;border:1.5px solid #FDE68A;background:#FFFBEB;border-radius:12px;padding:10px"><div style="font-size:26px;font-weight:900;color:#92400E">${fnum(tscr)}</div><div style="color:#92400E;font-weight:700">إجمالي المُتلَف</div></div>`:''}</div>`
-   +(rows.length?`<div style="font-weight:800;margin:6px 0">ملخص كل مادة</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:15px"><thead><tr style="background:#F3F4F6"><th style="padding:6px;text-align:right">المادة</th><th>المُضاف</th><th>المسحوب</th><th>المُتلَف</th></tr></thead><tbody>`
-     +Object.entries(sum).sort((a,b)=>a[0].localeCompare(b[0])).map(([n,v])=>`<tr style="border-top:1px solid #F1F5F9;text-align:center"><td style="padding:6px;text-align:right;font-weight:700">${esc(n)}</td><td style="color:#166534;font-weight:800">${fnum(v.in)}</td><td style="color:#B91C1C;font-weight:800">${fnum(v.out)}</td><td style="color:#92400E;font-weight:800">${fnum(v.scrap)}</td></tr>`).join('')+'</tbody></table></div>'
+      ${_stArcKind==='device'?`<div style="flex:1;text-align:center;border:1.5px solid #FDE68A;background:#FFFBEB;border-radius:12px;padding:10px"><div style="font-size:26px;font-weight:900;color:#92400E">${fnum(tscr)}</div><div style="color:#92400E;font-weight:700">إجمالي المُتلَف</div></div>`:''}</div>`
+   +(rows.length?`<div style="font-weight:800;margin:6px 0">ملخص كل مادة</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:15px"><thead><tr style="background:#F3F4F6"><th style="padding:6px;text-align:right">المادة</th><th>المُضاف</th><th>المسحوب</th>${_stArcKind==='device'?'<th>المُتلَف</th>':''}</tr></thead><tbody>`
+     +Object.entries(sum).sort((a,b)=>a[0].localeCompare(b[0])).map(([n,v])=>`<tr style="border-top:1px solid #F1F5F9;text-align:center"><td style="padding:6px;text-align:right;font-weight:700">${esc(n)}</td><td style="color:#166534;font-weight:800">${fnum(v.in)}</td><td style="color:#B91C1C;font-weight:800">${fnum(v.out)}</td>${_stArcKind==='device'?`<td style="color:#92400E;font-weight:800">${fnum(v.scrap)}</td>`:''}</tr>`).join('')+'</tbody></table></div>'
      +`<div style="font-weight:800;margin:14px 0 6px">الحركات (${fnum(rows.length)})</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:14.5px"><thead><tr style="background:#F3F4F6"><th style="padding:6px">التاريخ</th><th>المادة</th><th>الحركة</th><th>العدد</th><th>الإكسباير</th><th>ملاحظة</th><th>بواسطة</th></tr></thead><tbody>`
      +rows.map(m=>`<tr style="border-top:1px solid #F1F5F9;text-align:center"><td style="padding:6px">${fd(m.move_date)}</td><td style="font-weight:700">${esc(m.store_items?.name||'')}</td><td style="color:${m._k==='in'?'#166534':m._k==='scrap'?'#92400E':'#B91C1C'};font-weight:800">${m._k==='in'?'إضافة':m._k==='scrap'?'إتلاف':'سحب'}</td><td style="font-weight:800">${fnum(m.qty)}</td><td>${m.expiry_date?fd(m.expiry_date):'—'}</td><td style="font-size:13px;color:#475569">${esc(m.note||'')}</td><td style="font-size:13px">${esc(m.created_by_name||'')}</td></tr>`).join('')+'</tbody></table></div>'
     :'<div class="empty"><p>لا توجد حركات بهذه الفترة</p></div>');
@@ -214,7 +215,7 @@ function stExport(fmt){
   const sumRows=Object.entries(sum).sort((a,b)=>a[0].localeCompare(b[0])).map(([n,v])=>[n,v.in,v.out,v.scrap]);
   const mvRows=rows.map(m=>[fd(m.move_date),m.store_items?.name||'',m._k==='in'?'إضافة':m._k==='scrap'?'إتلاف':'سحب',m.qty,m.expiry_date?fd(m.expiry_date):'—',m.note||'',m.created_by_name||'']);
   const tbl=(h,rs)=>`<table border="1" style="border-collapse:collapse;margin-bottom:14px"><tr style="background:#BE123C;color:#fff;font-weight:bold">${h.map(x=>`<th>${E(x)}</th>`).join('')}</tr>${rs.map(rw=>'<tr>'+rw.map(c=>`<td>${E(c)}</td>`).join('')+'</tr>').join('')}</table>`;
-  const body=`<h2>مصرف الدم — واسط</h2><h3>أرشيف المخزن</h3><p>الفترة: ${E(period)}</p><h3>ملخص المواد</h3>${tbl(['المادة','المُضاف','المسحوب','المُتلَف'],sumRows)}<h3>الحركات</h3>${tbl(['التاريخ','المادة','الحركة','العدد','الإكسباير','ملاحظة','بواسطة'],mvRows)}`;
+  const body=`<h2>مصرف الدم — واسط</h2><h3>${_stArcKind==='device'?'أرشيف الأجهزة':'أرشيف المواد'}</h3><p>الفترة: ${E(period)}</p><h3>ملخص المواد</h3>${tbl(_stArcKind==='device'?['الجهاز','المُضاف','المسحوب','المُتلَف']:['المادة','المُضاف','المسحوب'],_stArcKind==='device'?sumRows:sumRows.map(x=>x.slice(0,3)))}<h3>الحركات</h3>${tbl(['التاريخ','المادة','الحركة','العدد','الإكسباير','ملاحظة','بواسطة'],mvRows)}`;
   if(fmt==='xls'){
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['﻿<html dir="rtl"><head><meta charset="UTF-8"></head><body>'+body+'</body></html>'],{type:'application/vnd.ms-excel;charset=utf-8'}));
     a.download='أرشيف_المخزن_'+_stToday()+'.xls'; a.click(); toast('✅ تم تصدير Excel','success',3000); return;

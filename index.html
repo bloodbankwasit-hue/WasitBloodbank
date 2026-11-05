@@ -4281,6 +4281,16 @@ async function openReagents(){
   try{ await loadOneScript('reagents.js'); }catch(e){ toast('تعذر تحميل مواد الفحص','error'); return; }
   rgOpen();
 }
+// إخفاء التنبيه بعد الضغط عليه (محلياً على هذا الجهاز) — يعود فقط إذا تغيّر محتواه (كمية/تسلسل/عدد)
+function _nk(x){ return String(x==null?'':x).replace(/['"\\]/g,''); }
+function _nDisGet(){ try{ return JSON.parse(localStorage.getItem('bb_notif_dis')||'{}'); }catch(e){ return {}; } }
+function _nDis(k){ return !!_nDisGet()[k]; }
+function _nDismiss(k){ try{ const d=_nDisGet(); d[k]=Date.now(); const ks=Object.keys(d); if(ks.length>400){ ks.sort((a,b)=>d[a]-d[b]).slice(0,ks.length-400).forEach(x=>delete d[x]); } localStorage.setItem('bb_notif_dis',JSON.stringify(d)); }catch(e){} try{ refreshExpiryNotifications(); }catch(e){} }
+function _nExpKey(g){ return _nk('exp|'+g.bt+'|'+g.ct+'|'+g.date+'|'+g.n); }
+function _nExpFilter(list){
+  const cnt={}; list.forEach(r=>{ const k=(r.blood_type||'—')+'|'+(r.component_type||'دم كامل')+'|'+r.expiry_date; cnt[k]=(cnt[k]||0)+1; });
+  return list.filter(r=>{ const bt=r.blood_type||'—', ct=r.component_type||'دم كامل', k=bt+'|'+ct+'|'+r.expiry_date; return !_nDis(_nExpKey({bt,ct,date:r.expiry_date,n:cnt[k]})); });
+}
 async function refreshExpiryNotifications(){
   const badge=G('notifBadge');
   if(!badge) return;
@@ -4309,6 +4319,9 @@ async function refreshExpiryNotifications(){
   if(isAdmin || hasPermission('virology')){
     try{ const r=await db.from('lab_reagents').select('id,name,qty,low_threshold').eq('is_active',true); if(!r.error) reagList=(r.data||[]).filter(x=>x.qty<=x.low_threshold).sort((a,b)=>a.qty-b.qty); }catch(e){}
   }
+  reagList=reagList.filter(r=>!_nDis(_nk('rg|'+r.id+'|'+r.qty)));
+  expiryList=_nExpFilter(expiryList);
+  infectedList=infectedList.filter(r=>!_nDis(_nk('inf|'+r.id)));
   window._REAGENT_NOTIFS=reagList;
   let seqList=[], seqNew=0;
   if(wantSeq){
@@ -4318,6 +4331,7 @@ async function refreshExpiryNotifications(){
       // a type that is back above 50 (new sequence added) forgets its old rung
       Object.keys(seen).forEach(t=>{ if(!seqList.some(a=>a.type===t)){ delete seen[t]; changed=true; } });
       if(changed) _seqSeenSet(seen);
+      seqList=seqList.filter(a=>!_nDis(_nk('seq|'+a.type+'|'+a.rung)));
       seqNew=seqList.filter(a=>seen[a.type]!==a.rung).length;
     }catch(e){ console.log('seq alerts:', e); }
   }
@@ -4380,7 +4394,7 @@ function openNotifPanel(){
   // Low / finished bottle-number sequences — shown first because only a refill fixes them
   const seqRows=seqList.map(a=>{
     const done=a.remaining<=0, red=a.remaining<=20;
-    return `<div onclick="bbNotifGo(()=>bbGoSection('settings'))" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid ${red?'#FECACA':'#FDE68A'};background:${red?'#FEF2F2':'#FFFBEB'};border-radius:10px;margin-bottom:8px">
+    return `<div onclick="_nDismiss('${_nk('seq|'+a.type+'|'+a.rung)}');bbNotifGo(()=>bbGoSection('settings'))" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid ${red?'#FECACA':'#FDE68A'};background:${red?'#FEF2F2':'#FFFBEB'};border-radius:10px;margin-bottom:8px">
       <div>
         <div style="font-weight:700;font-size:16.5px;color:${red?'#7F1D1D':'#92400E'}">${done?'⛔ انتهى تسلسل «'+esc(a.type)+'»':'⚠️ تسلسل «'+esc(a.type)+'»: بقي '+a.remaining+' قنينة فقط'}</div>
         <div style="font-size:14.5px;color:#757575;margin-top:2px">املأ تسلسلاً جديداً من الإعدادات${done?' — الاستقبال متوقف لهذا النوع':''}</div>
@@ -4390,13 +4404,13 @@ function openNotifPanel(){
 
   // مواد فحص الفيروسات: وصلت حد التنبيه أو نفدت
   const reagRows=(window._REAGENT_NOTIFS||[]).map(r=>{ const out=r.qty<=0;
-    return `<div onclick="bbNotifGo(()=>openReagents())" style="cursor:pointer;padding:12px 14px;border:1px solid ${out?'#FECACA':'#FDE68A'};background:${out?'#FEF2F2':'#FFFBEB'};border-radius:10px;margin-bottom:8px">
+    return `<div onclick="_nDismiss('${_nk('rg|'+r.id+'|'+r.qty)}');bbNotifGo(()=>openReagents())" style="cursor:pointer;padding:12px 14px;border:1px solid ${out?'#FECACA':'#FDE68A'};background:${out?'#FEF2F2':'#FFFBEB'};border-radius:10px;margin-bottom:8px">
       <div style="font-weight:700;font-size:16.5px;color:${out?'#7F1D1D':'#92400E'}">${out?'⛔ نفدت مادة «'+esc(r.name)+'» — فحص الفيروسات سيتوقف':'⚠️ مادة «'+esc(r.name)+'» قاربت على النفاد: بقي '+r.qty+' فحص'}</div>
       <div style="font-size:14.5px;color:#757575;margin-top:2px">اضغط لإضافة كمية جديدة</div></div>`; }).join('');
 
   // Infected bottles — one row per bottle, always on top (more urgent than expiry warnings)
   const infRows=infList.map(r=>`
-    <div onclick="bbNotifGo(()=>bbGoSection('infected'))" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid #FECACA;background:#FEF2F2;border-radius:10px;margin-bottom:8px">
+    <div onclick="_nDismiss('${_nk('inf|'+r.id)}');bbNotifGo(()=>bbGoSection('infected'))" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid #FECACA;background:#FEF2F2;border-radius:10px;margin-bottom:8px">
       <div>
         <div style="font-weight:700;font-size:16.5px;color:#7F1D1D">⛔ القنينة رقم ${r.bottle_number||'—'} مصابة</div>
         <div style="font-size:14.5px;color:#757575;margin-top:2px">${r.blood_type||'—'}${r.serology_type?' — '+esc(r.serology_type):''} — بانتظار الفرز بالمخزن المؤقت</div>
@@ -4416,7 +4430,7 @@ function openNotifPanel(){
     const expired=d<today;
     const days=Math.round((d-today)/86400000);
     const label=expired?'⛔ انتهت صلاحيتها':(days===0?'⚠️ تنتهي اليوم':'⏳ تنتهي بعد '+days+' يوم');
-    return `<div onclick="bbGoSupplyList('${g.ct}','${g.bt}')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid ${expired?'#FECACA':'#FDE68A'};background:${expired?'#FEF2F2':'#FFFBEB'};border-radius:10px;margin-bottom:8px">
+    return `<div onclick="_nDismiss('${_nExpKey(g)}');bbGoSupplyList('${g.ct}','${g.bt}')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid ${expired?'#FECACA':'#FDE68A'};background:${expired?'#FEF2F2':'#FFFBEB'};border-radius:10px;margin-bottom:8px">
       <div>
         <div style="font-weight:700;font-size:16.5px">${g.n} قنينة — ${g.bt} — ${g.ct}</div>
         <div style="font-size:14.5px;color:#757575;margin-top:2px">${label} — ${fd(g.date)}</div>
@@ -4424,9 +4438,9 @@ function openNotifPanel(){
     </div>`;
   }).join('');
 
-  const bkList=bbNoticeList().slice(0,12);
+  const bkList=bbNoticeList().filter(n=>!_nDis(_nk('bk|'+n.t))).slice(0,12);
   const bkRows=bkList.map(n=>{ const ok=n.kind!=='err', d=new Date(n.t); const dt=bbDmyTime(n.t);
-    return `<div onclick="bbNotifGo(()=>openBackupAutoFromNav())" style="cursor:pointer;padding:12px 14px;border:1px solid ${ok?'#BBF7D0':'#FECACA'};background:${ok?'#F0FDF4':'#FEF2F2'};border-radius:10px;margin-bottom:8px">
+    return `<div onclick="_nDismiss('${_nk('bk|'+n.t)}');bbNotifGo(()=>openBackupAutoFromNav())" style="cursor:pointer;padding:12px 14px;border:1px solid ${ok?'#BBF7D0':'#FECACA'};background:${ok?'#F0FDF4':'#FEF2F2'};border-radius:10px;margin-bottom:8px">
       <div style="font-weight:700;font-size:16.5px;color:${ok?'#166534':'#7F1D1D'}">${ok?'✅':'⛔'} ${esc(n.title)}</div>
       <div style="font-size:14px;color:#757575;margin-top:2px;direction:ltr;text-align:right;word-break:break-all">${esc(n.sub||'')}</div>
       <div style="font-size:13px;color:#9e9e9e;margin-top:2px">${dt}</div></div>`; }).join('');
