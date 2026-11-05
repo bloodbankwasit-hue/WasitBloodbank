@@ -71,12 +71,13 @@ function stDrawItems(){
   B.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
       <button class="btn btn-p" onclick="stAddOpen()"><i class="ti ti-plus"></i> ${_stGrp==='device'?'إضافة أجهزة':'إضافة مواد'}</button>
       <button class="btn" style="border-color:#7F1D1D;color:#7F1D1D" onclick="stOutOpen()"><i class="ti ti-minus"></i> ${_stGrp==='device'?'سحب أجهزة':'سحب مواد'}</button>
+      ${_stGrp==='device'?`<button class="btn" style="border-color:#92400E;color:#92400E" onclick="stOutOpen(null,null,'scrap')"><i class="ti ti-trash"></i> إتلاف أجهزة</button>`:''}
       <input id="stSearch" placeholder="🔍 ${_stGrp==='device'?'بحث باسم الجهاز':'بحث باسم المادة'}" value="${esc(_stQ)}" oninput="_stQ=this.value;stDrawItems();setTimeout(()=>{const i=G('stSearch');if(i){i.focus();i.setSelectionRange(99,99)}},0)" style="flex:1;min-width:160px;padding:9px;border:1.5px solid #E5E7EB;border-radius:10px;font-size:16px"></div>`
    +(rows.length?`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:16px"><thead><tr style="background:#F3F4F6"><th style="padding:8px;text-align:right">${_stGrp==='device'?'الجهاز':'المادة'}</th><th>العدد</th>${_stGrp==='device'?'':'<th>أقرب إكسباير</th>'}<th></th></tr></thead><tbody>`
     +rows.map(r=>`<tr style="border-top:1px solid #F1F5F9;text-align:center"><td style="padding:8px;text-align:right;font-weight:800">${esc(r.name)}</td><td style="font-size:20px;font-weight:900;color:${r.qty>0?'#166534':'#B91C1C'}">${fnum(r.qty)}</td>${_stGrp==='device'?'':`<td>${_stExpTag(r.exp)}</td>`}
       <td style="white-space:nowrap"><button class="btn" style="padding:6px 9px" onclick="stAddOpen('${r.id}')" title="إضافة"><i class="ti ti-plus"></i></button>
       <button class="btn" style="padding:6px 9px;color:#7F1D1D;border-color:#7F1D1D" onclick="stOutOpen('${r.id}')" title="سحب"><i class="ti ti-minus"></i></button>
-      ${_stGrp==='device'?'':`<button class="btn" style="padding:6px 9px" onclick="stLots('${r.id}')" title="الدفعات"><i class="ti ti-list-details"></i></button>`}</td></tr>`).join('')+'</tbody></table></div>'
+      ${_stGrp==='device'?`<button class="btn" style="padding:6px 9px;color:#92400E;border-color:#92400E" onclick="stOutOpen('${r.id}',null,'scrap')" title="إتلاف"><i class="ti ti-trash"></i></button>`:`<button class="btn" style="padding:6px 9px" onclick="stLots('${r.id}')" title="الدفعات"><i class="ti ti-list-details"></i></button>`}</td></tr>`).join('')+'</tbody></table></div>'
     :'<div class="empty"><i class="ti ti-building-warehouse"></i><p>'+(q?'لا نتائج':(_stGrp==='device'?'لا توجد أجهزة بعد — اضغط «إضافة أجهزة»':'لا توجد مواد بعد — اضغط «إضافة مواد»'))+'</p></div>');
 }
 function stForm(title,inner,okFn,okLabel){
@@ -117,17 +118,19 @@ async function stAddSave(){
   finally{ load(false); }
 }
 
-function stOutOpen(itemId,lotId){
-  const dev=_stGrp==='device', rows=_stSummary().filter(r=>r.qty>0);
-  if(!rows.length){ toast(dev?'لا توجد أجهزة بالمخزن للسحب':'لا توجد مواد بالمخزن للسحب','warning'); return; }
+let _stOutMode='out';
+function stOutOpen(itemId,lotId,mode){
+  _stOutMode = mode==='scrap' ? 'scrap' : 'out';
+  const dev=_stGrp==='device', scrap=_stOutMode==='scrap', rows=_stSummary().filter(r=>r.qty>0);
+  if(!rows.length){ toast(dev?'لا توجد أجهزة بالمخزن':'لا توجد مواد بالمخزن','warning'); return; }
   const lot=lotId?_stLots.find(l=>l.id===lotId):null;
   const sel=itemId||(lot&&lot.item_id)||'';
-  stForm('<i class="ti ti-minus"></i> '+(dev?'سحب أجهزة':'سحب مواد'),
+  stForm(scrap?'<i class="ti ti-trash"></i> إتلاف أجهزة':'<i class="ti ti-minus"></i> '+(dev?'سحب أجهزة':'سحب مواد'),
     `<div class="fgrp"><label>${dev?'الجهاز *':'المادة *'}</label><select id="st-item" ${lot?'disabled':''} onchange="stOutInfo()">${rows.map(r=>`<option value="${r.id}" ${r.id===sel?'selected':''}>${esc(r.name)} — المتوفر ${fnum(r.qty)}</option>`).join('')}</select></div>
      ${lot?`<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:8px;margin-bottom:8px;font-size:14.5px">السحب من دفعة محددة: المتبقي <b>${fnum(lot.qty_left)}</b> — إكسباير ${lot.expiry_date?fd(lot.expiry_date):'—'}<input type="hidden" id="st-lot" value="${lot.id}"></div>`:'<div id="st-info" style="font-size:14px;color:#6B7280;margin-bottom:8px"></div>'}`
-    +_stNumIn('st-qty','العدد المسحوب *')
-    +`<div class="fgrp"><label>تاريخ السحب</label><input type="date" id="st-date" value="${_stToday()}"></div>
-      <div class="fgrp"><label>ملاحظة (لمن / السبب)</label><input type="text" id="st-note" placeholder="${dev?'مثلاً: إلى قسم الفحص / للصيانة':'مثلاً: لوحدة الفيروسات'}"></div>`,'stOutSave()','سحب');
+    +_stNumIn('st-qty',scrap?'العدد المُتلَف *':'العدد المسحوب *')
+    +`<div class="fgrp"><label>${scrap?'تاريخ الإتلاف':'تاريخ السحب'}</label><input type="date" id="st-date" value="${_stToday()}"></div>
+      <div class="fgrp"><label>${scrap?'سبب الإتلاف *':'ملاحظة (لمن / السبب)'}</label><input type="text" id="st-note" placeholder="${dev?'مثلاً: إلى قسم الفحص / للصيانة':'مثلاً: لوحدة الفيروسات'}"></div>`,'stOutSave()',scrap?'إتلاف':'سحب');
   stOutInfo();
 }
 function stOutInfo(){
@@ -136,13 +139,15 @@ function stOutInfo(){
 }
 async function stOutSave(){
   if(!stCan()) return; if(!IS_ONLINE){ toast('يحتاج اتصالاً بالإنترنت','warning'); return; }
+  const scrap=_stOutMode==='scrap';
   const item=G('st-item').value, qty=_stN('st-qty'), date=G('st-date').value||_stToday(), note=(G('st-note').value||'').trim()||null, lot=G('st-lot')?.value||null;
   if(!Number.isInteger(qty)||qty<1){ toast('اكتب عدداً صحيحاً أكبر من صفر','error'); return; }
+  if(scrap && !note){ toast('اكتب سبب الإتلاف','error'); return; }
   load(true);
   try{
-    const r=await db.rpc('store_withdraw',{p_item:item,p_qty:qty,p_date:date,p_note:note,p_by:_stByName(),p_lot:lot});
+    const r=await db.rpc('store_withdraw',{p_item:item,p_qty:qty,p_date:date,p_note:note,p_by:_stByName(),p_lot:lot,p_reason:scrap?'scrap':null});
     if(r.error) throw r.error;
-    G('stFormOv')?.remove(); G('stLotsOv')?.remove(); toast('✅ تم سحب '+fnum(qty),'success',3500);
+    G('stFormOv')?.remove(); G('stLotsOv')?.remove(); toast(scrap?'✅ تم إتلاف '+fnum(qty):'✅ تم سحب '+fnum(qty),'success',3500);
     await stRenderItems();
   }catch(e){ toast(/INSUFFICIENT/i.test(e.message||'')?'⛔ الرصيد غير كافٍ (المنتهي الصلاحية لا يُسحب تلقائياً — اسحب منه من «الدفعات»)':('خطأ: '+(e.message||e)),'error',8000); }
   finally{ load(false); }
@@ -175,7 +180,7 @@ async function stRenderArchive(){
   if(r.open){ G('stArcBody').innerHTML='<div class="empty"><i class="ti ti-calendar"></i><p>اختر تاريخ البداية والنهاية</p></div>'; return; }
   G('stArcBody').innerHTML='<div class="empty"><p>جاري التحميل...</p></div>';
   try{
-    const mv=await bbFetchAll(()=>db.from('store_moves').select('id,item_id,kind,qty,move_date,expiry_date,note,created_by_name,created_at,store_items(name,kind)').gte('move_date',r.from).lte('move_date',r.to));
+    const mv=await bbFetchAll(()=>db.from('store_moves').select('id,item_id,kind,reason,qty,move_date,expiry_date,note,created_by_name,created_at,store_items(name,kind)').gte('move_date',r.from).lte('move_date',r.to));
     _stArc={rows:mv,range:r}; stDrawArchive();
   }catch(e){ G('stArcBody').innerHTML='<div style="color:#B91C1C;font-weight:700">تعذّر التحميل: '+esc(e.message||e)+'</div>'; }
 }
@@ -183,31 +188,33 @@ function stCustom(){ _stFrom=G('st-from').value; _stTo=G('st-to').value; if(_stF
 function _stArcData(){
   const all=_stArc.rows.filter(m=>!_stArcKind||((m.store_items?.kind||'material')===_stArcKind)), names=[...new Set(all.map(m=>m.store_items?.name||''))].sort();
   const rows=all.filter(m=>!_stItemF||(m.store_items?.name===_stItemF)).sort((a,b)=>String(b.move_date).localeCompare(String(a.move_date))||String(b.created_at).localeCompare(String(a.created_at)));
-  const sum={}; rows.forEach(m=>{ const n=m.store_items?.name||'—'; (sum[n]=sum[n]||{in:0,out:0})[m.kind]+=m.qty; });
+  rows.forEach(m=>{ m._k = m.kind==='out'&&m.reason==='scrap' ? 'scrap' : m.kind; });
+  const sum={}; rows.forEach(m=>{ const n=m.store_items?.name||'—'; (sum[n]=sum[n]||{in:0,out:0,scrap:0})[m._k]+=m.qty; });
   return {names,rows,sum};
 }
 function stDrawArchive(){
   const {names,rows,sum}=_stArcData();
-  const tin=rows.filter(m=>m.kind==='in').reduce((s,m)=>s+m.qty,0), tout=rows.filter(m=>m.kind==='out').reduce((s,m)=>s+m.qty,0);
+  const tin=rows.filter(m=>m._k==='in').reduce((s,m)=>s+m.qty,0), tout=rows.filter(m=>m._k==='out').reduce((s,m)=>s+m.qty,0), tscr=rows.filter(m=>m._k==='scrap').reduce((s,m)=>s+m.qty,0);
   G('stArcBody').innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
  <select onchange="_stArcKind=this.value;_stItemF='';stDrawArchive()" style="padding:8px;border:1.5px solid #E5E7EB;border-radius:10px;font-size:15px"><option value="">مواد وأجهزة</option><option value="material" ${_stArcKind==='material'?'selected':''}>المواد فقط</option><option value="device" ${_stArcKind==='device'?'selected':''}>الأجهزة فقط</option></select>
       <select onchange="_stItemF=this.value;stDrawArchive()" style="padding:8px;border:1.5px solid #E5E7EB;border-radius:10px;font-size:15px"><option value="">${_stArcKind==='device'?'كل الأجهزة':_stArcKind==='material'?'كل المواد':'الكل'}</option>${names.map(n=>`<option ${n===_stItemF?'selected':''}>${esc(n)}</option>`).join('')}</select>
       <button class="btn" onclick="stExport('xls')"><i class="ti ti-file-spreadsheet"></i> Excel</button><button class="btn" onclick="stExport('pdf')"><i class="ti ti-file-type-pdf"></i> PDF</button></div>
     <div style="display:flex;gap:10px;margin-bottom:12px"><div style="flex:1;text-align:center;border:1.5px solid #BBF7D0;background:#F0FDF4;border-radius:12px;padding:10px"><div style="font-size:26px;font-weight:900;color:#166534">${fnum(tin)}</div><div style="color:#166534;font-weight:700">إجمالي المُضاف</div></div>
-      <div style="flex:1;text-align:center;border:1.5px solid #FECACA;background:#FEF2F2;border-radius:12px;padding:10px"><div style="font-size:26px;font-weight:900;color:#B91C1C">${fnum(tout)}</div><div style="color:#B91C1C;font-weight:700">إجمالي المسحوب</div></div></div>`
-   +(rows.length?`<div style="font-weight:800;margin:6px 0">ملخص كل مادة</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:15px"><thead><tr style="background:#F3F4F6"><th style="padding:6px;text-align:right">المادة</th><th>المُضاف</th><th>المسحوب</th></tr></thead><tbody>`
-     +Object.entries(sum).sort((a,b)=>a[0].localeCompare(b[0])).map(([n,v])=>`<tr style="border-top:1px solid #F1F5F9;text-align:center"><td style="padding:6px;text-align:right;font-weight:700">${esc(n)}</td><td style="color:#166534;font-weight:800">${fnum(v.in)}</td><td style="color:#B91C1C;font-weight:800">${fnum(v.out)}</td></tr>`).join('')+'</tbody></table></div>'
+      <div style="flex:1;text-align:center;border:1.5px solid #FECACA;background:#FEF2F2;border-radius:12px;padding:10px"><div style="font-size:26px;font-weight:900;color:#B91C1C">${fnum(tout)}</div><div style="color:#B91C1C;font-weight:700">إجمالي المسحوب</div></div>
+      ${tscr||_stArcKind==='device'?`<div style="flex:1;text-align:center;border:1.5px solid #FDE68A;background:#FFFBEB;border-radius:12px;padding:10px"><div style="font-size:26px;font-weight:900;color:#92400E">${fnum(tscr)}</div><div style="color:#92400E;font-weight:700">إجمالي المُتلَف</div></div>`:''}</div>`
+   +(rows.length?`<div style="font-weight:800;margin:6px 0">ملخص كل مادة</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:15px"><thead><tr style="background:#F3F4F6"><th style="padding:6px;text-align:right">المادة</th><th>المُضاف</th><th>المسحوب</th><th>المُتلَف</th></tr></thead><tbody>`
+     +Object.entries(sum).sort((a,b)=>a[0].localeCompare(b[0])).map(([n,v])=>`<tr style="border-top:1px solid #F1F5F9;text-align:center"><td style="padding:6px;text-align:right;font-weight:700">${esc(n)}</td><td style="color:#166534;font-weight:800">${fnum(v.in)}</td><td style="color:#B91C1C;font-weight:800">${fnum(v.out)}</td><td style="color:#92400E;font-weight:800">${fnum(v.scrap)}</td></tr>`).join('')+'</tbody></table></div>'
      +`<div style="font-weight:800;margin:14px 0 6px">الحركات (${fnum(rows.length)})</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:14.5px"><thead><tr style="background:#F3F4F6"><th style="padding:6px">التاريخ</th><th>المادة</th><th>الحركة</th><th>العدد</th><th>الإكسباير</th><th>ملاحظة</th><th>بواسطة</th></tr></thead><tbody>`
-     +rows.map(m=>`<tr style="border-top:1px solid #F1F5F9;text-align:center"><td style="padding:6px">${fd(m.move_date)}</td><td style="font-weight:700">${esc(m.store_items?.name||'')}</td><td style="color:${m.kind==='in'?'#166534':'#B91C1C'};font-weight:800">${m.kind==='in'?'إضافة':'سحب'}</td><td style="font-weight:800">${fnum(m.qty)}</td><td>${m.expiry_date?fd(m.expiry_date):'—'}</td><td style="font-size:13px;color:#475569">${esc(m.note||'')}</td><td style="font-size:13px">${esc(m.created_by_name||'')}</td></tr>`).join('')+'</tbody></table></div>'
+     +rows.map(m=>`<tr style="border-top:1px solid #F1F5F9;text-align:center"><td style="padding:6px">${fd(m.move_date)}</td><td style="font-weight:700">${esc(m.store_items?.name||'')}</td><td style="color:${m._k==='in'?'#166534':m._k==='scrap'?'#92400E':'#B91C1C'};font-weight:800">${m._k==='in'?'إضافة':m._k==='scrap'?'إتلاف':'سحب'}</td><td style="font-weight:800">${fnum(m.qty)}</td><td>${m.expiry_date?fd(m.expiry_date):'—'}</td><td style="font-size:13px;color:#475569">${esc(m.note||'')}</td><td style="font-size:13px">${esc(m.created_by_name||'')}</td></tr>`).join('')+'</tbody></table></div>'
     :'<div class="empty"><p>لا توجد حركات بهذه الفترة</p></div>');
 }
 function stExport(fmt){
   if(!_stArc) return; const {rows,sum}=_stArcData(), r=_stArc.range, period=fd(r.from)+(r.from===r.to?'':' ← '+fd(r.to));
   const E=x=>esc(x==null?'':String(x));
-  const sumRows=Object.entries(sum).sort((a,b)=>a[0].localeCompare(b[0])).map(([n,v])=>[n,v.in,v.out]);
-  const mvRows=rows.map(m=>[fd(m.move_date),m.store_items?.name||'',m.kind==='in'?'إضافة':'سحب',m.qty,m.expiry_date?fd(m.expiry_date):'—',m.note||'',m.created_by_name||'']);
+  const sumRows=Object.entries(sum).sort((a,b)=>a[0].localeCompare(b[0])).map(([n,v])=>[n,v.in,v.out,v.scrap]);
+  const mvRows=rows.map(m=>[fd(m.move_date),m.store_items?.name||'',m._k==='in'?'إضافة':m._k==='scrap'?'إتلاف':'سحب',m.qty,m.expiry_date?fd(m.expiry_date):'—',m.note||'',m.created_by_name||'']);
   const tbl=(h,rs)=>`<table border="1" style="border-collapse:collapse;margin-bottom:14px"><tr style="background:#BE123C;color:#fff;font-weight:bold">${h.map(x=>`<th>${E(x)}</th>`).join('')}</tr>${rs.map(rw=>'<tr>'+rw.map(c=>`<td>${E(c)}</td>`).join('')+'</tr>').join('')}</table>`;
-  const body=`<h2>مصرف الدم — واسط</h2><h3>أرشيف المخزن</h3><p>الفترة: ${E(period)}</p><h3>ملخص المواد</h3>${tbl(['المادة','المُضاف','المسحوب'],sumRows)}<h3>الحركات</h3>${tbl(['التاريخ','المادة','الحركة','العدد','الإكسباير','ملاحظة','بواسطة'],mvRows)}`;
+  const body=`<h2>مصرف الدم — واسط</h2><h3>أرشيف المخزن</h3><p>الفترة: ${E(period)}</p><h3>ملخص المواد</h3>${tbl(['المادة','المُضاف','المسحوب','المُتلَف'],sumRows)}<h3>الحركات</h3>${tbl(['التاريخ','المادة','الحركة','العدد','الإكسباير','ملاحظة','بواسطة'],mvRows)}`;
   if(fmt==='xls'){
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['﻿<html dir="rtl"><head><meta charset="UTF-8"></head><body>'+body+'</body></html>'],{type:'application/vnd.ms-excel;charset=utf-8'}));
     a.download='أرشيف_المخزن_'+_stToday()+'.xls'; a.click(); toast('✅ تم تصدير Excel','success',3000); return;
