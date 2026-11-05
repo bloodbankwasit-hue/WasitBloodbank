@@ -29,8 +29,8 @@ function hsShift(kind, anchor, dir){
 }
 // Pure: count rows by a key → [[key,n],...] sorted desc.
 function hsCount(rows, keyFn){
-  const o={}; rows.forEach(r=>{ const k=keyFn(r); if(k==null||k==='') return; o[k]=(o[k]||0)+1; });
-  return Object.entries(o).sort((a,b)=>b[1]-a[1]);
+  const o={}, l={}; rows.forEach(r=>{ const k=keyFn(r); if(k==null||k==='') return; o[k]=(o[k]||0)+1; (l[k]=l[k]||[]).push(r); });
+  return Object.entries(o).sort((a,b)=>b[1]-a[1]).map(([k,n])=>[k,n,l[k]]);
 }
 // Pure: one row per physical draw (a Trima draw or a separated bottle can have several rows
 // sharing donor + bottle number).
@@ -51,6 +51,7 @@ async function _hsFetchAll(build){
   }
   return all;
 }
+const _hsLazy=build=>async()=>_hsFetchAll(build);   // قائمة تُجلب عند الضغط فقط (للأرقام الحالية مثل «بانتظار الآن»)
 async function _hsCount(q){ const{count,error}=await q; if(error) throw error; return count||0; }
 const _hsBD=()=>db.from('blood_donations');
 // Withdrawn / medically-rejected donations are soft-deleted rows, which the table's read policy hides —
@@ -68,10 +69,10 @@ const HS_BLOCKS=[
  {perm:'reception', icon:'➕', title:'الاستقبال', load: async (r)=>{
    const rows=await _hsFetchAll(()=>_hsBD().select('id,donation_type,blood_type,bottle_type,collection_form_id,parent_donation_id,donors(full_name,gender)')
      .gte('donation_date',r.from).lte('donation_date',r.to).eq('component_type','دم كامل').eq('is_deleted',false));
-   const rej=await _hsFetchAll(()=>db.from('rejected_donors').select('id,rejection_type').gte('rejection_date',r.from).lte('rejection_date',r.to));
+   const rej=await _hsFetchAll(()=>db.from('rejected_donors').select('id,full_name,rejection_reason,rejection_type,rejection_date').gte('rejection_date',r.from).lte('rejection_date',r.to));
    const rare=rows.filter(x=>x.blood_type==='O-'||x.blood_type==='AB-');
-   return {tiles:[['المتبرعون',rows.length],['المرفوضون',rej.length,'warn'],['فصائل نادرة',rare.length,'rare']],
-     groups:[['نوع التبرع',hsCount(rows,x=>x.donation_type)],['الجنس',hsCount(rows,x=>x.donors?.gender)],['نوع الرفض',hsCount(rej,x=>x.rejection_type)],
+   return {tiles:[['المتبرعون',rows.length,undefined,rows],['المرفوضون',rej.length,'warn',Object.assign(rej.slice(),{rej:true})],['فصائل نادرة',rare.length,'rare',rare]],
+     groups:[['نوع التبرع',hsCount(rows,x=>x.donation_type)],['الجنس',hsCount(rows,x=>x.donors?.gender)],['نوع الرفض',hsCount(rej,x=>x.rejection_type).map(p=>[p[0],p[1],Object.assign(p[2],{rej:true})])],
              ['الفصائل النادرة',hsCount(rare,x=>x.blood_type)]],
      src:rows};
  }},
@@ -81,7 +82,7 @@ const HS_BLOCKS=[
    const dmg=await _hsFetchAll(()=>_hsBD().select('id,bottle_type,damage_reason').gte('draw_date',r.from).lte('draw_date',r.to).eq('status','damaged').neq('bottle_type','تريما'));
    const med=await _hsExitCount(r,'medical_reject',false), wdr=await _hsExitCount(r,'withdrawn',false);
    const wait=await _hsCount(_hsBD().select('id',{count:'exact',head:true}).eq('status','pending_draw').eq('is_deleted',false).neq('bottle_type','تريما'));
-   return {tiles:[['قناني مسحوبة',ok.length],['تالفة',dmg.length,'bad'],['انسحبوا (لم يتم السحب)',wdr,'warn'],['رفض طبي',med,'warn'],['بانتظار الآن',wait]],
+   return {tiles:[['قناني مسحوبة',ok.length,undefined,ok],['تالفة',dmg.length,'bad',dmg],['انسحبوا (لم يتم السحب)',wdr,'warn'],['رفض طبي',med,'warn'],['بانتظار الآن',wait,undefined,_hsLazy(()=>_hsBD().select('id').eq('status','pending_draw').eq('is_deleted',false).neq('bottle_type','تريما'))]],
      groups:[['حسب نوع القنينة',hsCount(ok,x=>x.bottle_type)],['سبب التلف',hsCount(dmg,x=>x.damage_reason)],['التالفة حسب النوع',hsCount(dmg,x=>x.bottle_type)]], src:ok};
  }},
  {perm:'trima', icon:'🩸', title:'التريما', load: async (r)=>{
@@ -90,41 +91,42 @@ const HS_BLOCKS=[
    const dmg=await _hsFetchAll(()=>_hsBD().select('id,damage_reason').gte('draw_date',r.from).lte('draw_date',r.to).eq('status','damaged').eq('bottle_type','تريما'));
    const med=await _hsExitCount(r,'medical_reject',true), wdr=await _hsExitCount(r,'withdrawn',true);
    const wait=await _hsCount(_hsBD().select('id',{count:'exact',head:true}).eq('status','pending_draw').eq('is_deleted',false).eq('bottle_type','تريما'));
-   return {tiles:[['سحوبات تريما',hsDistinctDraws(comps).length],['تالفة',dmg.length,'bad'],['انسحبوا (لم يتم السحب)',wdr,'warn'],['رفض طبي',med,'warn'],['بانتظار الآن',wait]],
+   return {tiles:[['سحوبات تريما',hsDistinctDraws(comps).length,undefined,hsDistinctDraws(comps)],['تالفة',dmg.length,'bad',dmg],['انسحبوا (لم يتم السحب)',wdr,'warn'],['رفض طبي',med,'warn'],['بانتظار الآن',wait,undefined,_hsLazy(()=>_hsBD().select('id').eq('status','pending_draw').eq('is_deleted',false).eq('bottle_type','تريما'))]],
      groups:[['الناتج',hsCount(comps,x=>x.component_type)],['سبب التلف',hsCount(dmg,x=>x.damage_reason)]], src:hsDistinctDraws(comps)};
  }},
  {perm:'virology', icon:'🧪', title:'وحدة الفيروسات', load: async (r)=>{
    const rows=hsDistinctDraws(await _hsFetchAll(()=>_hsBD().select('id,donor_id,bottle_number,draw_date,serology_result,serology_type,collection_form_id,parent_donation_id')
      .gte('serology_date',r.from).lte('serology_date',r.to).not('serology_result','is',null).eq('is_deleted',false)));
-   const wait=hsDistinctDraws(await _hsFetchAll(()=>_hsBD().select('id,donor_id,bottle_number,draw_date').eq('status','pending_lab').is('serology_result',null).eq('is_deleted',false))).length;
+   const waitRows=hsDistinctDraws(await _hsFetchAll(()=>_hsBD().select('id,donor_id,bottle_number,draw_date').eq('status','pending_lab').is('serology_result',null).eq('is_deleted',false))), wait=waitRows.length;
+   let reag=[]; try{ const rg=await db.from('lab_reagents').select('name,qty,low_threshold').eq('is_active',true).order('name'); if(!rg.error) reag=rg.data||[]; }catch(e){}
    const pos=rows.filter(x=>x.serology_result==='Positive');
-   return {tiles:[['تم فحصها',rows.length],['سالبة (غير مصابة)',rows.length-pos.length],['موجبة (مصابة)',pos.length,'bad'],['نسبة الإصابة %',rows.length?(Math.round(pos.length*1000/rows.length)/10):0,'warn'],['بانتظار الآن',wait]],
-     groups:[['نوع الإصابة',hsCount(pos,x=>x.serology_type)]], src:rows};
+   return {tiles:[['تم فحصها',rows.length,undefined,rows],['سالبة (غير مصابة)',rows.length-pos.length,undefined,rows.filter(x=>x.serology_result!=='Positive')],['موجبة (مصابة)',pos.length,'bad',pos],['نسبة الإصابة %',rows.length?(Math.round(pos.length*1000/rows.length)/10):0,'warn'],['بانتظار الآن',wait,undefined,waitRows]],
+     groups:[['نوع الإصابة',hsCount(pos,x=>x.serology_type)],['مواد الفحص المتبقية (فحوصات)',reag.map(x=>[x.name+(x.qty<=0?' ⛔':x.qty<=x.low_threshold?' ⚠️':''),x.qty])]], src:rows};
  }},
  {perm:'classification', icon:'🅰️', title:'وحدة التصنيف', load: async (r)=>{
    const rows=hsDistinctDraws(await _hsFetchAll(()=>_hsBD().select('id,donor_id,bottle_number,draw_date,blood_type,collection_form_id,parent_donation_id')
      .gte('blood_type_date',r.from).lte('blood_type_date',r.to).not('blood_type','is',null).eq('is_deleted',false)));
-   const wait=hsDistinctDraws(await _hsFetchAll(()=>_hsBD().select('id,donor_id,bottle_number,draw_date').eq('status','pending_lab').is('blood_type',null).eq('is_deleted',false))).length;
-   return {tiles:[['تم تصنيفها',rows.length],['بانتظار الآن',wait]], groups:[['حسب الفصيلة',hsCount(rows,x=>x.blood_type)]], src:rows};
+   const waitRows=hsDistinctDraws(await _hsFetchAll(()=>_hsBD().select('id,donor_id,bottle_number,draw_date').eq('status','pending_lab').is('blood_type',null).eq('is_deleted',false))), wait=waitRows.length;
+   return {tiles:[['تم تصنيفها',rows.length,undefined,rows],['بانتظار الآن',wait,undefined,waitRows]], groups:[['حسب الفصيلة',hsCount(rows,x=>x.blood_type)]], src:rows};
  }},
  {perm:'separation', icon:'🧬', title:'الفصل', load: async (r)=>{
    const t0=new Date(_hsParse(r.from)).toISOString(), t1=new Date(_hsParse(hsShift('day',r.to,1))).toISOString();
    const rows=await _hsFetchAll(()=>_hsBD().select('id,component_type,collection_form_id,parent_donation_id').not('parent_donation_id','is',null).neq('bottle_type','تريما')
      .gte('created_at',t0).lt('created_at',t1).eq('is_deleted',false));
    const wait=await _hsCount(_hsBD().select('id',{count:'exact',head:true}).eq('status','pending_release').eq('is_deleted',false));
-   return {tiles:[['مكوّنات ناتجة',rows.length],['بالمخزن المؤقت الآن',wait]], groups:[['حسب المكوّن',hsCount(rows,x=>x.component_type)]], src:rows};
+   return {tiles:[['مكوّنات ناتجة',rows.length,undefined,rows],['بالمخزن المؤقت الآن',wait,undefined,_hsLazy(()=>_hsBD().select('id').eq('status','pending_release').eq('is_deleted',false))]], groups:[['حسب المكوّن',hsCount(rows,x=>x.component_type)]], src:rows};
  }},
  {perm:'supply', icon:'📦', title:'التجهيز', load: async (r)=>{
    const rows=await _hsFetchAll(()=>_hsBD().select('id,component_type,hospital_name,collection_form_id,parent_donation_id').gte('dispatch_date',r.from).lte('dispatch_date',r.to));
    const stock=await _hsCount(_hsBD().select('id',{count:'exact',head:true}).eq('status','in_stock').eq('is_deleted',false));
-   return {tiles:[['وحدات مصروفة',rows.length],['رصيد الخزين الآن',stock]],
+   return {tiles:[['وحدات مصروفة',rows.length,undefined,rows],['رصيد الخزين الآن',stock,undefined,_hsLazy(()=>_hsBD().select('id').eq('status','in_stock').eq('is_deleted',false))]],
      groups:[['حسب المكوّن',hsCount(rows,x=>x.component_type||'دم كامل')],['حسب الجهة',hsCount(rows,x=>x.hospital_name).slice(0,8)]], src:rows};
  }},
  {perm:'damaged_store', icon:'🗑️', title:'مخزن القناني التالفة', load: async (r)=>{
    const got=await _hsFetchAll(()=>_hsBD().select('id,damage_reason,collection_form_id,parent_donation_id').gte('damaged_date',r.from).lte('damaged_date',r.to).eq('status','damaged'));
    const reps=await _hsFetchAll(()=>db.from('destruction_reports').select('id,bottle_count').gte('report_date',r.from).lte('report_date',r.to));
    const wait=await _hsCount(_hsBD().select('id',{count:'exact',head:true}).eq('status','damaged').eq('is_deleted',false).is('destruction_report_id',null));
-   return {tiles:[['وصلت تالفة',got.length,'bad'],['أُتلفت',reps.reduce((s,x)=>s+(x.bottle_count||0),0)],['بانتظار الإتلاف الآن',wait,'warn']],
+   return {tiles:[['وصلت تالفة',got.length,'bad',got],['أُتلفت',reps.reduce((s,x)=>s+(x.bottle_count||0),0)],['بانتظار الإتلاف الآن',wait,'warn',_hsLazy(()=>_hsBD().select('id').eq('status','damaged').eq('is_deleted',false).is('destruction_report_id',null))]],
      groups:[['سبب التلف',hsCount(got,x=>x.damage_reason)]], src:got};
  }}
 ];
@@ -137,8 +139,9 @@ function hsVisibleBlocks(){
 function _hsTone(t){ return t==='bad'?'#B91C1C':t==='warn'?'#B45309':t==='rare'?'#7C3AED':'#BE123C'; }
 function _hsBlockHtml(b,res,err){
   if(err) return `<div class="hs-card"><div class="hs-h">${b.icon} ${b.title}</div><div style="color:#B91C1C;font-size:14px">تعذّر التحميل: ${esc(err)}</div></div>`;
-  const tiles=res.tiles.map(([l,v,t])=>`<div class="hs-tile"><div class="hs-v" style="color:${_hsTone(t)}">${fnum(v)}</div><div class="hs-l">${l}</div></div>`).join('');
-  const groups=res.groups.filter(g=>g[1].length).map(([t,p])=>`<div class="hs-g"><span class="hs-gt">${t}:</span> ${p.map(([k,v])=>`<span class="pill py" style="margin:2px">${esc(k)}: ${fnum(v)}</span>`).join('')}</div>`).join('');
+  const lk=(list,title)=>{ const has=typeof list==='function'||(Array.isArray(list)&&list.length); if(!has) return ''; (window._hsLists=window._hsLists||[]).push({list,title}); return ` onclick="hsOpenList(${window._hsLists.length-1})" style="cursor:pointer" title="اضغط لعرض القائمة"`; };
+  const tiles=res.tiles.map(([l,v,t,list])=>{ const a=lk(list,b.title+' — '+l); return `<div class="hs-tile"${a}><div class="hs-v" style="color:${_hsTone(t)}">${fnum(v)}</div><div class="hs-l">${l}${a?' ›':''}</div></div>`; }).join('');
+  const groups=res.groups.filter(g=>g[1].length).map(([t,p])=>`<div class="hs-g"><span class="hs-gt">${t}:</span> ${p.map(([k,v,list])=>{ const a=lk(list,b.title+' — '+t+': '+k); return `<span class="pill py" style="margin:2px${a?';cursor:pointer;text-decoration:underline dotted':''}"${a?a.replace(' style="cursor:pointer"',''):''}>${esc(k)}: ${fnum(v)}</span>`; }).join('')}</div>`).join('');
   let names='';
   if(res.src&&res.src.length){ const i=window._hsSrc.push(res.src)-1; names=`<button class="btn hs-namesbtn" onclick="hsOpenForms(${i},'${b.title}')"><i class="ti ti-clipboard-list"></i> الاستمارات والأسماء (${fnum(res.src.length)})</button>`; }
   return `<div class="hs-card"><div class="hs-h">${b.icon} ${b.title}</div><div class="hs-tiles">${tiles}</div>${groups}${names}</div>`;
@@ -149,7 +152,7 @@ function hsMove(dir){ _hsAnchor=hsShift(_hsKind,_hsAnchor,dir); loadRoleHome(); 
 
 async function loadRoleHome(){
   const box=G('roleHome'); if(!box) return;
-  window._hsSrc=[];
+  window._hsSrc=[]; window._hsLists=[];
   const blocks=hsVisibleBlocks();
   if(!blocks.length){ box.innerHTML=''; return; }
   if(!_hsAnchor) _hsAnchor=_hsYmd(new Date());
@@ -238,4 +241,34 @@ async function hsOpenForm(formId,no,grp){
 }
 async function hsOpenName(id){
   try{ await loadSectionScript('donors'); await editDonorRow(id); }catch(e){ toast('تعذر فتح الاسم: '+(e.message||e),'error'); }
+}
+
+// ── الأرقام حيّة: الضغط على أي رقم أو بند يفتح قائمة القناني (أو الأسماء) التي تكوّنه ──────────────
+async function hsOpenList(i){
+  const it=(window._hsLists||[])[i]; if(!it) return;
+  let o=G('hsListOv'); if(o) o.remove();
+  o=document.createElement('div'); o.className='overlay on'; o.id='hsListOv'; o.style.zIndex=9500;
+  o.innerHTML='<div class="modal" style="width:min(760px,97vw);max-height:92vh;display:flex;flex-direction:column"><div class="modal-title">'+esc(it.title)+'</div><div class="modal-body" id="hsListB" style="overflow:auto;flex:1;min-width:0"><div class="empty"><p>جاري التحميل...</p></div></div><div class="modal-foot"><button class="btn" onclick="G(\'hsListOv\').remove()"><i class="ti ti-x"></i> إغلاق</button></div></div>';
+  document.body.appendChild(o);
+  try{
+    let list=typeof it.list==='function' ? await it.list() : it.list;
+    const B=G('hsListB'); if(!B) return;
+    if(list.rej){ B.innerHTML=_hsListRej(list); return; }
+    if(!list.length){ B.innerHTML='<div class="empty"><p>لا توجد سجلات</p></div>'; return; }
+    const ids=[...new Set(list.map(r=>r.id))], out=[];
+    for(let k=0;k<ids.length;k+=150){
+      const{data,error}=await _hsBD().select('id,bottle_number,bottle_type,blood_type,component_type,status,draw_date,expiry_date,serology_result,serology_type,damage_reason,hospital_name,dispatch_date,donors(full_name)').in('id',ids.slice(k,k+150));
+      if(error) throw error; out.push(...(data||[]));
+    }
+    out.sort((a,b)=>(Number(a.bottle_number)||0)-(Number(b.bottle_number)||0));
+    const st=typeof AUDIT_STATUS_LABELS!=='undefined'?AUDIT_STATUS_LABELS:{};
+    const note=r=>[r.serology_result==='Positive'?('🦠 '+(r.serology_type||'')):'', r.damage_reason||'', r.hospital_name?('→ '+r.hospital_name):'', st[r.status]||r.status||''].filter(Boolean).join(' • ');
+    B.innerHTML='<div style="color:#6B7280;margin-bottom:8px">العدد: <b>'+fnum(out.length)+'</b></div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:15px"><thead><tr style="background:#F3F4F6"><th style="padding:6px">رقم القنينة</th><th>الاسم</th><th>النوع</th><th>الفصيلة</th><th>ملاحظة</th></tr></thead><tbody>'
+      +out.map(r=>'<tr style="border-top:1px solid #F1F5F9"><td style="padding:6px;font-weight:800;color:#BE123C;text-align:center">'+esc(r.bottle_number||'—')+'</td><td>'+esc(r.donors?.full_name||'—')+'</td><td style="text-align:center">'+esc(r.bottle_type||'')+(r.component_type&&r.component_type!=='دم كامل'?' · '+esc(r.component_type):'')+'</td><td style="text-align:center">'+esc(r.blood_type||'—')+'</td><td style="font-size:13.5px;color:#475569">'+esc(note(r))+'</td></tr>').join('')
+      +'</tbody></table></div>';
+  }catch(e){ const B=G('hsListB'); if(B) B.innerHTML='<div style="color:#B91C1C">تعذّر التحميل: '+esc(e.message||String(e))+'</div>'; }
+}
+function _hsListRej(list){
+  return '<div style="color:#6B7280;margin-bottom:8px">العدد: <b>'+fnum(list.length)+'</b></div><table style="width:100%;border-collapse:collapse;font-size:15px"><thead><tr style="background:#F3F4F6"><th style="padding:6px">الاسم</th><th>السبب</th><th>النوع</th><th>التاريخ</th></tr></thead><tbody>'
+    +list.map(r=>'<tr style="border-top:1px solid #F1F5F9"><td style="padding:6px;font-weight:700">'+esc(r.full_name||'—')+'</td><td>'+esc(r.rejection_reason||'')+'</td><td style="text-align:center">'+esc(r.rejection_type||'')+'</td><td style="text-align:center">'+esc(typeof fd==='function'?fd(r.rejection_date):r.rejection_date)+'</td></tr>').join('')+'</tbody></table>';
 }

@@ -57,6 +57,11 @@ async function applyLabUpdate(id, fieldUpdates){
   }
   if(error) throw error;
 
+  // أول نتيجة فحص لهذه القنينة: تُخصم فحص واحد من كل مادة «تلقائية» (HIV, HBcore ...). لا يوقف الفحص إن فشل الخصم.
+  if('serology_result' in fieldUpdates && !cur?.serology_result){
+    try{ const rr=await db.rpc('lab_reagent_use',{p_n:1}); if(!rr.error && typeof refreshExpiryNotifications==='function') refreshExpiryNotifications(); }catch(e){ console.log('reagent use:',e); }
+  }
+
   // One draw event can produce more than one pending-lab row sharing the same bottle number
   // (e.g. trima's two outputs, or a component separated before testing) — this unit's part of
   // the result applies to every sibling still awaiting it, linked by donor + bottle number.

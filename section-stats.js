@@ -59,7 +59,7 @@ async function ssRender(){
   G('ss-nav').innerHTML = _ssKind==='custom'
     ? `<div class="fgrp" style="margin:0"><label>من</label><input type="date" id="ss-from" value="${_ssFrom}" onchange="ssCustom()"></div><div class="fgrp" style="margin:0"><label>إلى</label><input type="date" id="ss-to" value="${_ssTo}" onchange="ssCustom()"></div>`
     : `<button class="btn" onclick="ssMove(-1)">›</button><b style="min-width:170px;text-align:center">${r.from===r.to?fd(r.from):fd(r.from)+' ← '+fd(r.to)}</b><button class="btn" onclick="ssMove(1)">‹</button>`;
-  const b=blocks.find(x=>x.perm===_ssKey); _ssBlock=b; _ssRes=null;
+  window._hsLists=[]; const b=blocks.find(x=>x.perm===_ssKey); _ssBlock=b; _ssRes=null;
   const body=G('ss-body');
   if(_ssKind==='custom' && r.open){ body.innerHTML='<div class="empty"><i class="ti ti-calendar"></i><p>اختر تاريخ البداية والنهاية</p></div>'; return; }
   body.innerHTML='<div class="empty"><i class="ti ti-loader"></i><p>جاري التحميل...</p></div>';
