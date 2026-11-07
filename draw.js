@@ -69,14 +69,22 @@ async function confirmBulkDraw(){
   load(true);
   try{
     let okN=0; const bad=[];
-    for(const id of ids){
-      const{data:row,error:re}=await db.from('blood_donations').select('bottle_type,bottle_number').eq('id',id).single();
-      if(re){ bad.push(id); continue; }
-      const days=WHOLE_BLOOD_DAYS[row?.bottle_type] ?? 45;
+    // طلب واحد لجلب كل القناني، ثم التحديثات 6 بالتوازي (بدل 2 طلب لكل اسم بالتسلسل)
+    const rows={};
+    for(let k=0;k<ids.length;k+=100){
+      const{data:rs,error:re}=await db.from('blood_donations').select('id,bottle_type,bottle_number').in('id',ids.slice(k,k+100));
+      if(re) throw re;
+      (rs||[]).forEach(r=>{ rows[r.id]=r; });
+    }
+    const one=async id=>{
+      const row=rows[id];
+      if(!row){ bad.push(id); return; }
+      const days=WHOLE_BLOOD_DAYS[row.bottle_type] ?? 45;
       const e=new Date(draw); e.setDate(e.getDate()+days);
       const{error:ue}=await db.from('blood_donations').update({draw_date:draw,expiry_date:e.toISOString().split('T')[0],status:'pending_lab'}).eq('id',id).eq('status','pending_draw');
-      if(ue) bad.push(row?.bottle_number||id); else okN++;
-    }
+      if(ue) bad.push(row.bottle_number||id); else okN++;
+    };
+    for(let k=0;k<ids.length;k+=6) await Promise.all(ids.slice(k,k+6).map(one));
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:ids[0],new_values:{status:'pending_lab',bulk_count:okN}});
     if(bad.length) toast('⛔ لم يُسحب '+bad.length+' من '+ids.length+' ('+bad.slice(0,6).join('، ')+') — راجعها وأعد المحاولة. تم تأكيد '+okN+' فقط','error',10000);
     else toast('✅ تم تأكيد السحب لـ'+okN+' متبرع','success',4000);
