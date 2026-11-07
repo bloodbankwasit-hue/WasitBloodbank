@@ -14,12 +14,16 @@ async function loadDash(){
     // every count here (today/month/year/all-time) counts one donation multiple times. The
     // whole-blood row itself (component_type stays 'دم كامل' even after separation — only its
     // STATUS changes to 'separated') is the one row that represents the actual donation event.
-    const [r0,r1,r2,r3,r4]=await Promise.all([
+    const _hs0=!((UPROF?.role==='admin')||hasPermission('supply')||hasPermission('pending_release'));
+    const [r0,r1,r2,r3,r4,sg,ir]=await Promise.all([
       db.from('blood_donations').select('*',{count:'exact',head:true}).eq('donation_date',today).eq('component_type','دم كامل').eq('is_deleted',false),
       db.from('blood_donations').select('*',{count:'exact',head:true}).gte('donation_date',ms).eq('component_type','دم كامل').eq('is_deleted',false),
       db.from('blood_donations').select('*',{count:'exact',head:true}).gte('donation_date',ms).eq('donation_type','طوعي').eq('component_type','دم كامل').eq('is_deleted',false),
       db.from('blood_donations').select('*',{count:'exact',head:true}).gte('donation_date',ms).eq('donation_type','تعويضي').eq('component_type','دم كامل').eq('is_deleted',false),
-      db.from('blood_donations').select('*',{count:'exact',head:true}).eq('component_type','دم كامل').eq('is_deleted',false)
+      db.from('blood_donations').select('*',{count:'exact',head:true}).eq('component_type','دم كامل').eq('is_deleted',false),
+      // الرصيد بطلب واحد مجمَّع (بدل جلب كل القناني صفحةً صفحة) + عدّاد المصابين بنفس الدفعة
+      _hs0 ? Promise.resolve(null) : ((typeof supplyGroups==='function') ? supplyGroups().catch(()=>null) : Promise.resolve(null)),
+      db.from('blood_donations').select('*',{count:'exact',head:true}).eq('serology_result','Positive').eq('is_deleted',false)
     ]);
     ['st0','st1','st2','st3','st4'].forEach((id,i)=>{
       const vals=[r0.count,r1.count,r2.count,r3.count,r4.count];
@@ -41,7 +45,7 @@ async function loadDash(){
     if(_sh) _sh.style.display=hideStock?'none':'';
     if(_bg) _bg.style.display=hideStock?'none':'';
     if(!hideStock){
-    let stockRows=[]; try{ stockRows=await bbFetchAll(()=>db.from('blood_donations').select('id,component_type').eq('status','in_stock').eq('is_deleted',false)); }catch(e){ toast('تعذر تحميل الرصيد: '+e.message,'error'); }
+    let stockRows=[]; if(sg&&sg.groups){ sg.groups.forEach(g=>{ for(let i=0;i<(+g.n||0);i++) stockRows.push({component_type:g.c}); }); } else try{ stockRows=await bbFetchAll(()=>db.from('blood_donations').select('id,component_type').eq('status','in_stock').eq('is_deleted',false)); }catch(e){ toast('تعذر تحميل الرصيد: '+e.message,'error'); }
     const compCnt={'دم كامل':0,'دم مضغوط':0,'دم مفلتر':0,'بلازما':0,'صفائح دموية':0,'بروتين بارد':0};
     (stockRows||[]).forEach(r=>{ const ct=r.component_type||'دم كامل'; compCnt[ct]=(compCnt[ct]||0)+1; });
     const compIcons={'دم كامل':BAG,'دم مضغوط':BAG,'دم مفلتر':BAG,'بلازما':'💛','صفائح دموية':'🟡','بروتين بارد':'🧊'};
@@ -54,7 +58,7 @@ async function loadDash(){
     }
 
     // Infected badge
-    const {count:ic}=await db.from('blood_donations').select('*',{count:'exact',head:true}).eq('serology_result','Positive').eq('is_deleted',false);
+    const ic=ir.count;
     if(ic>0){G('infBadge').textContent=ic; G('infBadge').style.display='inline-block';}
   }catch(e){
     console.log('loadDash error:',e);
