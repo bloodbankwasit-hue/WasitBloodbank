@@ -69,49 +69,61 @@ async function loadStats(){
   const f=G('stFrom').value, t=G('stTo').value;
   if(!f||!t){toast('يرجى تحديد الفترة الزمنية','warning'); return;}
   load(true);
-  let vis=null, data, outData;
-  try{
-    // الثلاثة بالتوازي، وكلها مرقّمة بصفحات (كانت data/outData بحد 1000 صف افتراضي)
-    const [v,d,o]=await Promise.all([
-      computeVisitors(f,t).catch(e=>{ console.log('visitors count failed:', e); return null; }),
-      _stFetchAll(()=>db.from('blood_donations')
-        .select('donation_type,bottle_type,blood_type,serology_result,component_type,status,dispatch_date,donors(gender)')
-        .gte('donation_date',f).lte('donation_date',t).eq('is_deleted',false).order('id')),
-      _stFetchAll(()=>db.from('blood_donations').select('component_type')
-        .eq('status','dispatched').gte('dispatch_date',f).lte('dispatch_date',t).eq('is_deleted',false).order('id'))
-    ]);
-    vis=v; data=d; outData=o;
-  }catch(e){ load(false); toast('تعذّر تحميل الإحصائيات: '+(e.message||e),'error'); return; }
-  load(false);
-  if(!data?.length && !(vis&&vis.total)){toast('لا توجد بيانات في هذه الفترة','warning'); return;}
-  data=data||[];
   const byTyp={}, byBot={}, byBld={}, byGen={ذكر:0,أنثى:0};
   const byCompIn={}, byCompOut={};
   const bts=['مفلتر','رباعي','ريفيوس','ثنائي','أحادي','تريما','حملة تبرع رباعي','حملة تبرع مفلتر','رباعي SAG'];
-  data.forEach(r=>{
-    // Donation-level stats (type, bottle type, blood type, gender) must count each ORIGINAL
-    // draw exactly once — a separated bottle's resulting component rows share the very same
-    // donation_type/bottle_type/blood_type/gender as their parent, and would otherwise inflate
-    // these counts by however many components that one draw was split into.
-    if((r.component_type||'دم كامل')==='دم كامل'){
-      byTyp[r.donation_type]=(byTyp[r.donation_type]||0)+1;
-      byBot[r.bottle_type]=(byBot[r.bottle_type]||0)+1;
-      if(r.blood_type) byBld[r.blood_type]=(byBld[r.blood_type]||0)+1;
-      if(r.donors?.gender) byGen[r.donors.gender]=(byGen[r.donors.gender]||0)+1;
+  let vis=null, totalDonations=0, anyRows=false, R=null;
+  // الطريقة الجديدة: السيرفر يحسب كل الأرقام ويرجع نتيجة صغيرة (طلب واحد، زمنه ثابت مهما كبرت البيانات)
+  if(!window._srMissing){
+    try{
+      const r=await db.rpc('stats_report',{p_from:f,p_to:t});
+      if(r.error) throw r.error;
+      R=r.data;
+    }catch(e){
+      if(/stats_report|PGRST202|42883|could not find/i.test((e.code||'')+' '+(e.message||''))) window._srMissing=true;
+      R=null;   // أي فشل → نرجع للطريقة القديمة (أبطأ لكنها كاملة)
     }
-    // Component-level stock (دخول) legitimately counts EVERY component row produced (each one
-    // really is a distinct unit of stock) — only the original whole-blood row is excluded once
-    // it's been superseded by separation (status='separated'), so it isn't counted twice
-    // alongside the components it turned into.
-    const ct=r.component_type||'دم كامل';
-    if(r.status!=='separated') byCompIn[ct]=(byCompIn[ct]||0)+1;
-  });
-  (outData||[]).forEach(r=>{
-    const ct=r.component_type||'دم كامل';
-    byCompOut[ct]=(byCompOut[ct]||0)+1;
-  });
+  }
+  if(R){
+    const put=(o,arr)=>(arr||[]).forEach(x=>{ if(x.k!==null&&x.k!==undefined&&x.k!=='') o[x.k]=(o[x.k]||0)+(+x.n||0); });
+    put(byTyp,R.byTyp); put(byBot,R.byBot); put(byBld,R.byBld); put(byGen,R.byGen); put(byCompIn,R.byCompIn); put(byCompOut,R.byCompOut);
+    totalDonations=+R.total||0; anyRows=+R.rows>0;
+    const v=R.vis||{}, drawn=+v.drawn||0, damaged=+v.damaged||0, legacyCamp=+v.legacyCamp||0, bank=+v.bank||0, campaigns=drawn+damaged+legacyCamp;
+    vis={bank, persons:+v.persons||0, med:+v.med||0, drawn, damaged, legacyCamp, campaigns, total:bank+campaigns, missingCol:false};
+    load(false);
+  } else {
+    let data, outData;
+    try{
+      // الثلاثة بالتوازي، وكلها مرقّمة بصفحات (كانت data/outData بحد 1000 صف افتراضي)
+      const [v,d,o]=await Promise.all([
+        computeVisitors(f,t).catch(e=>{ console.log('visitors count failed:', e); return null; }),
+        _stFetchAll(()=>db.from('blood_donations')
+          .select('donation_type,bottle_type,blood_type,serology_result,component_type,status,dispatch_date,donors(gender)')
+          .gte('donation_date',f).lte('donation_date',t).eq('is_deleted',false).order('id')),
+        _stFetchAll(()=>db.from('blood_donations').select('component_type')
+          .eq('status','dispatched').gte('dispatch_date',f).lte('dispatch_date',t).eq('is_deleted',false).order('id'))
+      ]);
+      vis=v; data=d; outData=o;
+    }catch(e){ load(false); toast('تعذّر تحميل الإحصائيات: '+(e.message||e),'error'); return; }
+    load(false);
+    data=data||[]; anyRows=data.length>0;
+    data.forEach(r=>{
+      // Donation-level stats count each ORIGINAL draw once (components share the parent's type/blood/gender).
+      if((r.component_type||'دم كامل')==='دم كامل'){
+        byTyp[r.donation_type]=(byTyp[r.donation_type]||0)+1;
+        byBot[r.bottle_type]=(byBot[r.bottle_type]||0)+1;
+        if(r.blood_type) byBld[r.blood_type]=(byBld[r.blood_type]||0)+1;
+        if(r.donors?.gender) byGen[r.donors.gender]=(byGen[r.donors.gender]||0)+1;
+      }
+      // Component-level stock (دخول) counts every component row; only a superseded whole-blood row (separated) is excluded.
+      const ct=r.component_type||'دم كامل';
+      if(r.status!=='separated') byCompIn[ct]=(byCompIn[ct]||0)+1;
+    });
+    (outData||[]).forEach(r=>{ const ct=r.component_type||'دم كامل'; byCompOut[ct]=(byCompOut[ct]||0)+1; });
+    totalDonations = data.filter(r=>(r.component_type||'دم كامل')==='دم كامل').length;
+  }
+  if(!anyRows && !(vis&&vis.total)){toast('لا توجد بيانات في هذه الفترة','warning'); return;}
   const allComps=[...new Set([...Object.keys(byCompIn),...Object.keys(byCompOut)])];
-  const totalDonations = data.filter(r=>(r.component_type||'دم كامل')==='دم كامل').length;
   window._STATS_BREAKDOWN={f,t,total:totalDonations,byTyp,byGen,byBot,bts,byBld,byCompIn,byCompOut,allComps,vis};
   G('stRpt').style.display='block';
   G('stRpt').innerHTML=`<div class="rpt">
