@@ -23,8 +23,7 @@ function perfRender(extra){
   G('pfBody').innerHTML=(extra||'')+'<div style="font-weight:800;margin:6px 0">منذ فتح التطبيق على هذا الجهاز</div>'
    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'+box(s.n,'طلب لقاعدة البيانات','#1D4ED8')+box(s.med+' ms','وسيط زمن الطلب',col(s.med))+box((s.tot/1000).toFixed(1)+' ث','مجموع وقت الانتظار',col(s.tot/Math.max(1,s.n)))+box(L.length+' / '+(lsum/1000).toFixed(1)+' ث','تجمّد الواجهة (مرات / مجموع)',lsum>1500?'#B91C1C':'#166534')+'</div>'
    +'<div style="font-weight:800;margin:12px 0 4px">أكثر ما استهلك وقتاً (حسب الجدول)</div>'
-   +'<table class="tbl" style="width:100%;font-size:14px"><thead><tr><th>الطلب</th><th>مرات</th><th>متوسط</th><th>أبطأ</th><th>المجموع</th></tr></thead><tbody>'
-   +s.rows.slice(0,10).map(r=>'<tr><td style="direction:ltr;text-align:left">'+esc(r.k.slice(0,44))+'</td><td>'+r.n+'</td><td style="color:'+col(r.avg)+';font-weight:800">'+r.avg+'</td><td>'+r.max+'</td><td>'+r.sum+'</td></tr>').join('')+'</tbody></table>'
+   +s.rows.slice(0,10).map(r=>'<div style="border-bottom:1px solid #EEF2F6;padding:6px 0;direction:ltr;text-align:left"><div style="font-weight:800;font-size:14px;word-break:break-all">'+esc(r.k.slice(0,50))+'</div><div style="font-size:13px;color:#475569">× '+r.n+' &nbsp;|&nbsp; avg <b style="color:'+col(r.avg)+'">'+r.avg+'</b> &nbsp;|&nbsp; max '+r.max+' &nbsp;|&nbsp; sum '+r.sum+' ms</div></div>').join('')
    +'<div style="font-size:13px;color:#6B7280;margin-top:8px">الأرقام بالملّي ثانية. استعمل التطبيق (افتح الأقسام التي تبدو بطيئة) ثم اضغط «تحديث» وصوّر الشاشة وأرسلها لي.</div>';
 }
 async function perfTest(){
@@ -40,16 +39,15 @@ async function perfTest(){
     out.bd=await time(()=>db.from('blood_donations').select('id',{count:'exact',head:true}).eq('is_deleted',false));
     out.cdn=await time(()=>fetch('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.js',{cache:'no-store'}));
   }catch(e){}
-  const v=out.ping, verdict=v<80?'ممتاز — الخادم قريب':v<200?'متوسط':'بعيد — هذا وحده يبطّئ كل نافذة';
-  const row=(l,ms,hint)=>'<tr><td>'+l+'</td><td style="font-weight:800;color:'+(ms>600?'#B91C1C':ms>250?'#B45309':'#166534')+'">'+ms+' ms</td><td style="font-size:12px;color:#6B7280">'+hint+'</td></tr>';
-  const html='<div style="border:2px solid #FDE68A;background:#FFFBEB;border-radius:12px;padding:10px;margin-bottom:10px"><div style="font-weight:900">نتيجة الاختبار: زمن الاتصال '+out.ping+' ms (أفضل '+out.pmin+') — '+verdict+'</div>'
-    +'<table class="tbl" style="width:100%;font-size:14px;margin-top:6px"><tbody>'
-    +row('اتصال فارغ بالخادم (5 مرات، الوسيط)',out.ping,'هذا هو التأخير الأدنى لأي طلب')
-    +row('قراءة صف واحد',out.one,'اتصال + استعلام بسيط')
-    +row('عدّ المتبرعين',out.cnt,'يتأثر بالفهارس وحجم الجدول')
-    +row('بحث اسم «محمد»',out.srch,'يبيّن أثر ilike على ' +'المتبرعين')
-    +row('عدّ قناني الدم',out.bd,'جدول القناني')
-    +row('تحميل مكتبة Supabase من CDN',out.cdn,'تُحمَّل عند كل فتح')
-    +'</tbody></table></div>';
+  const v=out.one, verdict=v<120?'ممتاز':v<300?'متوسط':'بطيء — التأخير في قاعدة البيانات نفسها';
+  const row=(l,ms)=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid #F3E8B8;font-size:14px"><span>'+l+'</span><b style="color:'+(ms>600?'#B91C1C':ms>250?'#B45309':'#166534')+';white-space:nowrap">'+ms+' ms</b></div>';
+  const html='<div style="border:2px solid #FDE68A;background:#FFFBEB;border-radius:12px;padding:10px;margin-bottom:10px"><div style="font-weight:900">نتيجة الاختبار: قراءة صف واحد '+out.one+' ms ('+verdict+') — اتصال فارغ '+out.ping+' ms'+'</div>'
+    +row('اتصال فارغ بالخادم (الوسيط)',out.ping,'')
+    +row('قراءة صف واحد من donors',out.one,'')
+    +row('عدّ المتبرعين',out.cnt,'')
+    +row('بحث اسم «محمد»',out.srch,'')
+    +row('عدّ قناني الدم',out.bd,'')
+    +row('تحميل مكتبة Supabase (CDN)',out.cdn,'')
+    +'</div>';
   btn.disabled=false; btn.innerHTML='<i class="ti ti-bolt"></i> اختبار السرعة الآن'; perfRender(html);
 }
