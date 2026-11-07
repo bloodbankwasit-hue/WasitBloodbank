@@ -36,14 +36,15 @@ const RARE_TYPES = ['A-','B-','O-','AB-','A+','AB+'];
 // Reads straight from donors_with_last_donation (a view that computes each donor's most recent
 // donation date server-side — see the SQL that ships with this change), so "آخر تبرع" never
 // requires pulling the donations table to the device either.
-async function _rareFilteredData(forExport){
+let _rareTotal=0;
+async function _rareFilteredData(forExport,offset){
   const q  = (G('rareSearch')?.value||'').trim();
   const bg = G('rareBGFilter')?.value||'';
   const df = G('rareDateFrom')?.value||'';
   const dt = G('rareDateTo')?.value||'';
   if(!q && !bg && !df && !dt) return [];
 
-  let query = db.from('donors_with_last_donation').select('id,full_name,mobile,address,blood_type,last_donation_date');
+  let query = db.from('donors_with_last_donation').select('id,full_name,mobile,address,blood_type,last_donation_date',forExport?undefined:{count:'exact'});
   query = bg ? query.eq('blood_type', bg) : query.in('blood_type', RARE_TYPES);
   if(q){
     const clean = q.replace(/ة/g,'ه');
@@ -68,9 +69,10 @@ async function _rareFilteredData(forExport){
       from+=1000;
     }
   } else {
-    const{data:d,error} = await query.limit(200);
+    const o=offset||0;
+    const{data:d,error,count} = await query.range(o,o+199);
     if(error){ toast('خطأ: '+error.message,'error'); return []; }
-    data=d||[];
+    data=d||[]; _rareTotal=count==null?data.length:count;
   }
 
   // All donors stay in the staff-facing list — each is just tagged with whether they're
@@ -95,14 +97,25 @@ async function _rareFilteredData(forExport){
   });
 }
 
-async function filterRare(){
-  const filtered = await _rareFilteredData();
+let _rareRows=[], _rareTok=0, _rareTimer=null;
+function rareDebounce(){ clearTimeout(_rareTimer); _rareTimer=setTimeout(filterRare,400); }
+async function rareMore(){
+  const b=G('rareMoreBtn'); if(b){ b.disabled=true; b.textContent='جاري التحميل…'; }
+  const more=await _rareFilteredData(false,_rareRows.length);
+  if(more.length) _rareRows=_rareRows.concat(more);
+  filterRare(true);
+}
+async function filterRare(keep){
+  const tok=++_rareTok;
+  let filtered;
+  if(keep===true){ filtered=_rareRows; }
+  else{ filtered=await _rareFilteredData(false,0); if(tok!==_rareTok) return; _rareRows=filtered; }
   const q  = (G('rareSearch')?.value||'').trim();
   const bg = G('rareBGFilter')?.value||'';
   const df = G('rareDateFrom')?.value||'', dt = G('rareDateTo')?.value||'';
 
   const badge=G('rareCountBadge');
-  if(badge) badge.textContent=filtered.length;
+  if(badge) badge.textContent=(keep===true||_rareTotal)?_rareTotal:filtered.length;
 
   // Highlight active card
   const RARE=['A-','B-','O-','AB-','A+','AB+'];
@@ -133,6 +146,7 @@ async function filterRare(){
   </div>
   ${selAllRow('rare-chk','updateRareBulkBar')}`;
 
+  const _chk=new Set([...document.querySelectorAll('.rare-chk:checked')].map(c=>c.value));
   G('rareList').innerHTML = bar + filtered.map(d=>`
     <div class="rare-row">
       <input type="checkbox" class="rare-chk" value="${esc(d.full_name||'')}" data-name="${esc(d.full_name||'—')}" data-mobile="${esc(normIraqiMobile(d.mobile)||'')}" onchange="updateRareBulkBar()" style="width:18px;height:18px;flex-shrink:0;align-self:flex-start;margin-top:4px">
@@ -152,7 +166,9 @@ async function filterRare(){
           <a href="${waLink(d.mobile, WA_TEMPLATES.invite)}" target="_blank" style="background:#0369A1;color:#fff;border-radius:8px;padding:6px 10px;text-decoration:none;font-size:14px;font-weight:700">📱 دعوة للتبرع</a>
         </div>`:''}
       </div>
-    </div>`).join('');
+    </div>`).join('')
+    + `<div style="text-align:center;padding:12px;color:#6B7280;font-size:15px">عرض ${filtered.length} من ${_rareTotal}${filtered.length<_rareTotal?`<br><button class="btn" id="rareMoreBtn" style="margin-top:8px" onclick="rareMore()"><i class="ti ti-chevron-down"></i> عرض المزيد (${Math.min(200,_rareTotal-filtered.length)})</button>`:''}</div>`;
+  document.querySelectorAll('.rare-chk').forEach(c=>{ if(_chk.has(c.value)) c.checked=true; });
   updateRareBulkBar();
 }
 

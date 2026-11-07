@@ -40,7 +40,7 @@ window.__perf={reqs:[],long:[],t0:performance.now(),cdn:null};
     const m=((o&&o.method)||(u&&u.method)||'GET').toUpperCase(), t=performance.now();
     const rec=(ok,hit)=>{ const r=window.__perf.reqs; if(hit){ window.__perf.hits++; return; } r.push({u:url,m:m,ms:Math.round(performance.now()-t),at:Math.round(t),ok:ok}); if(r.length>600) r.shift(); };
     const rpcRead=CR.test(url), readable=(m==='GET'||m==='HEAD'||(m==='POST'&&rpcRead));
-    if(!readable){ cache.clear(); return of(u,o).then(x=>{ rec(x.ok); return x; },e=>{ rec(false); throw e; }); }
+    if(!readable){ cache.clear(); window.__perf.w=(window.__perf.w||0)+1; return of(u,o).then(x=>{ rec(x.ok); return x; },e=>{ rec(false); throw e; }); }
     let hk=''; try{ const h=o&&o.headers; if(h){ const g=h instanceof Headers?[...h.entries()]:Object.entries(h); hk=g.filter(x=>/^(prefer|range|accept|content-profile|accept-profile)$/i.test(x[0])).map(x=>x[0].toLowerCase()+'='+x[1]).sort().join('&'); } }catch(e){}
     const key=m+' '+url+' '+hk+' '+(m==='POST'?String(o&&o.body||''):'');
     const cacheable=(m!=='POST'&&CT.test(url))||rpcRead;
@@ -1384,7 +1384,7 @@ tbody tr:hover td{background:#fafafa}
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
               <div style="grid-column:1/-1">
                 <input type="text" id="rareSearch" placeholder="🔍 اسم / هاتف / عنوان..."
-                  oninput="filterRare()" autocomplete="off"
+                  oninput="rareDebounce()" autocomplete="off"
                   style="width:100%;padding:10px 12px;border:1.5px solid #EEF2F6;border-radius:10px;font-family:inherit;font-size:17px;direction:rtl">
               </div>
               <select id="rareBGFilter" onchange="filterRare()"
