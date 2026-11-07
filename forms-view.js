@@ -96,7 +96,12 @@ const FV = (function(){
     const u=units[unit]; if(!u) return;
     const host=G(u.cfg.host); if(!host) return;
     try{
-      if(!u.forms || u.reload!==false){ load(true); try{ await loadData(u); } finally{ load(false); } }
+      if(!u.forms || u.reload!==false){
+        load(true);
+        // السجلات القديمة (بلا استمارة) تُجلب بالتوازي مع الاستمارات بدل التسلسل
+        u._lp = (u.tab!=='archive' && u.cfg.legacy) ? Promise.resolve().then(()=>u.cfg.legacy()).catch(()=>'') : null;
+        try{ await loadData(u); } finally{ load(false); }
+      }
       u.reload=true;
       if(u.view==='detail') return renderDetail(u,host);
       renderList(u,host);
@@ -111,7 +116,10 @@ const FV = (function(){
       <div class="fv-tabs"><button class="btn ${arch?'':'btn-p'}" onclick="FV.tab('${u.cfg.unit}','active')">الاستمارات</button><button class="btn ${arch?'btn-p':''}" onclick="FV.tab('${u.cfg.unit}','archive')">الأرشيف</button></div></div>`;
     let body = list.length ? list.map(f=>card(u,f)).join('') : `<div class="empty"><i class="ti ti-check"></i><p>${arch?'لا توجد استمارات في الأرشيف':'لا توجد استمارات بانتظار هذه الوحدة'}</p></div>`;
     let legacy='';
-    if(!arch && u.cfg.legacy){ try{ legacy = await u.cfg.legacy(); }catch(e){} }
+    if(!arch && u.cfg.legacy){
+      const lp=u._lp; u._lp=null;
+      try{ legacy = await (lp || u.cfg.legacy()); }catch(e){}
+    }
     host.innerHTML = top + `<div id="fv-res-${u.cfg.unit}"></div><div id="fv-list-${u.cfg.unit}">${body}${legacy}</div>`;
     if(u.q && u.q.trim().length>=2) FV.search(u.cfg.unit,u.q,true);
   }
