@@ -24,9 +24,34 @@
 // قياس الأداء: يسجّل زمن كل طلب لقاعدة البيانات (للعرض في الإعدادات ← قياس الأداء). لا يرسل شيئاً لأي جهة.
 window.__perf={reqs:[],long:[],t0:performance.now(),cdn:null};
 (function(){ try{
-  const of=window.fetch; window.fetch=function(u,o){ const url=String(u&&u.url||u), t=performance.now();
-    const rec=ok=>{ if(url.indexOf('supabase.co')<0) return; const r=window.__perf.reqs; r.push({u:url,m:(o&&o.method)||(u&&u.method)||'GET',ms:Math.round(performance.now()-t),at:Math.round(t),ok:ok}); if(r.length>600) r.shift(); };
-    return of.apply(this,arguments).then(x=>{ rec(x.ok); return x; },e=>{ rec(false); throw e; }); };
+  // طبقة طلبات ذكية (تقلل رحلات الشبكة لقاعدة البيانات البعيدة):
+  //  1) الطلبات المتطابقة المتزامنة (قراءة فقط) تُدمج بطلب واحد.
+  //  2) قراءات قليلة الأهمية فقط تُحفظ 20 ثانية (إعدادات، مواد الفحص، حسابات، استمارات). لا كاش لأي بيانات تُستعمل للتحقق قبل الحفظ
+  //     (متبرعون، قناني، تسلسلات، مرفوضون…) حفاظاً على سلامة البيانات.
+  //  3) أي كتابة (إضافة/تعديل/حذف/دالة غير قراءة) تمسح الكاش كله فوراً.
+  const of=window.fetch.bind(window), TTL=20000, inflight=new Map(), cache=new Map();
+  const CT=/\/rest\/v1\/(app_settings|lab_reagents|user_profiles|lab_reagent_log)(\?|$)/;
+  const CR=/\/rest\/v1\/rpc\/(forms_recent|donation_exit_counts|my_waiting_forms|form_members)(\?|$)/;
+  window.__perf.hits=0; window.bbCacheClear=()=>{ cache.clear(); };
+  const mkRes=o=>new Response(o.body,{status:o.status,statusText:o.statusText,headers:o.headers});
+  window.fetch=function(u,o){
+    const url=String(u&&u.url||u);
+    if(url.indexOf('supabase.co')<0||url.indexOf('/auth/')>=0) return of(u,o);
+    const m=((o&&o.method)||(u&&u.method)||'GET').toUpperCase(), t=performance.now();
+    const rec=(ok,hit)=>{ const r=window.__perf.reqs; if(hit){ window.__perf.hits++; return; } r.push({u:url,m:m,ms:Math.round(performance.now()-t),at:Math.round(t),ok:ok}); if(r.length>600) r.shift(); };
+    const rpcRead=CR.test(url), readable=(m==='GET'||m==='HEAD'||(m==='POST'&&rpcRead));
+    if(!readable){ cache.clear(); return of(u,o).then(x=>{ rec(x.ok); return x; },e=>{ rec(false); throw e; }); }
+    let hk=''; try{ const h=o&&o.headers; if(h){ const g=h instanceof Headers?[...h.entries()]:Object.entries(h); hk=g.filter(x=>/^(prefer|range|accept|content-profile|accept-profile)$/i.test(x[0])).map(x=>x[0].toLowerCase()+'='+x[1]).sort().join('&'); } }catch(e){}
+    const key=m+' '+url+' '+hk+' '+(m==='POST'?String(o&&o.body||''):'');
+    const cacheable=(m!=='POST'&&CT.test(url))||rpcRead;
+    if(cacheable){ const c=cache.get(key); if(c&&Date.now()-c.t<TTL){ rec(true,true); return Promise.resolve(mkRes(c.v)); } }
+    let p=inflight.get(key);
+    if(p){ rec(true,true); return p.then(mkRes); }
+    p=of(u,o).then(async x=>{ const body=await x.arrayBuffer(); const h=[...x.headers.entries()]; rec(x.ok);
+      const v={body:body,status:x.status,statusText:x.statusText,headers:h}; if(cacheable&&x.ok) cache.set(key,{t:Date.now(),v:v}); return v; },e=>{ rec(false); throw e; });
+    inflight.set(key,p); const fin=()=>{ inflight.delete(key); }; p.then(fin,fin);
+    return p.then(mkRes);
+  };
   if(window.PerformanceObserver){ new PerformanceObserver(l=>{ l.getEntries().forEach(e=>{ const a=window.__perf.long; a.push(Math.round(e.duration)); if(a.length>300) a.shift(); }); }).observe({entryTypes:['longtask']}); }
 }catch(e){} })();
 </script>
