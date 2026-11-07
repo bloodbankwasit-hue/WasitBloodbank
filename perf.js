@@ -16,6 +16,18 @@ function perfOpen(){
   ov.innerHTML='<div class="modal" style="width:min(620px,96vw);max-height:92vh"><div class="modal-title"><i class="ti ti-gauge"></i> قياس الأداء</div><div class="modal-body" id="pfBody" style="overflow:auto"></div><div class="modal-foot"><button class="btn" onclick="G(\'pfOv\').remove()">إغلاق</button><button class="btn" onclick="perfRender()"><i class="ti ti-refresh"></i> تحديث</button><button class="btn btn-p" id="pfTest" onclick="perfTest()"><i class="ti ti-bolt"></i> اختبار السرعة الآن</button></div></div>';
   document.body.appendChild(ov); perfRender();
 }
+// تفصيل الطلبات: كل «شكل استعلام» مميز بعدد مراته وزمنه (يوضح من أين تأتي طلبات الجدول الواحد)
+function _pfSig(u){
+  try{ const x=new URL(u); const n=_pfName(u); const ps=[...x.searchParams.entries()].map(e=>e[0]+'='+e[1]).sort().join('&');
+    return n+(ps?'?'+decodeURIComponent(ps):''); }catch(e){ return u.slice(0,100); }
+}
+function _pfDetail(){
+  const r=(window.__perf&&window.__perf.reqs)||[], g={};
+  r.forEach(q=>{ const k=_pfSig(q.u); const o=g[k]||(g[k]={k,n:0,sum:0,first:q.at}); o.n++; o.sum+=q.ms; });
+  const rows=Object.values(g).sort((a,b)=>b.sum-a.sum).slice(0,14);
+  return '<details style="margin-top:10px"><summary style="font-weight:800;cursor:pointer">تفصيل الطلبات (للمطوّر)</summary>'
+    +rows.map(o=>'<div style="border-bottom:1px solid #EEF2F6;padding:5px 0;direction:ltr;text-align:left;font-size:12px;word-break:break-all"><b>×'+o.n+' | '+o.sum+' ms</b> | +'+Math.round(o.first/100)/10+'s<br>'+esc(o.k.slice(0,170))+'</div>').join('')+'</details>';
+}
 function perfRender(extra){
   const s=_pfStats(), L=(window.__perf&&window.__perf.long)||[], lsum=L.reduce((a,b)=>a+b,0);
   const col=ms=>ms>600?'#B91C1C':ms>250?'#B45309':'#166534';
@@ -24,6 +36,7 @@ function perfRender(extra){
    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'+box(s.n,'طلب لقاعدة البيانات','#1D4ED8')+box(s.med+' ms','وسيط زمن الطلب',col(s.med))+box((s.tot/1000).toFixed(1)+' ث','مجموع وقت الانتظار',col(s.tot/Math.max(1,s.n)))+box((window.__perf.hits||0),'طلب وُفّر (كاش/دمج)','#166534')+box(L.length+' / '+(lsum/1000).toFixed(1)+' ث','تجمّد الواجهة (مرات / مجموع)',lsum>1500?'#B91C1C':'#166534')+'</div>'
    +'<div style="font-weight:800;margin:12px 0 4px">أكثر ما استهلك وقتاً (حسب الجدول)</div>'
    +s.rows.slice(0,10).map(r=>'<div style="border-bottom:1px solid #EEF2F6;padding:6px 0;direction:ltr;text-align:left"><div style="font-weight:800;font-size:14px;word-break:break-all">'+esc(r.k.slice(0,50))+'</div><div style="font-size:13px;color:#475569">× '+r.n+' &nbsp;|&nbsp; avg <b style="color:'+col(r.avg)+'">'+r.avg+'</b> &nbsp;|&nbsp; max '+r.max+' &nbsp;|&nbsp; sum '+r.sum+' ms</div></div>').join('')
+   +_pfDetail()
    +'<div style="font-size:13px;color:#6B7280;margin-top:8px">الأرقام بالملّي ثانية. استعمل التطبيق (افتح الأقسام التي تبدو بطيئة) ثم اضغط «تحديث» وصوّر الشاشة وأرسلها لي.</div>';
 }
 async function perfTest(){
