@@ -2946,9 +2946,10 @@ async function cacheRejectedDonors(){
     // rejected_donors has no national_id/mobile columns — selecting them here was the same
     // "column does not exist" error that broke the online check, silently emptying this
     // offline cache every single time it ran.
-    const{data}=await db.from('rejected_donors')
-      .select('id,full_name,rejection_reason,rejection_type,rejection_date')
-      .eq('is_deleted',false).limit(5000);
+    // كل المرفوضين بصفحات (كان limit 5000 يقطع بصمت إن زاد العدد عن ذلك فتنقص نسخة الفحص بدون إنترنت)
+    let data=null;
+    try{ data=await bbFetchAll(()=>db.from('rejected_donors').select('id,full_name,rejection_reason,rejection_type,rejection_date').eq('is_deleted',false)); }
+    catch(e){ data=null; }
     if(!data) return;
     const tx  = offlineDB.transaction('rejected_cache','readwrite');
     const st  = tx.objectStore('rejected_cache');
@@ -3269,7 +3270,8 @@ async function appInit(){
   }
   diag("appInit started");
   try{ await initOfflineDB(); diag("IndexedDB OK"); }catch(e){ diag("IndexedDB failed: "+e.message, "#ffd700"); }
-  try{ if(IS_ONLINE) cacheRejectedDonors(); else onOffline(); }catch(e){}
+  // تحديث نسخة المرفوضين للعمل بدون إنترنت: يؤجَّل 8 ثوانٍ حتى لا ينافس طلبات بدء التشغيل (كان ~2 ثانية ويؤخّر الصلاحيات)
+  try{ if(IS_ONLINE) setTimeout(()=>{ try{ cacheRejectedDonors(); }catch(e){} }, 8000); else onOffline(); }catch(e){}
   G('tbDate').textContent = new Date().toLocaleDateString('ar-IQ-u-nu-latn',{weekday:'long'})+'  '+bbDmy(new Date());
   setDefaults();
   diag("Checking Supabase session...");
