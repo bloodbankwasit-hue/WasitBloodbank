@@ -4303,14 +4303,13 @@ async function campReservedCount(from,to){
   return r.count||0;
 }
 async function computeSeqAlerts(){
-  const{data:seqs}=await db.from('bottle_sequences').select('bottle_type,current_number,start_number,end_number,is_active,created_at');
-  const{data:pool}=await db.from('bottle_number_pool').select('bottle_type');
+  const[{data:seqs},{data:pool}]=await Promise.all([db.from('bottle_sequences').select('bottle_type,current_number,start_number,end_number,is_active,created_at'),db.from('bottle_number_pool').select('bottle_type')]);
   const poolCnt={}; (pool||[]).forEach(p=>{ poolCnt[p.bottle_type]=(poolCnt[p.bottle_type]||0)+1; });
   const byType={};
   (seqs||[]).forEach(s=>{ (byType[s.bottle_type]=byType[s.bottle_type]||[]).push(s); });
   const out=[];
   const campLeft={};
-  for(const cs of (seqs||[]).filter(x=>x.bottle_type===SEQ_CAMP && x.is_active)){ campLeft[cs.created_at]=await campReservedCount(cs.start_number,cs.end_number); }
+  await Promise.all((seqs||[]).filter(x=>x.bottle_type===SEQ_CAMP && x.is_active).map(async cs=>{ campLeft[cs.created_at]=await campReservedCount(cs.start_number,cs.end_number); }));
   Object.entries(byType).forEach(([type,list])=>{
     if(seqKey(type)!==type) return;   // الأنواع الخمسة تُحسب على التسلسل المشترك فقط
     // same pick as reception: the newest ACTIVE sequence of that type
@@ -4354,34 +4353,34 @@ async function refreshExpiryNotifications(){
   const wantExpiry   = isAdmin || hasPermission('supply');
   const wantInfected = isAdmin || hasPermission('separation') || hasPermission('classification');
 
-  let expiryList=[], infectedList=[];
-  if(wantExpiry){
+  // الجلب: كل الاستعلامات بالتوازي (رحلة شبكة واحدة بدل 6 متتالية)، ونتيجته تُحفظ 30 ثانية وتُلغى عند أي كتابة.
+  // إخفاء تنبيه بالضغط عليه لا يعيد الجلب: يعيد الرسم فقط من النتيجة المحفوظة.
+  const W=()=>((window.__perf&&window.__perf.w)||0);
+  const need=JSON.stringify([wantExpiry,wantInfected,isAdmin||hasPermission('virology'),wantSeq,isAdmin||hasPermission('reception')]);
+  let raw=window._notifRaw;
+  if(!(raw && raw.w===W() && raw.need===need && Date.now()-raw.t<30000)){
+    const w0=W();
     const today=new Date(); today.setHours(0,0,0,0);
     const limit=new Date(today); limit.setDate(limit.getDate()+5);
-    const{data}=await db.from('blood_donations')
-      .select('id,expiry_date,blood_type,component_type')
-      .eq('status','in_stock').eq('is_deleted',false)
-      .lte('expiry_date', limit.toISOString().split('T')[0]);
-    expiryList=data||[];
+    const [ex,inf,rg,sq,wf]=await Promise.all([
+      wantExpiry ? db.from('blood_donations').select('id,expiry_date,blood_type,component_type').eq('status','in_stock').eq('is_deleted',false).lte('expiry_date', limit.toISOString().split('T')[0]).then(r=>r.data||[],()=>[]) : [],
+      wantInfected ? db.from('blood_donations').select('id,bottle_number,blood_type,serology_type,bottle_note').eq('status','rejected_positive').eq('is_deleted',false).then(r=>r.data||[],()=>[]) : [],
+      (isAdmin||hasPermission('virology')) ? db.from('lab_reagents').select('id,name,qty,low_threshold').eq('is_active',true).then(r=>r.error?[]:(r.data||[]),()=>[]) : [],
+      wantSeq ? computeSeqAlerts().catch(e=>{ console.log('seq alerts:', e); return null; }) : [],
+      (isAdmin||hasPermission('reception')) ? db.rpc('my_waiting_forms').then(r=>r.error?[]:(r.data||[]),()=>[]) : []
+    ]);
+    raw={w:w0,need,t:Date.now(),ex,inf,rg,sq,wf}; window._notifRaw=raw;
   }
-  if(wantInfected){
-    const{data}=await db.from('blood_donations')
-      .select('id,bottle_number,blood_type,serology_type,bottle_note')
-      .eq('status','rejected_positive').eq('is_deleted',false);
-    infectedList=data||[];
-  }
-  let reagList=[];
-  if(isAdmin || hasPermission('virology')){
-    try{ const r=await db.from('lab_reagents').select('id,name,qty,low_threshold').eq('is_active',true); if(!r.error) reagList=(r.data||[]).filter(x=>x.qty<=x.low_threshold).sort((a,b)=>a.qty-b.qty); }catch(e){}
-  }
+  let expiryList=raw.ex.slice(), infectedList=raw.inf.slice();
+  let reagList=raw.rg.filter(x=>x.qty<=x.low_threshold).sort((a,b)=>a.qty-b.qty);
   reagList=reagList.filter(r=>!_nDis(_nk('rg|'+r.id+'|'+r.qty)));
   expiryList=_nExpFilter(expiryList);
   infectedList=infectedList.filter(r=>!_nDis(_nk('inf|'+r.id)));
   window._REAGENT_NOTIFS=reagList;
   let seqList=[], seqNew=0;
-  if(wantSeq){
+  if(wantSeq && raw.sq){
     try{
-      seqList=await computeSeqAlerts();
+      seqList=raw.sq.slice();
       const seen=_seqSeenGet(); let changed=false;
       // a type that is back above 50 (new sequence added) forgets its old rung
       Object.keys(seen).forEach(t=>{ if(!seqList.some(a=>a.type===t)){ delete seen[t]; changed=true; } });
@@ -4391,10 +4390,7 @@ async function refreshExpiryNotifications(){
     }catch(e){ console.log('seq alerts:', e); }
   }
   // collection forms this account moved to "waiting for print"
-  let waitForms=[];
-  if(isAdmin || hasPermission('reception')){
-    try{ const r=await db.rpc('my_waiting_forms'); if(!r.error) waitForms=r.data||[]; }catch(e){}
-  }
+  const waitForms=raw.wf||[];
   window._WAIT_FORMS=waitForms;
   window._EXPIRY_NOTIFS=expiryList;
   window._INFECTED_NOTIFS=infectedList;
