@@ -49,8 +49,12 @@ function stTab(t){
   return t==='archive' ? stRenderArchive() : stRenderItems();
 }
 async function stLoad(){
-  const it=await db.from('store_items').select('id,name,kind').order('name'); if(it.error) throw it.error;
-  const lt=await bbFetchAll(()=>db.from('store_lots').select('id,item_id,qty_left,expiry_date,received_date,qty_in,note').gt('qty_left',0));
+  // الطلبان مستقلان → معاً (كانا بالتسلسل)
+  const [it,lt]=await Promise.all([
+    db.from('store_items').select('id,name,kind').order('name'),
+    bbFetchAll(()=>db.from('store_lots').select('id,item_id,qty_left,expiry_date,received_date,qty_in,note').gt('qty_left',0))
+  ]);
+  if(it.error) throw it.error;
   _stItems=it.data||[]; _stLots=lt||[];
 }
 function _stSummary(){
