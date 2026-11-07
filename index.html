@@ -4576,20 +4576,39 @@ function bbComp(c){ return c==='بروتين بارد' ? 'Cryo' : c; }
   window.Blob=function(parts,opt){ const ty=(opt&&opt.type)||''; if(/html|excel|csv/i.test(ty)&&Array.isArray(parts)) parts=parts.map(p=>typeof p==='string'?p.replace(RX,'Cryo'):p); return new OB(parts,opt); };
   window.Blob.prototype=OB.prototype;
 })();
+// طبقات التجهيز: كل طبقة تأخذ أرقامها فقط. طلب واحد صغير (دالة supply_open تجمع الأعداد في الخادم) بدل جلب كل القناني.
+// تُحفظ النتيجة 30 ثانية للتنقل بين الطبقة 1 و2 دون أي طلب جديد، وتُلغى فوراً عند أي كتابة.
+let _supplyGroupsCache=null;
+async function supplyGroups(force){
+  const w=(window.__perf&&window.__perf.w)||0, c=_supplyGroupsCache;
+  if(!force && c && c.w===w && Date.now()-c.t<30000) return c.v;
+  let v=null;
+  try{
+    const{data,error}=await db.rpc('supply_open'); if(error) throw error;
+    v={groups:(data.groups||[]).map(x=>({c:x.c||'دم كامل',b:x.b,n:Number(x.n)})),damaged:Number(data.damaged||0),expired:Number(data.expired||0)};
+  }catch(e){   // الدالة غير منفذة بعد → الطريقة القديمة (أبطأ لكنها تعمل)
+    const rows=await bbFetchAll(()=>db.from('blood_donations').select('id,component_type,blood_type,expiry_date').eq('status','in_stock').eq('is_deleted',false));
+    const today=new Date().toISOString().split('T')[0], m={}; let expired=0;
+    rows.forEach(r=>{ const k=(r.component_type||'دم كامل')+'|'+(r.blood_type||''); m[k]=(m[k]||0)+1; if(r.expiry_date&&r.expiry_date<today) expired++; });
+    const{count}=await db.from('blood_donations').select('id',{count:'exact',head:true}).eq('status','damaged').eq('is_deleted',false).is('destruction_report_id',null);
+    v={groups:Object.entries(m).map(([k,n])=>{ const p=k.split('|'); return {c:p[0],b:p[1]||null,n}; }),damaged:count||0,expired};
+  }
+  _supplyGroupsCache={w:(window.__perf&&window.__perf.w)||0,t:Date.now(),v};
+  return v;
+}
 async function loadSupply(){
-  await autoMarkExpiredDamaged();
-  const{count:dmgCount}=await db.from('blood_donations').select('id',{count:'exact',head:true}).eq('status','damaged').eq('is_deleted',false).is('destruction_report_id',null);
   const dmgBtn=G('viewDamagedBtn');
   if(dmgBtn) dmgBtn.style.display = (UPROF?.role==='admin'||hasPermission('damaged_store')) ? '' : 'none';
-  if(dmgBtn) dmgBtn.textContent='🗑️ القناني التالفة ('+(dmgCount||0)+')';
+  let g; try{ g=await supplyGroups(); }catch(e){ toast('تعذر تحميل أعداد الرصيد: '+e.message,'error'); g={groups:[],damaged:0,expired:0}; }
+  if(g.expired>0){ await autoMarkExpiredDamaged(); _supplyGroupsCache=null; try{ g=await supplyGroups(true); }catch(e){} }
+  if(dmgBtn) dmgBtn.textContent='🗑️ القناني التالفة ('+(g.damaged||0)+')';
   await loadSupplyComponentGrid();
-  refreshExpiryNotifications();
 }
 
 // Level 1 — component types with live counts, each clickable
 async function loadSupplyComponentGrid(){
   _supplySelectedComponent=null;
-  let counts; try{ counts=await bbFetchAll(()=>db.from('blood_donations').select('id,component_type').eq('status','in_stock').eq('is_deleted',false)); }catch(e){ toast('تعذر تحميل أعداد الرصيد: '+e.message,'error'); counts=[]; }
+  let counts=[]; try{ const g=await supplyGroups(); g.groups.forEach(x=>{ for(let i=0;i<x.n;i++) counts.push({component_type:x.c}); }); }catch(e){ toast('تعذر تحميل أعداد الرصيد: '+e.message,'error'); counts=[]; }
   const compCnt={'دم كامل':0,'دم مضغوط':0,'دم مفلتر':0,'بلازما':0,'صفائح دموية':0,'بروتين بارد':0};
   (counts||[]).forEach(r=>{ const ct=r.component_type||'دم كامل'; compCnt[ct]=(compCnt[ct]||0)+1; });
   const compIcons={'دم كامل':BAG,'دم مضغوط':BAG,'دم مفلتر':BAG,'بلازما':'💛','صفائح دموية':'🟡','بروتين بارد':'🧊'};
@@ -4606,7 +4625,7 @@ async function loadSupplyComponentGrid(){
 async function loadSupplyByComponent(componentType){
   _supplySelectedComponent=componentType;
   const bts=bbNoSign(componentType) ? PLASMA_ABO : ['A+','A-','B+','B-','O+','O-','AB+','AB-'];
-  let counts; try{ counts=await bbFetchAll(()=>db.from('blood_donations').select('id,blood_type').eq('status','in_stock').eq('is_deleted',false).eq('component_type',componentType)); }catch(e){ toast('تعذر تحميل أعداد الرصيد: '+e.message,'error'); counts=[]; }
+  let counts=[]; try{ const g=await supplyGroups(); g.groups.filter(x=>x.c===componentType).forEach(x=>{ for(let i=0;i<x.n;i++) counts.push({blood_type:x.b}); }); }catch(e){ toast('تعذر تحميل أعداد الرصيد: '+e.message,'error'); counts=[]; }
   const cnt={};
   (counts||[]).forEach(r=>{ const k=bbBt(r.blood_type,componentType); cnt[k]=(cnt[k]||0)+1; });
   G('supplyGrid').innerHTML=`
