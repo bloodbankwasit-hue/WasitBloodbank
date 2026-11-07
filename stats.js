@@ -11,13 +11,18 @@
 //   بالحملات : campaign numbers that were drawn or damaged during the draw ('reserved' = nobody came,
 //              not counted) + old-style registrations whose bottle type starts with "حملة".
 async function _stFetchAll(build){
-  let all=[], from=0; const ps=1000;
+  // صفحات متوازية (4 بالموجة) بدل التسلسل؛ الترتيب محفوظ لأن الاستعلامات مرتّبة بـ id
+  const ps=1000, W=4; let all=[], from=0;
   for(;;){
-    const{data,error}=await build().range(from,from+ps-1);
-    if(error) throw error;
-    all=all.concat(data||[]);
-    if((data||[]).length<ps) break;
-    from+=ps;
+    const pages=await Promise.all(Array.from({length:W},(_,k)=>build().range(from+k*ps,from+(k+1)*ps-1)));
+    let short=false;
+    for(const r of pages){
+      if(r.error) throw r.error;
+      const d=r.data||[]; all=all.concat(d);
+      if(d.length<ps){ short=true; break; }
+    }
+    if(short) break;
+    from+=W*ps;
   }
   return all;
 }
@@ -51,10 +56,10 @@ async function computeVisitors(f,t){
   const v=visitorsFromRows(rows);
   const camps=await _stFetchAll(()=>db.from('campaigns').select('id').gte('campaign_date',f).lte('campaign_date',t).order('id'));
   const ids=camps.map(c=>c.id); let drawn=0, damaged=0;
-  for(let i=0;i<ids.length;i+=50){
-    const part=ids.slice(i,i+50);
-    const sl=await _stFetchAll(()=>db.from('campaign_slots').select('id,status').in('campaign_id',part).in('status',['drawn','damaged']).order('id'));
-    sl.forEach(s=>{ if(s.status==='drawn') drawn++; else damaged++; });
+  const parts=[]; for(let i=0;i<ids.length;i+=50) parts.push(ids.slice(i,i+50));
+  for(let i=0;i<parts.length;i+=3){
+    const res=await Promise.all(parts.slice(i,i+3).map(part=>_stFetchAll(()=>db.from('campaign_slots').select('id,status').in('campaign_id',part).in('status',['drawn','damaged']).order('id'))));
+    res.forEach(sl=>sl.forEach(s=>{ if(s.status==='drawn') drawn++; else damaged++; }));
   }
   const campaigns=drawn+damaged+v.legacyCamp;
   return {bank:v.bank, persons:v.persons, med:v.med, drawn, damaged, legacyCamp:v.legacyCamp, campaigns, total:v.bank+campaigns, missingCol};
@@ -64,14 +69,19 @@ async function loadStats(){
   const f=G('stFrom').value, t=G('stTo').value;
   if(!f||!t){toast('يرجى تحديد الفترة الزمنية','warning'); return;}
   load(true);
-  let vis=null;
-  try{ vis=await computeVisitors(f,t); }catch(e){ console.log('visitors count failed:', e); }
-  let {data}=await db.from('blood_donations')
-    .select('donation_type,bottle_type,blood_type,serology_result,component_type,status,dispatch_date,donors(gender)')
-    .gte('donation_date',f).lte('donation_date',t).eq('is_deleted',false);
-  const {data:outData}=await db.from('blood_donations')
-    .select('component_type')
-    .eq('status','dispatched').gte('dispatch_date',f).lte('dispatch_date',t).eq('is_deleted',false);
+  let vis=null, data, outData;
+  try{
+    // الثلاثة بالتوازي، وكلها مرقّمة بصفحات (كانت data/outData بحد 1000 صف افتراضي)
+    const [v,d,o]=await Promise.all([
+      computeVisitors(f,t).catch(e=>{ console.log('visitors count failed:', e); return null; }),
+      _stFetchAll(()=>db.from('blood_donations')
+        .select('donation_type,bottle_type,blood_type,serology_result,component_type,status,dispatch_date,donors(gender)')
+        .gte('donation_date',f).lte('donation_date',t).eq('is_deleted',false).order('id')),
+      _stFetchAll(()=>db.from('blood_donations').select('component_type')
+        .eq('status','dispatched').gte('dispatch_date',f).lte('dispatch_date',t).eq('is_deleted',false).order('id'))
+    ]);
+    vis=v; data=d; outData=o;
+  }catch(e){ load(false); toast('تعذّر تحميل الإحصائيات: '+(e.message||e),'error'); return; }
   load(false);
   if(!data?.length && !(vis&&vis.total)){toast('لا توجد بيانات في هذه الفترة','warning'); return;}
   data=data||[];
