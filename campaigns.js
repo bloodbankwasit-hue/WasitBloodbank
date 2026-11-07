@@ -119,32 +119,55 @@ function _prShowLevel(n){
 
 // Fetches every row that belongs in this screen (unchanged query logic) and shows level 1 —
 // one tile per category, each with a live count.
+let _prFull=false;   // true = كل الصفوف محمّلة مسبقاً (الطريقة القديمة عند غياب دالة release_open)
+const _PR_SEL='id,bottle_number,bottle_type,blood_type,component_type,status,draw_date,serology_result,serology_type,bottle_note,pool_numbers,donors(full_name)';
+// الطبقة الثانية: قناني فئة واحدة فقط (نفس شروط الاستعلامات الأربعة القديمة لكن مقيّدة بالفئة وتعمل معاً)
+async function _prFetchCat(cat){
+  const nonSep=Object.keys(WHOLE_BLOOD_DAYS).filter(t=>!COMPONENT_RULES[t]);
+  const sel=_PR_SEL;
+  if(cat==='__infected') return await bbFetchAll(()=>db.from('blood_donations').select('id,'+sel).eq('status','rejected_positive').eq('is_deleted',false));
+  const catF=q=> cat==='دم كامل' ? q.or('component_type.eq.دم كامل,component_type.is.null') : q.eq('component_type',cat);
+  const jobs=[
+    bbFetchAll(()=>catF(db.from('blood_donations').select('id,'+sel).eq('status','pending_release').eq('is_deleted',false))),
+    bbFetchAll(()=>catF(db.from('blood_donations').select('id,'+sel).eq('status','pending_lab').in('bottle_type',nonSep).eq('is_deleted',false)))
+  ];
+  if(cat!=='دم كامل') jobs.push(bbFetchAll(()=>catF(db.from('blood_donations').select('id,'+sel).eq('status','pending_lab').neq('component_type','دم كامل').eq('is_deleted',false))));
+  else jobs.push(bbFetchAll(()=>db.from('blood_donations').select('id,'+sel).eq('status','pending_lab').eq('not_separated',true).eq('component_type','دم كامل').eq('is_deleted',false)).catch(()=>[]));
+  const seen=new Set(), out=[];
+  (await Promise.all(jobs)).forEach(a=>(a||[]).forEach(r=>{ if(!seen.has(r.id)){ seen.add(r.id); out.push(r); } }));
+  return out.sort((a,b)=>(a.bottle_number||0)-(b.bottle_number||0));
+}
 async function loadPendingRelease(){
   load(true);
   const nonSeparableTypes=Object.keys(WHOLE_BLOOD_DAYS).filter(t=>!COMPONENT_RULES[t]);
-  const sel='id,bottle_number,bottle_type,blood_type,component_type,status,draw_date,serology_result,serology_type,bottle_note,pool_numbers,donors(full_name)';
-  // (1) fully complete — either outcome, any type/component
-  const d1=await bbFetchAll(()=>db.from('blood_donations').select('id,'+sel)
-    .in('status',['pending_release','rejected_positive']).eq('is_deleted',false));
-  // (2) non-separable whole blood, still mid-lab — visible from the moment of draw
-  const d2=await bbFetchAll(()=>db.from('blood_donations').select('id,'+sel)
-    .eq('status','pending_lab').in('bottle_type',nonSeparableTypes).eq('is_deleted',false));
-  // (3) already-separated components, still mid-lab — visible from the moment of separation
-  // (a separable type's un-separated دم كامل row stays out of here; it's tracked in شاشة الفصل)
-  const d3=await bbFetchAll(()=>db.from('blood_donations').select('id,'+sel)
-    .eq('status','pending_lab').neq('component_type','دم كامل').eq('is_deleted',false));
-  // (4) دم كامل لنوع قابل للفصل اختير له «لم تُفصل» — يكمل مساره كدم طبيعي حتى قبل اكتمال الفحص
-  let d4=[]; try{ d4=await bbFetchAll(()=>db.from('blood_donations').select('id,'+sel)
-    .eq('status','pending_lab').eq('not_separated',true).eq('component_type','دم كامل').eq('is_deleted',false)); }catch(e){ d4=[]; }
+  const counts={}; PR_CATEGORIES.forEach(c=>counts[c]=0); let infectedCount=0, ok=false;
+  // الطبقة الأولى: الأعداد فقط بطلب واحد مجمَّع بالسيرفر (بدون أي قنينة)
+  if(!window._roMissing){
+    try{
+      const r=await db.rpc('release_open',{p_nonsep:nonSeparableTypes});
+      if(r.error) throw r.error;
+      (r.data?.groups||[]).forEach(g=>{ counts[g.c]=(counts[g.c]||0)+(+g.n||0); });
+      infectedCount=+r.data?.infected||0; ok=true; _prFull=false; _prAllRows=[];
+    }catch(e){ if(/release_open|PGRST202|42883|could not find/i.test((e.code||'')+' '+(e.message||''))) window._roMissing=true; }
+  }
+  if(!ok){
+    // احتياط: الطريقة القديمة (تحميل كل الصفوف) إن لم تُنشأ الدالة بعد
+    const sel=_PR_SEL;
+    const [d1,d2,d3,d4]=await Promise.all([
+      bbFetchAll(()=>db.from('blood_donations').select('id,'+sel).in('status',['pending_release','rejected_positive']).eq('is_deleted',false)),
+      bbFetchAll(()=>db.from('blood_donations').select('id,'+sel).eq('status','pending_lab').in('bottle_type',nonSeparableTypes).eq('is_deleted',false)),
+      bbFetchAll(()=>db.from('blood_donations').select('id,'+sel).eq('status','pending_lab').neq('component_type','دم كامل').eq('is_deleted',false)),
+      bbFetchAll(()=>db.from('blood_donations').select('id,'+sel).eq('status','pending_lab').eq('not_separated',true).eq('component_type','دم كامل').eq('is_deleted',false)).catch(()=>[])
+    ]);
+    _prAllRows=[...(d1||[]),...(d2||[]),...(d3||[]),...d4].sort((a,b)=>(a.bottle_number||0)-(b.bottle_number||0));
+    _prFull=true;
+    _prAllRows.forEach(r=>{
+      if(r.status==='rejected_positive'){ infectedCount++; return; }
+      const ct=r.component_type||'دم كامل';
+      counts[ct]=(counts[ct]||0)+1;
+    });
+  }
   load(false);
-  _prAllRows=[...(d1||[]),...(d2||[]),...(d3||[]),...d4].sort((a,b)=>(a.bottle_number||0)-(b.bottle_number||0));
-
-  const counts={}; PR_CATEGORIES.forEach(c=>counts[c]=0); let infectedCount=0;
-  _prAllRows.forEach(r=>{
-    if(r.status==='rejected_positive'){ infectedCount++; return; }
-    const ct=r.component_type||'دم كامل';
-    counts[ct]=(counts[ct]||0)+1;
-  });
   const catIcons={'دم كامل':BAG,'دم مضغوط':BAG,'دم مفلتر':BAG,'بلازما':'💛','صفائح دموية':'🟡','بروتين بارد':'🧊'};
   const tiles = PR_CATEGORIES.map(c=>`
     <div class="comp-stock-card ${counts[c]===0?'empty-bt':''}" onclick="loadPendingReleaseList('${c}')" style="cursor:pointer">
@@ -163,8 +186,15 @@ async function loadPendingRelease(){
 
 // Level 2 — the bottles of one selected category, rendered from the already-fetched _prAllRows
 // (no extra query needed — everything for this screen was already pulled in loadPendingRelease).
-function loadPendingReleaseList(cat){
+async function loadPendingReleaseList(cat){
   _prSelectedCat=cat;
+  // الطبقة الثانية: قناني هذه الفئة فقط تُجلب الآن (إلا إن كانت كلها محمّلة مسبقاً بالطريقة القديمة)
+  if(!_prFull){
+    load(true);
+    try{ _prAllRows=await _prFetchCat(cat); }
+    catch(e){ load(false); toast('تعذّر تحميل القناني: '+(e.message||e),'error'); return; }
+    load(false);
+  }
   const list = cat==='__infected'
     ? _prAllRows.filter(r=>r.status==='rejected_positive')
     : _prAllRows.filter(r=>r.status!=='rejected_positive' && (r.component_type||'دم كامل')===cat);
@@ -217,7 +247,7 @@ function loadPendingReleaseList(cat){
 // category grid — so confirming/separating/damaging a bottle from deep in a category's list
 // doesn't bounce them back out to level 1.
 async function _prRefreshCurrentLevel(){
-  if(_prLevel===2 && _prSelectedCat){ await loadPendingRelease(); loadPendingReleaseList(_prSelectedCat); }
+  if(_prLevel===2 && _prSelectedCat){ const c=_prSelectedCat; await loadPendingRelease(); await loadPendingReleaseList(c); }
   else await loadPendingRelease();
 }
 
