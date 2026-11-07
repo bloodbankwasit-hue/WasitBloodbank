@@ -138,34 +138,57 @@ function hsVisibleBlocks(){
 
 function _hsTone(t){ return t==='bad'?'#B91C1C':t==='warn'?'#B45309':t==='rare'?'#7C3AED':'#BE123C'; }
 function _hsBlockHtml(b,res,err){
-  if(err) return `<div class="hs-card"><div class="hs-h">${b.icon} ${b.title}</div><div style="color:#B91C1C;font-size:14px">تعذّر التحميل: ${esc(err)}</div></div>`;
+  if(err) return `<div style="color:#B91C1C;font-size:14px">تعذّر التحميل: ${esc(err)}</div>`;
   const lk=(list,title)=>{ const has=typeof list==='function'||(Array.isArray(list)&&list.length); if(!has) return ''; (window._hsLists=window._hsLists||[]).push({list,title}); return ` onclick="hsOpenList(${window._hsLists.length-1})" style="cursor:pointer" title="اضغط لعرض القائمة"`; };
   const tiles=res.tiles.map(([l,v,t,list])=>{ const a=lk(list,b.title+' — '+l); return `<div class="hs-tile"${a}><div class="hs-v" style="color:${_hsTone(t)}">${fnum(v)}</div><div class="hs-l">${l}${a?' ›':''}</div></div>`; }).join('');
   const groups=res.groups.filter(g=>g[1].length).map(([t,p])=>`<div class="hs-g"><span class="hs-gt">${t}:</span> ${p.map(([k,v,list])=>{ const a=lk(list,b.title+' — '+t+': '+k); return `<span class="pill py" style="margin:2px${a?';cursor:pointer;text-decoration:underline dotted':''}"${a?a.replace(' style="cursor:pointer"',''):''}>${esc(k)}: ${fnum(v)}</span>`; }).join('')}</div>`).join('');
   let names='';
   if(res.src&&res.src.length){ const i=window._hsSrc.push(res.src)-1; names=`<button class="btn hs-namesbtn" onclick="hsOpenForms(${i},'${b.title}')"><i class="ti ti-clipboard-list"></i> الاستمارات والأسماء (${fnum(res.src.length)})</button>`; }
-  return `<div class="hs-card"><div class="hs-h">${b.icon} ${b.title}</div><div class="hs-tiles">${tiles}</div>${groups}${names}</div>`;
+  return `<div class="hs-tiles">${tiles}</div>${groups}${names}`;
 }
 
 function hsSetKind(k){ _hsKind=k; _hsAnchor=_hsYmd(new Date()); loadRoleHome(); }
 function hsMove(dir){ _hsAnchor=hsShift(_hsKind,_hsAnchor,dir); loadRoleHome(); }
 
+// طبقات الإحصائيات: الصفحة تعرض عناوين الكتل فقط. لا يُحمَّل شيء حتى يضغط المستخدم على كتلة (وإن كانت كتلة واحدة فقط فتُفتح تلقائياً).
+// تغيير الفترة (يومي/شهري…) يعيد تحميل الكتل المفتوحة فقط. النتيجة تُحفظ 60 ثانية وتُلغى عند أي كتابة.
+window._hsOpen=window._hsOpen||new Set(); window._hsBlk=window._hsBlk||{}; window._hsEpoch=window._hsEpoch||'';
+function _hsKey(){ return _hsKind+'|'+_hsAnchor+'|'+((window.__perf&&window.__perf.w)||0); }
+async function hsLoadBlock(i){
+  const blocks=hsVisibleBlocks(), b=blocks[i]; if(!b) return;
+  const slot=G('hsb-'+i); if(!slot) return;
+  const r=hsRange(_hsKind,_hsAnchor), key=_hsKey(), pk=_hsKind+'|'+_hsAnchor, c=window._hsBlk[b.title];
+  if(c && c.k===key && Date.now()-c.t<60000){ slot.innerHTML=c.html; return; }
+  slot.innerHTML='<div class="empty"><i class="ti ti-loader"></i><p>جاري التحميل...</p></div>';
+  let html;
+  try{ html=_hsBlockHtml(b,await b.load(r)); }catch(e){ html=_hsBlockHtml(b,null,e.message||String(e)); window._hsBlk[b.title]=null; if(G('hsb-'+i)) G('hsb-'+i).innerHTML=html; return; }
+  window._hsBlk[b.title]={k:key,t:Date.now(),html};
+  const now=G('hsb-'+i); if(now && (_hsKind+'|'+_hsAnchor)===pk) now.innerHTML=html;
+}
+function hsToggle(i){
+  const b=hsVisibleBlocks()[i]; if(!b) return;
+  const slot=G('hsb-'+i), arrow=G('hsa-'+i);
+  if(window._hsOpen.has(b.title)){ window._hsOpen.delete(b.title); if(slot) slot.style.display='none'; if(arrow) arrow.textContent='‹'; return; }
+  window._hsOpen.add(b.title); if(slot) slot.style.display=''; if(arrow) arrow.textContent='⌄';
+  hsLoadBlock(i);
+}
 async function loadRoleHome(){
   const box=G('roleHome'); if(!box) return;
-  window._hsSrc=[]; window._hsLists=[];
   const blocks=hsVisibleBlocks();
   if(!blocks.length){ box.innerHTML=''; return; }
   if(!_hsAnchor) _hsAnchor=_hsYmd(new Date());
-  const r=hsRange(_hsKind,_hsAnchor), token=++_hsToken;
+  const r=hsRange(_hsKind,_hsAnchor), key=_hsKey();
+  if(window._hsEpoch!==key){ window._hsEpoch=key; window._hsSrc=[]; window._hsLists=[]; window._hsBlk={}; }
+  if(blocks.length===1) window._hsOpen.add(blocks[0].title);
   const bar=`<div class="hs-bar">
     <div class="tabs">${_HS_KINDS.map(([k,l])=>`<div class="tab ${k===_hsKind?'on':''}" onclick="hsSetKind('${k}')">${l}</div>`).join('')}</div>
     <div class="hs-nav"><button class="btn" onclick="hsMove(-1)">›</button>
       <span class="hs-range">${r.from===r.to?fd(r.from):fd(r.from)+' ← '+fd(r.to)}</span>
       <button class="btn" onclick="hsMove(1)">‹</button></div></div>`;
-  box.innerHTML=bar+'<div id="hsBody"><div class="empty"><i class="ti ti-loader"></i><p>جاري التحميل...</p></div></div>';
-  const out=await Promise.all(blocks.map(async b=>{ try{ return _hsBlockHtml(b,await b.load(r)); }catch(e){ return _hsBlockHtml(b,null,e.message||String(e)); } }));
-  if(token!==_hsToken) return;
-  const body=G('hsBody'); if(body) body.innerHTML=out.join('');
+  const cards=blocks.map((b,i)=>{ const open=window._hsOpen.has(b.title);
+    return `<div class="hs-card"><div class="hs-h" onclick="hsToggle(${i})" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;margin-bottom:${open?8:0}px"><span>${b.icon} ${b.title}</span><span id="hsa-${i}" style="color:#9CA3AF">${open?'⌄':'‹'}</span></div><div id="hsb-${i}" style="${open?'':'display:none'}"></div></div>`; }).join('');
+  box.innerHTML=bar+'<div id="hsBody">'+cards+'</div>';
+  blocks.forEach((b,i)=>{ if(window._hsOpen.has(b.title)) hsLoadBlock(i); });
 }
 
 
