@@ -20,6 +20,16 @@
 <!-- Noto Color Emoji: Windows 7 has no colour-emoji font (emoji show as empty squares there); Google serves only the slices of the emoji actually used -->
 <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<script>
+// قياس الأداء: يسجّل زمن كل طلب لقاعدة البيانات (للعرض في الإعدادات ← قياس الأداء). لا يرسل شيئاً لأي جهة.
+window.__perf={reqs:[],long:[],t0:performance.now(),cdn:null};
+(function(){ try{
+  const of=window.fetch; window.fetch=function(u,o){ const url=String(u&&u.url||u), t=performance.now();
+    const rec=ok=>{ if(url.indexOf('supabase.co')<0) return; const r=window.__perf.reqs; r.push({u:url,m:(o&&o.method)||(u&&u.method)||'GET',ms:Math.round(performance.now()-t),at:Math.round(t),ok:ok}); if(r.length>600) r.shift(); };
+    return of.apply(this,arguments).then(x=>{ rec(x.ok); return x; },e=>{ rec(false); throw e; }); };
+  if(window.PerformanceObserver){ new PerformanceObserver(l=>{ l.getEntries().forEach(e=>{ const a=window.__perf.long; a.push(Math.round(e.duration)); if(a.length>300) a.shift(); }); }).observe({entryTypes:['longtask']}); }
+}catch(e){} })();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js" async></script>
@@ -1425,6 +1435,11 @@ tbody tr:hover td{background:#fafafa}
             <div class="setc-ico"><i class="ti ti-clock-hour-4"></i></div>
             <div class="setc-t">مدة الصلاحية (الإكسباير) لكل نوع</div>
             <div class="setc-d">تحديد عدد أيام صلاحية كل نوع قنينة ومكوّن، وتُطبَّق على القناني الجديدة</div>
+          </div>
+          <div class="setc" onclick="openPerfBtn()">
+            <div class="setc-ico"><i class="ti ti-gauge"></i></div>
+            <div class="setc-t">قياس الأداء</div>
+            <div class="setc-d">يقيس سرعة الاتصال بقاعدة البيانات ويعرض أبطأ الطلبات (للمدير فقط)</div>
           </div>
           <div class="setc" onclick="openLegacyImportBtn()">
             <div class="setc-ico"><i class="ti ti-database-import"></i></div>
@@ -4281,6 +4296,11 @@ async function computeSeqAlerts(){
     if(rem<=50) out.push({type, remaining:rem, rung:seqRung(rem)});
   });
   return out.sort((a,b)=>a.remaining-b.remaining);
+}
+async function openPerfBtn(){
+  if(UPROF?.role!=='admin'){ toast('⛔ للمدير فقط','error'); return; }
+  try{ await loadOneScript('perf.js'); }catch(e){ toast('تعذر تحميل قياس الأداء','error'); return; }
+  perfOpen();
 }
 async function openLegacyImportBtn(){
   if(UPROF?.role!=='admin'){ toast('⛔ هذه الأداة للمدير فقط','error'); return; }
