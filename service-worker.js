@@ -1,5 +1,5 @@
 // مصرف الدم الرئيسي — واسط | Service Worker v4
-const CACHE = 'bloodbank-wasit-v115';
+const CACHE = 'bloodbank-wasit-v116';
 
 const CRITICAL = [
   './',
@@ -45,8 +45,10 @@ self.addEventListener('install', e=>{
       await Promise.all(CRITICAL.map(u=>
         cache.add(new Request(u, {cache:'reload'}))
       ));
+      // خط الأيقونات وملف CSS الخاص به ثابتان (نسخة محددة): نعيد استعمالهما من الكاش القديم بدل تنزيلهما مع كل تحديث
+      const reuse=async u=>{ const r=await caches.match(u,{ignoreSearch:true}); if(r){ await cache.put(u,r.clone()); return true; } return false; };
       await Promise.all(OPTIONAL.map(u=>
-        cache.add(new Request(u, {cache:'reload'}))
+        ((u.indexOf('/tabler/')>=0) ? reuse(u).then(ok=>ok||cache.add(new Request(u,{cache:'reload'}))) : cache.add(new Request(u, {cache:'reload'})))
           .catch(()=>console.log('Optional skipped:', u))
       ));
     })
@@ -75,6 +77,15 @@ self.addEventListener('fetch', e=>{
 
   // Non-GET: pass through
   if(e.request.method !== 'GET') return;
+
+  // خط الأيقونات (Tabler): ثابت لا يتغير → الكاش أولاً. (كان يُجلب من الشبكة كل مرة، وعلى شبكة بطيئة تظهر الأيقونات مربعات □ حتى يكتمل تنزيله)
+  if(/\/tabler\/(fonts\/|tabler-icons\.min\.css)/.test(url)){
+    e.respondWith(caches.match(e.request,{ignoreSearch:true}).then(c=> c || fetch(e.request).then(res=>{
+      if(res.ok){ const cl=res.clone(); caches.open(CACHE).then(x=>x.put(e.request,cl)); }
+      return res;
+    })));
+    return;
+  }
 
   // Network-first: whenever the device is online, ALWAYS fetch the current file and refresh
   // the cache with it — never blindly serve whatever happened to be cached before. The cache
