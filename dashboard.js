@@ -15,16 +15,26 @@ async function loadDash(){
     // whole-blood row itself (component_type stays 'دم كامل' even after separation — only its
     // STATUS changes to 'separated') is the one row that represents the actual donation event.
     const _hs0=!((UPROF?.role==='admin')||hasPermission('supply')||hasPermission('pending_release'));
-    const [r0,r1,r2,r3,r4,sg,ir]=await Promise.all([
-      db.from('blood_donations').select('*',{count:'exact',head:true}).eq('donation_date',today).eq('component_type','دم كامل').eq('is_deleted',false),
-      db.from('blood_donations').select('*',{count:'exact',head:true}).gte('donation_date',ms).eq('component_type','دم كامل').eq('is_deleted',false),
-      db.from('blood_donations').select('*',{count:'exact',head:true}).gte('donation_date',ms).eq('donation_type','طوعي').eq('component_type','دم كامل').eq('is_deleted',false),
-      db.from('blood_donations').select('*',{count:'exact',head:true}).gte('donation_date',ms).eq('donation_type','تعويضي').eq('component_type','دم كامل').eq('is_deleted',false),
-      db.from('blood_donations').select('*',{count:'exact',head:true}).eq('component_type','دم كامل').eq('is_deleted',false),
-      // الرصيد بطلب واحد مجمَّع (بدل جلب كل القناني صفحةً صفحة) + عدّاد المصابين بنفس الدفعة
-      _hs0 ? Promise.resolve(null) : ((typeof supplyGroups==='function') ? supplyGroups().catch(()=>null) : Promise.resolve(null)),
-      db.from('blood_donations').select('*',{count:'exact',head:true}).eq('serology_result','Positive').eq('is_deleted',false)
-    ]);
+    // الأعداد الستة (اليوم/الشهر/طوعي/تعويضي/الكلي/المصابين) بطلب واحد من السيرفر؛ وإن لم تُنشأ الدالة نرجع للاستعلامات القديمة
+    const dcP = window._dcMissing ? Promise.resolve(null)
+      : db.rpc('dash_counts',{p_today:today,p_month:ms}).then(r=>{
+          if(r.error){ if(/dash_counts|PGRST202|42883|could not find/i.test((r.error.code||'')+' '+(r.error.message||''))) window._dcMissing=true; return null; }
+          return r.data; }).catch(()=>null);
+    const sgP = _hs0 ? Promise.resolve(null) : ((typeof supplyGroups==='function') ? supplyGroups().catch(()=>null) : Promise.resolve(null));
+    const [dc,sg]=await Promise.all([dcP,sgP]);
+    let r0,r1,r2,r3,r4,ir;
+    if(dc){
+      r0={count:dc.today}; r1={count:dc.month}; r2={count:dc.month_vol}; r3={count:dc.month_comp}; r4={count:dc.total}; ir={count:dc.infected};
+    } else {
+      [r0,r1,r2,r3,r4,ir]=await Promise.all([
+        db.from('blood_donations').select('*',{count:'exact',head:true}).eq('donation_date',today).eq('component_type','دم كامل').eq('is_deleted',false),
+        db.from('blood_donations').select('*',{count:'exact',head:true}).gte('donation_date',ms).eq('component_type','دم كامل').eq('is_deleted',false),
+        db.from('blood_donations').select('*',{count:'exact',head:true}).gte('donation_date',ms).eq('donation_type','طوعي').eq('component_type','دم كامل').eq('is_deleted',false),
+        db.from('blood_donations').select('*',{count:'exact',head:true}).gte('donation_date',ms).eq('donation_type','تعويضي').eq('component_type','دم كامل').eq('is_deleted',false),
+        db.from('blood_donations').select('*',{count:'exact',head:true}).eq('component_type','دم كامل').eq('is_deleted',false),
+        db.from('blood_donations').select('*',{count:'exact',head:true}).eq('serology_result','Positive').eq('is_deleted',false)
+      ]);
+    }
     ['st0','st1','st2','st3','st4'].forEach((id,i)=>{
       const vals=[r0.count,r1.count,r2.count,r3.count,r4.count];
       const el=G(id); if(el) el.textContent=fnum(vals[i]||0);
