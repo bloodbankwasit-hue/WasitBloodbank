@@ -1426,6 +1426,11 @@ tbody tr:hover td{background:#fafafa}
             <div class="setc-t">مدة الصلاحية (الإكسباير) لكل نوع</div>
             <div class="setc-d">تحديد عدد أيام صلاحية كل نوع قنينة ومكوّن، وتُطبَّق على القناني الجديدة</div>
           </div>
+          <div class="setc" onclick="openLegacyImportBtn()">
+            <div class="setc-ico"><i class="ti ti-database-import"></i></div>
+            <div class="setc-t">استيراد بيانات النظام القديم</div>
+            <div class="setc-d">إضافة المتبرعين والمصابين والفصائل من الملف المجهّز بدون تكرار (للمدير فقط)</div>
+          </div>
           <div class="setc" onclick="bbGoSection('audit')">
             <div class="setc-ico"><i class="ti ti-shield-lock"></i></div>
             <div class="setc-t">سجل التتبع (Audit Log)</div>
@@ -4276,6 +4281,11 @@ async function computeSeqAlerts(){
     if(rem<=50) out.push({type, remaining:rem, rung:seqRung(rem)});
   });
   return out.sort((a,b)=>a.remaining-b.remaining);
+}
+async function openLegacyImportBtn(){
+  if(UPROF?.role!=='admin'){ toast('⛔ هذه الأداة للمدير فقط','error'); return; }
+  try{ await loadOneScript('import-legacy.js'); }catch(e){ toast('تعذر تحميل أداة الاستيراد','error'); return; }
+  openLegacyImport();
 }
 async function openReagents(){
   try{ await loadOneScript('reagents.js'); }catch(e){ toast('تعذر تحميل مواد الفحص','error'); return; }
