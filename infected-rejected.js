@@ -38,7 +38,7 @@ async function loadInfected(type, tabEl, page=1){
     tabEl.classList.add('on');
     _infType = type;
   }
-  _infPage=page;
+  _infPage=page; const _tok=(window._infTok=(window._infTok||0)+1);
   const s=(G('infSrch')?.value||'').trim();
   const cols='bottle_number,serology_result,serology_type,donation_date,bottle_note,id,donors(donor_number,full_name,mobile,national_id)';
   load(true);
@@ -53,22 +53,27 @@ async function loadInfected(type, tabEl, page=1){
     // Search: positives are few, so fetch them all (1000 per page) and match here. That allows
     // Arabic-aware matching (أإآ=ا، ى=ي، ة=ه) across name, mobile, donor no., national ID,
     // bottle number, infection type and the note — one box, no need to say which field.
-    let all=[], from=0;
+    // المصابون قلّة: تُجلب مرة وتُحفظ 30 ثانية (مفتاحها نوع الإصابة وعدّاد الكتابات) فلا يُعاد الجلب مع كل حرف
+    const _ck=(_infType||'')+'|'+((window.__perf&&window.__perf.w)||0), _c=window._infAllC;
+    let all=[], from=0, _err=false;
+    if(_c && _c.k===_ck && Date.now()-_c.t<30000){ all=_c.v; } else
     for(;;){
       let q=db.from('blood_donations').select(cols)
         .eq('serology_result','Positive').eq('is_deleted',false).order('created_at',{ascending:false});
       if(_infType) q=q.eq('serology_type',_infType);
       const r=await q.range(from,from+999);
-      if(r.error) break;
+      if(r.error){ _err=true; break; }
       all=all.concat(r.data||[]);
       if((r.data||[]).length<1000) break;
       from+=1000;
     }
+    if(!_err && !(_c && _c.k===_ck && Date.now()-_c.t<30000)) window._infAllC={k:_ck,t:Date.now(),v:all};
     const needle=_normSearch(s);
     const filtered=all.filter(r=>_normSearch([r.donors?.full_name,r.donors?.mobile,r.donors?.donor_number,r.donors?.national_id,r.bottle_number,r.serology_type,r.bottle_note].join(' | ')).includes(needle));
     count=filtered.length; data=filtered.slice((page-1)*PS, page*PS);
   }
   load(false);
+  if(_tok!==window._infTok) return;   // وصلت نتيجة أقدم من آخر بحث
   if(data&&data.length){
     G('infTbl').innerHTML=`<div class="tw"><table><thead><tr>
       ${_canUnInfect()?'<th>إجراء</th>':''}<th>رقم المتبرع</th><th>اسم المتبرع</th><th>رقم القنينة</th>
@@ -205,7 +210,7 @@ function rjSearchLive(){
 function goRjPage(p){ loadRejected(p); }
 
 async function loadRejected(page=1){
-  _rjPage=page;
+  _rjPage=page; const _tok=(window._rjTok=(window._rjTok||0)+1);
   const s=G('rjSrch').value.trim(); load(true);
   let q=db.from('rejected_donors').select('*',{count:'exact'}).eq('is_deleted',false).order('rejection_date',{ascending:false});
   // With no search text: browse the current tab's type only. While searching: search across
@@ -214,6 +219,7 @@ async function loadRejected(page=1){
   else  q=q.eq('rejection_type', _rejMode==='perm' ? 'دائم' : 'مؤقت');
   q=q.range((page-1)*PS, page*PS-1);
   const {data,count}=await q; load(false);
+  if(_tok!==window._rjTok) return;   // وصلت نتيجة أقدم من آخر بحث
   if(data&&data.length){
     G('rjTbl').innerHTML=`<div class="tw"><table><thead><tr>
       ${_canUnInfect()?'<th>إجراء</th>':''}<th>الاسم</th><th>العمر</th><th>سبب الرفض</th><th>تاريخ الرفض</th><th>نوع الرفض</th><th>ملاحظات</th>
