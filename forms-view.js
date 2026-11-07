@@ -40,27 +40,46 @@ const FV = (function(){
 
   async function rpc(fn,args){ const r=await db.rpc(fn,args||{}); if(r.error) throw r.error; return r.data; }
 
-  async function loadData(u){
+  // وحدات المختبر تخفي أصل التريما وتدمج ناتجيه بقنينة واحدة (cfg.filter / cfg.dedup)
+  function shape(u,list){
+    const cfg=u.cfg; let out=list||[];
+    if(cfg.filter) out=out.filter(m=>cfg.filter(m));
+    if(cfg.dedup){ const seen=new Set(); out=out.filter(m=>{ const k=cfg.dedup(m); if(seen.has(k)) return false; seen.add(k); return true; }); }
+    return out;
+  }
+  // الطبقة الثانية: أسماء استمارة واحدة فقط عند فتحها
+  async function loadMembers(u,id){
+    const ms=await rpc('form_members',{p_forms:[id]})||[];
+    u.by[id]=shape(u,ms);
+  }
+  let _ovMissing=false;   // دالة forms_overview غير موجودة بقاعدة البيانات → الطريقة القديمة
+  async function loadDataOld(u){
     const forms = await rpc('forms_recent',{p_groups:u.cfg.groups,p_limit:60}) || [];
     const ids = forms.map(f=>f.id), by = {};
     if(ids.length){ (await rpc('form_members',{p_forms:ids}) || []).forEach(m=>{ (by[m.form_id]=by[m.form_id]||[]).push(m); }); }
-    // وحدات المختبر تخفي أصل التريما وتدمج ناتجيه بقنينة واحدة (cfg.filter / cfg.dedup)
-    if(u.cfg.filter || u.cfg.dedup){
-      Object.keys(by).forEach(fid=>{
-        const seen=new Set();
-        by[fid]=by[fid].filter(m=>{
-          if(u.cfg.filter && !u.cfg.filter(m)) return false;
-          if(u.cfg.dedup){ const k=u.cfg.dedup(m); if(seen.has(k)) return false; seen.add(k); }
-          return true;
-        });
-      });
-    }
+    ids.forEach(id=>{ by[id]=shape(u,by[id]||[]); });
     u.forms = forms; u.by = by;
   }
+  async function loadData(u){
+    if(!_ovMissing){
+      try{
+        // الطبقة الأولى: الاستمارات + أعدادها (جاهز/غير جاهز/أُنجز/خرج) محسوبة بالسيرفر، بدون أسماء
+        const forms = await rpc('forms_overview',{p_unit:u.cfg.unit,p_groups:u.cfg.groups,p_limit:60,p_types:u.cfg.types?u.cfg.types():[]});
+        u.forms = forms||[]; u.by = {};
+        if(u.view==='detail' && u.formId) await loadMembers(u,u.formId);
+        return;
+      }catch(e){
+        if(!/forms_overview|PGRST202|42883|could not find/i.test((e.code||'')+' '+(e.message||''))) throw e;
+        _ovMissing=true;
+      }
+    }
+    await loadDataOld(u);
+  }
   function counts(u,f){
-    const c={ready:0,notready:0,done:0,excl:0}, ms=u.by[f.id]||[];
-    ms.forEach(m=>{ c[u.cfg.stateOf(m).k]++; });
-    c.total=ms.length; return c;
+    const ms=u.by[f.id];
+    if(!ms && f.c) return {ready:f.c.ready||0,notready:f.c.notready||0,done:f.c.done||0,excl:f.c.excl||0,total:f.c.total||0};
+    const c={ready:0,notready:0,done:0,excl:0}; (ms||[]).forEach(m=>{ c[u.cfg.stateOf(m).k]++; });
+    c.total=(ms||[]).length; return c;
   }
   const isActive = (u,f)=>{ const c=counts(u,f); return f.status==='open' || c.ready+c.notready>0; };
 
@@ -166,7 +185,7 @@ const FV = (function(){
     },
     async refresh(unit){ if(!units[unit]) return; units[unit].reload=true; await render(unit); },
     async open(unit,id){ const u=units[unit]; if(!u) return; u.formId=id; u.view='detail';
-      if(!(u.by[id])){ try{ load(true); (await rpc('form_members',{p_forms:[id]})||[]).forEach(m=>{ (u.by[id]=u.by[id]||[]).push(m); }); u.by[id]=u.by[id]||[]; } finally{ load(false); } }
+      if(!(u.by[id])){ try{ load(true); await loadMembers(u,id); } finally{ load(false); } }
       u.reload=false; await render(unit); window.scrollTo&&window.scrollTo(0,0); },
     async back(unit){ const u=units[unit]; if(!u) return; u.view='list'; u.reload=true; await render(unit); },
     async tab(unit,t){ const u=units[unit]; if(!u) return; u.tab=t; u.view='list'; u.reload=false; await render(unit); },

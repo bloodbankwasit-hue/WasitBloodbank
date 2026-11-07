@@ -16,7 +16,7 @@ function _sepShowLevel(n){
 
 // الفصل الآن يعرض الاستمارات (راجع forms-view.js) بدل شبكة أنواع القناني؛ الإحصائيات تبقى بزرها
 const SEP_FV = {
-  unit:'sep', host:'sepBoardList', groups:['R','B'], chk:'sep-chk', onSel:'updateSepBulkBar', bigBottle:true,
+  unit:'sep', host:'sepBoardList', groups:['R','B'], types:()=>Object.keys(COMPONENT_RULES), chk:'sep-chk', onSel:'updateSepBulkBar', bigBottle:true,
   // الفصل للدم الكامل فقط (ناتج الفصل لا يدخل هنا)
   filter:m=> (m.component_type||'دم كامل')==='دم كامل' && !!COMPONENT_RULES[m.bottle_type] || m.status==='pending_draw' || m.exit_reason==='medical_reject',
   stateOf(m){
