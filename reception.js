@@ -439,24 +439,29 @@ async function saveReception(){
       if(doe){ if(claimed){ try{ await releaseBottleNumber(btype,bnum); }catch(x){} } throw doe; }
       // the donation joins the open collection form of its group (a new form opens automatically after 10 names)
       const formInfo = await bbAssignForm(don.id, btype);
-      await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'INSERT',table_name:'blood_donations',record_id:don.id,new_values:{donor:nm,status:'pending_draw',bottle:bnum}});
-      // Consume the bottle number: from the reuse pool if that's where it came from,
-      // otherwise advance the main sequence.
-      if(claimed){ /* already consumed on the server */ }
-      else if(payload.pool_id){
-        await db.from('bottle_number_pool').delete().eq('id', payload.pool_id);
-      } else if(payload.seq_id){
-        await db.from('bottle_sequences')
-          .update({current_number: bnum+1})
-          .eq('id', payload.seq_id).lt('current_number', bnum+1);
-      }
-      // donor_number ("رقم الاستمارة") — the insert above returns it for a brand-new donor;
-      // for an existing donor picked via autocomplete, dn only has {id}, so fetch it.
+      // بعد حفظ التبرع هذه الخطوات مستقلة عن بعضها (وكانت تُنفَّذ بالتسلسل) → تُنفَّذ معاً: التدقيق + استهلاك الرقم + جلب رقم الاستمارة
       let donorNumber = dn.donor_number;
-      if(donorNumber==null){
-        const{data:dRow}=await db.from('donors').select('donor_number').eq('id',dn.id).single();
-        donorNumber = dRow?.donor_number ?? null;
-      }
+      await Promise.all([
+        (async()=>{ await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'INSERT',table_name:'blood_donations',record_id:don.id,new_values:{donor:nm,status:'pending_draw',bottle:bnum}}); })().catch(()=>{}),
+        (async()=>{
+          // Consume the bottle number: from the reuse pool if that's where it came from, otherwise advance the main sequence.
+          if(claimed){ /* already consumed on the server */ }
+          else if(payload.pool_id){
+            await db.from('bottle_number_pool').delete().eq('id', payload.pool_id);
+          } else if(payload.seq_id){
+            await db.from('bottle_sequences')
+              .update({current_number: bnum+1})
+              .eq('id', payload.seq_id).lt('current_number', bnum+1);
+          }
+        })().catch(()=>{}),
+        (async()=>{
+          // donor_number: the insert returns it for a brand-new donor; for an existing donor dn has only {id}
+          if(donorNumber==null){
+            const{data:dRow}=await db.from('donors').select('donor_number').eq('id',dn.id).single();
+            donorNumber = dRow?.donor_number ?? null;
+          }
+        })().catch(()=>{})
+      ]);
       // Store for printing
       _lastDonation = {
         id:don.id,
