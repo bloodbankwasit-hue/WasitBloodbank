@@ -62,7 +62,7 @@ window.__perf={reqs:[],long:[],t0:performance.now(),cdn:null};
 <style>
 /* ===== RESET ===== */
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow:hidden}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
 #loginPage ~ .bottom-nav, #loginPage:not([style*="none"]) ~ * .bottom-nav{display:none !important}
 body{font-family:'Segoe UI',Tahoma,Arial,'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif;font-size:18px;direction:rtl;background:#F1F5F9;color:#1E293B;-webkit-tap-highlight-color:transparent}
 html{-webkit-text-size-adjust:100%}
@@ -112,7 +112,7 @@ html{-webkit-text-size-adjust:100%}
 .modal-foot{display:flex;gap:7px;justify-content:flex-end;padding:12px 22px 16px;border-top:1px solid #f0f0f0;background:#fff;flex-shrink:0}
 
 /* ===== LOGIN ===== */
-#loginPage{height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#FFF1F2 0%,#f5f6fa 60%)}
+#loginPage{height:100vh;height:100dvh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#FFF1F2 0%,#f5f6fa 60%)}
 .lcard{background:#fff;border:1px solid #e0e0e0;border-radius:16px;padding:32px 36px;width:400px;box-shadow:0 4px 24px rgba(0,0,0,.07)}
 .lbrand{text-align:center;margin-bottom:24px}
 .licon{width:68px;height:68px;background:#BE123C;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
@@ -136,7 +136,7 @@ html{-webkit-text-size-adjust:100%}
 .lsec i{font-size:15px;color:#2e7d32}
 
 /* ===== APP SHELL ===== */
-#app{display:none;height:100vh;flex-direction:row}
+#app{display:none;height:100vh;height:100dvh;flex-direction:row}
 #app.on{display:flex}
 
 /* ===== SIDEBAR ===== */
@@ -186,7 +186,7 @@ html{-webkit-text-size-adjust:100%}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
 
 /* ===== PAGE AREA ===== */
-.page{flex:1;overflow-y:auto;overflow-x:hidden;padding:16px 18px}
+.page{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;padding:16px 18px}
 .sc{display:none}
 .sc.on{display:block}
 
@@ -344,7 +344,7 @@ tbody tr:hover td{background:#fafafa}
 @media(max-width:768px){
   /* Sidebar handled by JS */
   .sb{display:none !important}
-  .sb.open{display:flex !important;flex-direction:column;position:fixed;right:0;top:0;bottom:0;z-index:5000;height:100vh;width:220px;animation:slideIn .2s ease}
+  .sb.open{display:flex !important;flex-direction:column;position:fixed;right:0;top:0;bottom:0;z-index:5000;height:100vh;height:100dvh;width:220px;animation:slideIn .2s ease}
   @keyframes slideIn{from{transform:translateX(220px)}to{transform:translateX(0)}}
   
   /* Show hamburger button */
@@ -352,6 +352,8 @@ tbody tr:hover td{background:#fafafa}
   
   /* Content full width - sidebar is overlay */
   #app{flex-direction:row}
+  /* الموبايل: الغلاف مثبّت على الشاشة المرئية فعلاً (بدل 100vh) حتى لا تنزاح الصفحة ولا ينعكس التمرير على الآيفون */
+  #app.on{position:fixed;top:0;right:0;bottom:0;left:0;height:auto;width:100%}
   .content{width:100%;min-width:0;flex:1}
   
   /* Topbar */
