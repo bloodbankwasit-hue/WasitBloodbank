@@ -122,7 +122,11 @@ async function loadStats(){
     (outData||[]).forEach(r=>{ const ct=r.component_type||'دم كامل'; byCompOut[ct]=(byCompOut[ct]||0)+1; });
     totalDonations = data.filter(r=>(r.component_type||'دم كامل')==='دم كامل').length;
   }
-  if(!anyRows && !(vis&&vis.total)){toast('لا توجد بيانات في هذه الفترة','warning'); return;}
+  // الرصيد الخارجي (أعداد): المجهّز (مستشفى + باي هاند) يُحسب مع الصرف العادي بخانة «خرج»؛ الإتلاف سطر منفصل
+  let opOut=0, opDes=0;
+  try{ const orows=await _stFetchAll(()=>db.from('opening_dispatch').select('kind,component_type,qty').gte('dispatch_date',f).lte('dispatch_date',t).order('id'));
+    orows.forEach(x=>{ const q=+x.qty||0; if(x.kind==='destroy'){ opDes+=q; return; } const ct=x.component_type||'دم كامل'; byCompOut[ct]=(byCompOut[ct]||0)+q; opOut+=q; }); }catch(e){}
+  if(!anyRows && !(vis&&vis.total) && !opOut){toast('لا توجد بيانات في هذه الفترة','warning'); return;}
   const allComps=[...new Set([...Object.keys(byCompIn),...Object.keys(byCompOut)])];
   window._STATS_BREAKDOWN={f,t,total:totalDonations,byTyp,byGen,byBot,bts,byBld,byCompIn,byCompOut,allComps,vis};
   G('stRpt').style.display='block';
@@ -160,6 +164,7 @@ async function loadStats(){
       <div class="rs"><div class="rs-t">دخول وخروج حسب نوع المحتوى (دم كامل / مضغوط / بلازما / صفائح / بروتين بارد)</div>
         ${allComps.map(c=>`<div class="rr"><span>${c}</span><span class="rv">دخل: ${fnum(byCompIn[c]||0)} — خرج: ${fnum(byCompOut[c]||0)}</span></div>`).join('')}
         ${!allComps.length?'<div class="rr"><span>لا توجد بيانات</span><span class="rv">0</span></div>':''}
+        ${(opOut||opDes)?`<div style="font-size:12.5px;color:#757575;padding:4px 8px">${opOut?'«خرج» يشمل '+fnum(opOut)+' جُهّزت من الرصيد الخارجي. ':''}${opDes?'أُتلف من الرصيد الخارجي: '+fnum(opDes)+' (غير محسوب بخانة خرج).':''}</div>`:''}
       </div>
     </div>
   </div>`;
