@@ -1815,6 +1815,7 @@ tbody tr:hover td{background:#fafafa}
           <div class="sh-t"><i class="ti ti-package"></i> خزين القناني</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn" style="font-size:15px;padding:7px 12px" onclick="openSupplyExport()"><i class="ti ti-file-export"></i> تصدير متقدم</button>
+            <button id="openingBtn" class="btn" style="background:#FFFBEB;border:1.5px solid #FCD34D;color:#92400E;font-weight:800;font-size:15px;padding:7px 12px" onclick="openOpeningStock()"><i class="ti ti-packages"></i> الرصيد الخارجي</button>
             <button id="viewDamagedBtn" class="btn" style="border-color:#7F1D1D;color:#7F1D1D;font-size:15px;padding:7px 12px" onclick="bbGoSection('damaged_store')">🗑️ القناني التالفة (0)</button>
           </div>
         </div>
@@ -2224,6 +2225,10 @@ function load(v){ G('loader').classList.toggle('on',v); }
 // Opens the donation editor from any screen (donors.js is loaded on demand).
 // Opens the donor/donation record READ-ONLY first (👁); the «تعديل الاستمارة» button inside unlocks it.
 // opts: {edit:true} opens unlocked straight away; {noEdit:true} hides the unlock button (viewing only).
+async function openOpeningStock(){
+  try{ await loadOneScript('opening-stock.js'); }catch(e){ toast('تعذر تحميل شاشة الرصيد القديم','error'); return; }
+  osOpen();
+}
 async function openSupplyHosp(){
   try{ await loadOneScript('supply-hosp.js'); }catch(e){ toast('تعذر تحميل شاشة تجهيز المستشفيات','error'); return; }
   shpOpen();
