@@ -447,7 +447,10 @@ async function saveReception(){
           // Consume the bottle number: from the reuse pool if that's where it came from, otherwise advance the main sequence.
           if(claimed){ /* already consumed on the server */ }
           else if(payload.pool_id){
-            await db.from('bottle_number_pool').delete().eq('id', payload.pool_id);
+            // الحذف يجب أن ينجح وإلا يبقى الرقم بالمخزن ويُعرض لمتبرع ثانٍ: نتحقق من الخطأ ونعيد المحاولة مرة
+            let pe=(await db.from('bottle_number_pool').delete().eq('id', payload.pool_id)).error;
+            if(pe) pe=(await db.from('bottle_number_pool').delete().eq('id', payload.pool_id)).error;
+            if(pe) toast('⚠️ الرقم '+bnum+' بقي بمخزن الأرقام المعادة — أبلغ المسؤول لتنظيفه','error',8000);
           } else if(payload.seq_id){
             await db.from('bottle_sequences')
               .update({current_number: bnum+1})
