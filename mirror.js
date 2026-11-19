@@ -95,6 +95,8 @@
     try{
       for(const k of ['donors','donations']){ out[k]=await syncKind(k); }
       try{ if(typeof cacheRejectedDonors==='function') await cacheRejectedDonors(); }catch(e){}
+      try{ await syncBN(); }catch(e){ console.log('[mirror] bn state',e); }
+      try{ await metaSet('bn_local',{used:[],next:{}}); }catch(e){}   // كل ما استُعمل محلياً أُرسل (لا يوجد طابور معلّق هنا) فصار ضمن بيانات السيرفر
       await metaSet('lastSync',Date.now());
       D=null; LAST=null; DALL=null; BALL=null; out.ok=true;
     }catch(e){ out.error=e&&e.message; console.log('[mirror] sync failed',e); }
@@ -225,6 +227,60 @@
     }catch(e){}
   }
 
+
+  // ───────── أرقام القناني بدون إنترنت (حاسبة الاستقبال وحدها تستعملها) ─────────
+  async function syncBN(){
+    const st={seqs:{},pool:[],camp:[]};
+    const a=await _rawDb.from('bottle_sequences').select('id,bottle_type,current_number,end_number,created_at').eq('is_active',true).order('created_at',{ascending:false});
+    if(a.error) throw a.error;
+    for(const r of (a.data||[])){ if(!st.seqs[r.bottle_type]) st.seqs[r.bottle_type]=r; }   // الأحدث لكل نوع (كما يفعل الاستقبال)
+    const b=await _rawDb.from('bottle_number_pool').select('id,bottle_type,bottle_number');
+    if(!b.error) st.pool=b.data||[];
+    for(let p=0;;p+=1000){
+      const c=await _rawDb.from('campaign_slots').select('bottle_number').not('bottle_number','is',null).range(p,p+999);
+      if(c.error) break; st.camp=st.camp.concat((c.data||[]).map(x=>x.bottle_number)); if(!c.data||c.data.length<1000) break;
+    }
+    await metaSet('bn_state',st);
+  }
+  async function usedNumbers(){
+    const rows=await loadAll('blood_donations'); const set=new Set();
+    for(const r of rows) if(r.bottle_number!=null) set.add(Number(r.bottle_number));
+    return set;
+  }
+  // يقترح رقماً بنفس منطق الاستقبال: الأرقام المعادة أولاً ثم التسلسل، مع تخطي المستعمل وأرقام الحملات
+  async function allocBN(sqk){
+    const st=await metaGet('bn_state'); if(!st) return null;
+    const loc=(await metaGet('bn_local'))||{used:[],next:{}};
+    const used=await usedNumbers(), camp=new Set((st.camp||[]).map(Number)), locSet=new Set((loc.used||[]).map(Number));
+    const blocked=n=>used.has(n)||camp.has(n)||locSet.has(n);
+    const pool=(st.pool||[]).filter(x=>x.bottle_type===sqk && !blocked(Number(x.bottle_number))).sort((x,y)=>x.bottle_number-y.bottle_number);
+    if(pool.length) return {number:Number(pool[0].bottle_number),poolId:pool[0].id};
+    const seq=st.seqs[sqk]; if(!seq) return null;
+    let n=Math.max(Number(seq.current_number),Number((loc.next||{})[sqk]||0));
+    while(n<=Number(seq.end_number) && blocked(n)) n++;
+    if(n>Number(seq.end_number)) return {finished:true};
+    return {number:n,seqId:seq.id};
+  }
+  async function commitBN(sqk,n){
+    const loc=(await metaGet('bn_local'))||{used:[],next:{}};
+    loc.used=(loc.used||[]).concat([Number(n)]); loc.next=loc.next||{}; loc.next[sqk]=Math.max(Number(loc.next[sqk]||0),Number(n)+1);
+    await metaSet('bn_local',loc);
+  }
+  // سجلات محلية مؤقتة (تبرع/متبرع حُفظ بدون إنترنت) كي تراها شاشات السحب والمختبر على نفس الحاسبة
+  async function addLocal(donation,donor){
+    if(donor) await putMany('donors',[donor],false);
+    if(donation) await putMany('donations',[donation],false);
+    DALL=null; BALL=null; D=null; LAST=null;
+  }
+  async function removeLocal(ids){
+    const d=await open();
+    for(const store of ['donors','donations']){
+      const tx=d.transaction(store,'readwrite'); for(const id of ids) if(id) tx.objectStore(store).delete(id);
+      await new Promise(r=>{tx.oncomplete=r;tx.onerror=r;});
+    }
+    DALL=null; BALL=null; D=null; LAST=null;
+  }
+
   // شريط حالة بشاشة الاستقبال
   async function render(){
     try{
@@ -248,7 +304,7 @@
     setInterval(render,30000); render();
   }
   async function reset(){ const d=await open(); for(const s of ['donors','donations','meta']){ const tx=d.transaction(s,'readwrite'); tx.objectStore(s).clear(); } D=null; LAST=null; return sync(); }
-  window.bbm={start,sync,searchDonors,exactDonor,lastDonation,render,reset,runQuery,applyLocal,refreshIds,
+  window.bbm={start,sync,searchDonors,exactDonor,lastDonation,render,reset,runQuery,applyLocal,refreshIds,allocBN,commitBN,addLocal,removeLocal,syncBN,
     ready:async()=>!!(await metaGet('lastSync'))};
   window.bbmStart=start; window.bbmSync=sync;
 })();

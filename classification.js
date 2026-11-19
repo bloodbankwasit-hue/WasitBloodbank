@@ -200,6 +200,7 @@ async function saveClassification(){
       // completion/rejection decision needs the real server state and is only made for real
       // when syncQueue() replays this through applyLabUpdate() once back online.
       await enqueueOp('lab', {donation_id:id, fieldUpdates:{blood_type:bt, blood_type_date:labToday()}});
+      try{ if(window.bbm) await bbm.applyLocal('blood_donations',[['update',[{blood_type:bt, blood_type_date:labToday()}]],['eq',['id',id]]]); }catch(e){}
       const q = await getPendingQueue();
       updateOfflineBar('offline', q.length+' عملية معلّقة');
       toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً عند عودة الإنترنت','warning',5000);

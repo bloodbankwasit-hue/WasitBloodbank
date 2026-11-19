@@ -237,6 +237,7 @@ async function saveVirology(){
       // replays this through applyLabUpdate() for real once back online, instead of guessing
       // the outcome here.
       await enqueueOp('lab', {donation_id:id, fieldUpdates});
+      try{ if(window.bbm) await bbm.applyLocal('blood_donations',[['update',[fieldUpdates]],['eq',['id',id]]]); }catch(e){}
       const q = await getPendingQueue();
       updateOfflineBar('offline', q.length+' عملية معلّقة');
       toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً عند عودة الإنترنت (بما فيها إضافة المرفوضين لو موجبة)','warning',6000);

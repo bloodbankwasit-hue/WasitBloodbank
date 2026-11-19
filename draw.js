@@ -192,6 +192,7 @@ async function confirmDrawSuccess(){
       // (draw_date + expiry_date + status) against an already-existing row, so it's safe to
       // replay later exactly like reception's offline path does.
       await enqueueOp('draw', {donation_id:id, draw_date:draw, expiry_date:exp});
+      try{ if(window.bbm) await bbm.applyLocal('blood_donations',[['update',[{draw_date:draw,expiry_date:exp,status:'pending_lab'}]],['eq',['id',id]]]); }catch(e){}
       const q = await getPendingQueue();
       updateOfflineBar('offline', q.length+' عملية معلّقة');
       toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً عند عودة الإنترنت','warning',5000);

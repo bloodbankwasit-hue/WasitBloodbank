@@ -353,7 +353,9 @@ async function saveReception(){
     const seqId = G('rc-bnum')?.dataset?.seqId;
     const poolId = G('rc-bnum')?.dataset?.poolId;
     if(!btype){ toast('يرجى اختيار نوع القنينة','error'); load(false); return; }
-    if(!bnum){  toast('يرجى اختيار نوع القنينة للحصول على الرقم','error'); load(false); return; }
+    // بدون اتصال: الرقم الظاهر معاينة فقط، والرقم الحقيقي يُحجز من السيرفر عند المزامنة
+    if(!bnum && !IS_ONLINE && G('rc-bnum')?.dataset?.preview==='1') bnum=0;
+    if(!bnum && !(bnum===0 && !IS_ONLINE)){  toast('يرجى اختيار نوع القنينة للحصول على الرقم','error'); load(false); return; }
 
     const payload = {
       full_name:nm, birth_year:by, gender:G('rc-gen').value,
@@ -369,6 +371,11 @@ async function saveReception(){
       donation_date:new Date().toISOString().split('T')[0],
       donation_time:new Date().toTimeString().substring(0,5),
       existing_donor_id:G('s-reception')?.dataset?.existingDonorId||null,
+      blood_pressure:G('rc-bp').value.trim()||null,
+      pulse:parseInt(G('rc-pulse').value)||null,
+      temperature:parseFloat(G('rc-temp').value)||null,
+      weight:parseFloat(G('rc-weight').value)||null,
+      hemoglobin:parseFloat(G('rc-hgb').value)||null,
       bottle_type:btype,
       bottle_number:bnum,
       seq_id:seqId,
@@ -377,12 +384,43 @@ async function saveReception(){
     };
 
     if(!IS_ONLINE){
-      // Offline: save to queue
+      // بدون اتصال: يُحفظ بالطابور + سجل محلي مؤقت (يراه السحب والمختبر) + تُطبع الأوراق بشكل طبيعي
+      const _rnd=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+      payload.local_id='local-'+_rnd();
+      payload.local_donor_id = payload.existing_donor_id ? null : 'local-d-'+_rnd();
+      payload.local_bn = G('rc-bnum')?.dataset?.local==='1' && bnum>0;
+      const _donorNoShown = parseInt(G('rc-donornum')?.value)||null;
+      payload.donor_number_shown=_donorNoShown;
       await enqueueOp('reception', payload);
+      if(payload.local_bn && window.bbm) { try{ await bbm.commitBN(seqKey(btype),bnum); }catch(e){} }
+      const _now=new Date().toISOString();
+      try{
+        if(window.bbm) await bbm.addLocal({
+          id:payload.local_id, donor_id:payload.existing_donor_id||payload.local_donor_id, bottle_type:btype, bottle_number:bnum||null,
+          component_type:'دم كامل', donation_type:payload.donation_type, patient_name:payload.patient_name, hospital_name:payload.hospital_name,
+          donation_date:payload.donation_date, donation_time:payload.donation_time, blood_pressure:payload.blood_pressure, pulse:payload.pulse,
+          temperature:payload.temperature, weight:payload.weight, hemoglobin:payload.hemoglobin, status:'pending_draw', is_deleted:false,
+          created_by:payload.created_by, created_at:_now, updated_at:_now
+        }, payload.local_donor_id ? {
+          id:payload.local_donor_id, full_name:nm, birth_year:by, gender:payload.gender, mother_name:payload.mother_name, national_id:payload.national_id,
+          id_type:payload.id_type, mobile:payload.mobile, address:payload.address, occupation:payload.occupation, donor_number:_donorNoShown,
+          is_deleted:false, created_at:_now, updated_at:_now } : null);
+      }catch(e){ console.log('addLocal failed',e); }
       const q = await getPendingQueue();
       updateOfflineBar('offline', q.length+' عملية معلّقة');
-      toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً عند عودة الإنترنت','warning',5000);
+      _lastDonation = {
+        id:payload.local_id, donor_name:nm, bottle_number:bnum||'', bottle_type:btype, donor_number:_donorNoShown,
+        donation_date:payload.donation_date, donation_time:payload.donation_time, birth_year:by, gender:payload.gender,
+        mobile:payload.mobile||'', national_id:payload.national_id||'', id_type:payload.id_type||'', mother_name:payload.mother_name||'',
+        address:payload.address||'', occupation:payload.occupation||'', donation_type:payload.donation_type, patient_name:payload.patient_name||'',
+        hospital_name:payload.hospital_name||'', blood_pressure:payload.blood_pressure||'', pulse:payload.pulse||'', temperature:payload.temperature||'',
+        weight:payload.weight||'', hemoglobin:payload.hemoglobin||'', expiry_date:''
+      };
+      toast('💾 حُفظ بدون اتصال — يمكنك الطباعة الآن، والإرسال تلقائي عند عودة الإنترنت'+(bnum?(' (رقم القنينة '+bnum+')'):''),'warning',6000);
+      G('rcPrintModal').classList.add('on');
+      { const eb=G('rcEditBtn'); if(eb) eb.style.display='none'; }
       resetReception();
+      G('rcSaveBtn').style.display='flex';
     } else {
       // Online: send directly
       // Check if existing donor selected via autocomplete — or, if not, whether one can be
