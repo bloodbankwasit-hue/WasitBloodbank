@@ -3327,8 +3327,33 @@ function updateOfflineBar(state, msg){
   }
 }
 
+// جلسة الدخول المحفوظة من Supabase بالمتصفح (تبقى حتى لو انتهت صلاحية رمز الدخول أثناء الانقطاع)
+function bbStoredSession(){
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(/^sb-.*-auth-token$/.test(k)){ const v=JSON.parse(localStorage.getItem(k)||'null'); if(v&&v.user&&v.user.id&&localStorage.getItem('bb_prof_'+v.user.id)) return v; }
+    }
+  }catch(e){}
+  return null;
+}
+async function bbRestoreAuth(){
+  const o=window.BB_OFFLINE_SESSION; if(!o) return true;
+  try{
+    const{data,error}=await db.auth.setSession({access_token:o.access_token,refresh_token:o.refresh_token});
+    if(error||!data||!data.session) throw (error||new Error('no session'));
+    SES=data.session; window.BB_OFFLINE_SESSION=null; return true;
+  }catch(e){
+    if(!navigator.onLine) return false;
+    // رمز التحديث لم يعد صالحاً (مثلاً غُيّرت كلمة المرور أو عُطّل الحساب): يلزم دخول جديد، وما حُفظ محلياً يبقى بالطابور
+    toast('انتهت جلسة الدخول — سجّل الدخول من جديد. العمليات المحفوظة محلياً باقية وستُرسل بعد الدخول.','error',15000);
+    window.BB_OFFLINE_SESSION=null; try{ showLogin(); }catch(x){}
+    return false;
+  }
+}
 async function onOnline(){
   IS_ONLINE = true;
+  if(window.BB_OFFLINE_SESSION){ const ok=await bbRestoreAuth(); if(!ok) return; }
   updateOfflineBar('online','');
   await cacheRejectedDonors();
   await syncQueue();
@@ -3462,10 +3487,20 @@ async function appInit(){
   setDefaults();
   diag("Checking Supabase session...");
   try{
-  const {data:{session}} = await db.auth.getSession();
-    if(session){ diag("Session found: "+session.user.email, "#00bfff"); SES=session; await loadProf(); showApp(); }
+  try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(); }catch(e){}   // يطلب من المتصفح عدم حذف بيانات الجهاز المحلية عند ضيق المساحة
+  let {data:{session}} = await db.auth.getSession();
+  if(!session){ // لا اتصال والجلسة منتهية: ندخل بالجلسة المحفوظة وبروفايل الحساب المحفوظ (وضع بدون إنترنت)
+    const _os=bbStoredSession();
+    if(_os && (!navigator.onLine || !IS_ONLINE)){ session=_os; window.BB_OFFLINE_SESSION=_os; diag("Offline session restored","#ffd700"); }
+  }
+    if(session){ diag("Session found: "+session.user.email, "#00bfff"); SES=session; await loadProf(); if(UPROF) showApp(); }
     else { diag("No session - showing login", "#ffd700"); showLogin(); }
-  }catch(e){ diag("Supabase error: "+e.message, "#ff4444"); showLogin(); }
+  }catch(e){
+    diag("Supabase error: "+e.message, "#ff4444");
+    const _os=bbStoredSession();
+    if(_os){ window.BB_OFFLINE_SESSION=_os; SES=_os; try{ await loadProf(); if(UPROF) showApp(); else showLogin(); }catch(x){ showLogin(); } }
+    else showLogin();
+  }
   db.auth.onAuthStateChange(async(ev,s)=>{
     // Handle session events
     if(ev==='SIGNED_IN' || ev==='TOKEN_REFRESHED' || ev==='INITIAL_SESSION'){
