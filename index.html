@@ -1994,7 +1994,100 @@ if(typeof supabase === 'undefined'){
   throw new Error('Supabase CDN not loaded');
 }
 const { createClient } = supabase;
-const db = createClient(SURL, SKEY);
+const _rawDb = createClient(SURL, SKEY);
+// ════════════════════════════════════════════════════════════════
+// طبقة القراءة المحلية (v124): كل قراءة ناجحة تُحفظ بالجهاز؛ إذا انقطعت الشبكة تُعاد آخر نسخة محفوظة
+// بدل الخطأ. لا تتدخل أبداً والإنترنت شغّال (النتيجة الحية دائماً). الكتابة لا تُلمس هنا.
+// ════════════════════════════════════════════════════════════════
+const BBRC_RPC_READ = new Set(['form_members','dispatch_archive','supply_open','stats_report','release_open','my_waiting_forms','integrity_report','forms_recent','donation_exit_counts','dispatch_stats','dash_counts']);
+const BBRC_MAX_ENTRIES = 4000, BBRC_MAX_BYTES = 6*1024*1024;
+let _bbrcDB = null, _bbrcOpening = null, BBRC_SERVED = {n:0, oldest:0, last:0};
+function bbrcOpen(){
+  if(_bbrcDB) return Promise.resolve(_bbrcDB);
+  if(_bbrcOpening) return _bbrcOpening;
+  _bbrcOpening = new Promise(res=>{
+    try{
+      const rq = indexedDB.open('bloodbank_readcache',1);
+      rq.onupgradeneeded = e=>{ const d=e.target.result; if(!d.objectStoreNames.contains('q')) d.createObjectStore('q',{keyPath:'k'}).createIndex('ts','ts'); };
+      rq.onsuccess = e=>{ _bbrcDB=e.target.result; res(_bbrcDB); };
+      rq.onerror = ()=>res(null); rq.onblocked = ()=>res(null);
+    }catch(e){ res(null); }
+  });
+  return _bbrcOpening;
+}
+function bbrcKey(kind,name,ops){
+  let uid=''; try{ uid = (typeof SES!=='undefined' && SES && SES.user && SES.user.id) || ''; }catch(e){}
+  return uid+'|'+kind+'|'+name+'|'+JSON.stringify(ops);
+}
+async function bbrcPut(k,val){
+  try{
+    const d=await bbrcOpen(); if(!d) return;
+    const s=JSON.stringify(val.data); if(s.length>BBRC_MAX_BYTES) return;
+    await new Promise(res=>{ const tx=d.transaction('q','readwrite'); tx.objectStore('q').put({k,data:val.data,count:val.count==null?null:val.count,ts:Date.now()}); tx.oncomplete=res; tx.onerror=res; tx.onabort=res; });
+    if(Math.random()<0.02) bbrcTrim(d);
+  }catch(e){}
+}
+function bbrcTrim(d){
+  try{
+    const st=d.transaction('q','readwrite').objectStore('q'); const c=st.count();
+    c.onsuccess=()=>{ let extra=c.result-BBRC_MAX_ENTRIES; if(extra<=0) return;
+      st.index('ts').openCursor().onsuccess=e=>{ const cur=e.target.result; if(cur&&extra-->0){ cur.delete(); cur.continue(); } }; };
+  }catch(e){}
+}
+async function bbrcGet(k){
+  try{
+    const d=await bbrcOpen(); if(!d) return null;
+    return await new Promise(res=>{ const r=d.transaction('q','readonly').objectStore('q').get(k); r.onsuccess=()=>res(r.result||null); r.onerror=()=>res(null); });
+  }catch(e){ return null; }
+}
+function bbrcIsNetErr(res,thrown){
+  if(thrown) return true;
+  if(!res||!res.error) return false;
+  if(res.status===0) return true;
+  return /failed to fetch|networkerror|network request|load failed|fetch failed|timeout|err_internet|econn|aborted/i.test(String(res.error.message||''));
+}
+async function bbrcRun(kind,name,ops,rpcArgs){
+  const build=()=>{
+    let b;
+    if(kind==='rpc') b=_rawDb.rpc(name,rpcArgs[0],rpcArgs[1]); else { b=_rawDb.from(name); for(const o of ops) b=b[o[0]](...o[1]); }
+    return b;
+  };
+  const cacheable = kind==='rpc' ? BBRC_RPC_READ.has(name)
+    : (ops.length>0 && ops[0][0]==='select' && !ops.some(o=>o[0]==='ilike'||o[0]==='like'||o[0]==='textSearch'));
+  if(!cacheable) return await build();
+  const key = bbrcKey(kind,name, kind==='rpc'?rpcArgs:ops);
+  let res=null, thrown=false;
+  try{ res=await build(); }catch(e){ thrown=true; }
+  if(!thrown && res && !res.error){ bbrcPut(key,res); return res; }
+  if(bbrcIsNetErr(res,thrown)){
+    const c=await bbrcGet(key);
+    if(c){
+      BBRC_SERVED.n++; BBRC_SERVED.last=Date.now(); if(!BBRC_SERVED.oldest||c.ts<BBRC_SERVED.oldest) BBRC_SERVED.oldest=c.ts;
+      try{ bbrcNotice(); }catch(e){}
+      return {data:c.data,error:null,count:c.count,status:200,statusText:'OFFLINE_CACHE',_cached:true,_ts:c.ts};
+    }
+  }
+  if(thrown) throw new Error('تعذر الاتصال بالسيرفر ولا توجد نسخة محفوظة لهذه البيانات على الجهاز');
+  return res;
+}
+let _bbrcNoticeAt=0;
+function bbrcNotice(){
+  const now=Date.now(); if(now-_bbrcNoticeAt<60000) return; _bbrcNoticeAt=now;
+  if(typeof toast==='function') toast('📴 لا يوجد اتصال — تُعرض آخر بيانات محفوظة على هذا الجهاز','info',5000);
+}
+function bbrcRec(kind,name,ops,rpcArgs){
+  return new Proxy({},{ get(_,p){
+    if(p==='then') return (ok,ko)=>bbrcRun(kind,name,ops,rpcArgs).then(ok,ko);
+    if(p==='catch'||p==='finally') return (...a)=>bbrcRun(kind,name,ops,rpcArgs)[p](...a);
+    if(typeof p==='symbol') return undefined;
+    return (...a)=>bbrcRec(kind,name,[...ops,[p,a]],rpcArgs);
+  }});
+}
+const db = new Proxy(_rawDb,{ get(t,p){
+  if(p==='from') return n=>bbrcRec('from',n,[]);
+  if(p==='rpc') return (n,a,o)=>bbrcRec('rpc',n,[],[a,o]);
+  const v=Reflect.get(t,p,t); return typeof v==='function'? v.bind(t) : v;
+}});
 let SES = null, UPROF = null, DPAGE = 1, SRDATA = [], BCDATA = null;
 const PS = 20;
 
@@ -3338,7 +3431,21 @@ async function doLogin(){
 
 async function loadProf(){
   if(!SES){ return; }
-  const {data}=await db.from('user_profiles').select('*').eq('id',SES.user.id).single();
+  // الحساب (الدور والصلاحيات) يُحفظ نسخة محلية عند كل نجاح، ويُستعمل فقط عند انقطاع الاتصال،
+  // حتى تظهر كل أقسام الحساب بدون إنترنت (وإلا تظهر لوحة التحكم فقط). السيرفر يبقى المرجع عند توفر الاتصال.
+  const _pk='bb_prof_'+SES.user.id;
+  let data=null, _netErr=false;
+  try{
+    const r=await db.from('user_profiles').select('*').eq('id',SES.user.id).single();
+    data=r.data;
+    if(!data && r.error) _netErr = !navigator.onLine || !r.status || /fetch|network|timeout|failed/i.test(r.error.message||'');
+  }catch(e){ _netErr=true; }
+  if(data){ try{ localStorage.setItem(_pk,JSON.stringify(data)); }catch(e){} }
+  else if(_netErr){
+    try{ data=JSON.parse(localStorage.getItem(_pk)||'null'); }catch(e){ data=null; }
+    if(data) setTimeout(()=>toast('لا يوجد اتصال: أقسامك ظاهرة، والعمليات تُحفظ وتُرسل عند العودة','info',5000),600);
+    else { setTimeout(()=>toast('لا يوجد اتصال ولا نسخة محفوظة لحسابك. سجّل الدخول مرة واحدة والإنترنت متوفر','error',7000),600); return; }
+  }
   UPROF=data;
   if(!data||!data.is_active){
     await db.auth.signOut(); showLogin();
