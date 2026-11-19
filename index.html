@@ -5279,6 +5279,52 @@ async function saveDispatch(){
   await loadSupply();
 }
 
+// [تسلسلات القناني: js/sequences.js] — يُحمّل عند فتح شاشة الإعدادات لأول مرة
+// [الصلاحيات وإدارة المستخدمين: js/users.js] — يُحمّل عند فتح شاشة المستخدمين لأول مرة
+
+// ================================================================
+// MAIN TAB SYSTEM
+// ================================================================
+const WORK_CARDS = [
+  {key:'reception', icon:'➕', name:'إضافة متبرع',  desc:'تسجيل متبرع جديد'},
+  {key:'collection', icon:'📋', name:'استمارة التبرع بالدم', desc:'طباعة استمارة السحب A4 وأرشيفها'},
+  {key:'campaigns', icon:'🚐', name:'حملات التبرع',  desc:'تسلسلات ومتابعة الحملات'},
+  {key:'draw',      icon:'💉', name:'السحب',        desc:'وحدة سحب الدم'},
+  {key:'trima',     icon:'🩸', name:'وحدة التريما',  desc:'سحب التريما: دم مضغوط أو صفائح'},
+  {key:'virology',      icon:'🧪', name:'وحدة الفيروسات', desc:'فحص العينات'},
+  {key:'classification',icon:'🩸', name:'وحدة التصنيف',  desc:'تحديد فصيلة القناني'},
+  {key:'separation',icon:'🧬', name:'الفصل',        desc:'متابعة القناني من السحب لحد الفصل'},
+  {key:'pending_release', icon:'⏳', name:'المخزن المؤقت', desc:'تأكيد القناني قبل دخولها للتجهيز'},
+  {key:'supply',    icon:'📦', name:'التجهيز',      desc:'الخزين والصرف'},
+  {key:'donors',    icon:'👥', name:'المتبرعون',    desc:'سجل التبرعات'},
+  {key:'globalsearch', icon:'🔍', name:'البحث والأرشيف', desc:'بحث سريع أو متقدم بكل البيانات'},
+  {key:'infected',  icon:'⚠️', name:'المصابون والمرفوضون', desc:'الحالات الإيجابية والمرفوضون مؤقتاً ودائماً'},
+  {key:'rare',      icon:'💎', name:'الفصائل النادرة', desc:'O− و AB−'},
+  {key:'damaged_store', icon:'🗑️', name:'مخزن القناني التالفة', desc:'استلام التالف وإتلافه بمحضر وأرشيفه'},
+  {key:'store',     icon:'🏬', name:'المخزن',        desc:'مواد المصرف: إضافة وسحب وأرشيف'},
+  {key:'stats',     icon:'📈', name:'الإحصائيات',  desc:'تقارير وطباعة'},
+  {key:'backup',    icon:'💾', name:'النسخ الاحتياطي', desc:'تلقائي كل 3 أيام على هذه الحاسبة'},
+];
+
+const ADMIN_ONLY_CARDS = [
+  {key:'audit',    icon:'🔒', name:'سجل التتبع',    desc:'جميع العمليات'},
+  {key:'settings', icon:'⚙️', name:'الإعدادات',    desc:'إعدادات النظام'},
+  {key:'users',    icon:'👥', name:'إدارة الحسابات', desc:'الموظفون والصلاحيات'},
+];
+
+// nav(name) target -> the permission key required to reach it. Built from the same cards that
+// already control which tiles show, so the two can never drift apart.
+const SECTION_PERM = {};
+[...WORK_CARDS, ...ADMIN_ONLY_CARDS].forEach(c=>{ SECTION_PERM[c.key]=c.key; });
+SECTION_PERM.add = 'reception';
+SECTION_PERM.collection = 'reception'; // the A4 draw form is a reception task
+function cardVisible(c,isAdmin,perms){
+  if(c.key==='backup') return !!window.nativeBackup && (isAdmin || perms.includes('backup')); // desktop app only
+  return isAdmin || perms.includes(c.key) || (c.key==='collection' && perms.includes('reception'));
+}
+// ── Automatic backup (desktop app only): launcher, notices, startup hook ──────────────────────
+function canAutoBackup(){ return !!window.nativeBackup && !!UPROF && (UPROF.role==='admin' || hasPermission('backup')); }
+
 async function openBackupAutoFromNav(){
   if(!canAutoBackup()){ toast('⛔ النسخ الاحتياطي متاح في تطبيق الويندوز للحسابات المصرّح لها فقط','error'); return; }
   try{ await loadSectionScript('backup'); }catch(e){ toast('تعذر تحميل هذا القسم — تحقق من الاتصال بالإنترنت','error',4000); return; }
