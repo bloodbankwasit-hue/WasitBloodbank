@@ -78,6 +78,7 @@ async function loadStats(){
     try{
       const r=await db.rpc('stats_report',{p_from:f,p_to:t});
       if(r.error) throw r.error;
+      if(r._cached) throw new Error('cached');   // بدون نت: الطريقة المحلية
       R=r.data;
     }catch(e){
       if(/stats_report|PGRST202|42883|could not find/i.test((e.code||'')+' '+(e.message||''))) window._srMissing=true;

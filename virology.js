@@ -89,7 +89,6 @@ function openBulkVirologyModal(){
 async function confirmBulkVirology(){
   const ids=G('bvm-ids').value.split(',').filter(Boolean);
   if(!G('bvm-allneg').checked){ toast('يرجى تفعيل All-Negative للمتابعة','error'); return; }
-  if(!IS_ONLINE){ toast('الفحص الجماعي يحتاج اتصال بالإنترنت (استخدم الفحص الفردي بدون نت)','error'); return; }
   load(true);
   try{
     for(const id of ids){
@@ -161,7 +160,6 @@ async function openVirologyEdit(id,name,bn,drawDate){
 async function saveVirologyEdit(id,ser,serType,note){
   const reason=(G('vm-edit-reason')?.value||'').trim();
   if(!reason){ toast('اكتب سبب التعديل','error'); return; }
-  if(!IS_ONLINE){ toast('التعديل يحتاج اتصالاً بالإنترنت','warning'); return; }
   const restore=!!G('vm-edit-restore')?.checked;
   load(true);
   try{

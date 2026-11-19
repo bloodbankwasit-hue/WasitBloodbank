@@ -150,7 +150,6 @@ async function confirmDrawSuccess(){
   const btyp=G('dm-btyp-val').value;
 
   if(btyp==='تريما'){
-    if(!IS_ONLINE){ toast('سحب التريما يحتاج اتصال بالإنترنت (ينشئ عدة قناني دفعة وحدة)','error'); return; }
     const wantBlood=G('dm-trima-blood').checked;
     const wantPlt=G('dm-trima-plt').checked;
     if(!wantBlood && !wantPlt){ toast('يرجى تحديد ناتج واحد على الأقل (دم مضغوط أو صفائح)','error'); return; }

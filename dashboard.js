@@ -18,6 +18,7 @@ async function loadDash(){
     // الأعداد الستة (اليوم/الشهر/طوعي/تعويضي/الكلي/المصابين) بطلب واحد من السيرفر؛ وإن لم تُنشأ الدالة نرجع للاستعلامات القديمة
     const dcP = window._dcMissing ? Promise.resolve(null)
       : db.rpc('dash_counts',{p_today:today,p_month:ms}).then(r=>{
+          if(r._cached) return null;   // بدون نت: نحسب من النسخة المحلية (تشمل المعلّق) بدل رقم قديم محفوظ
           if(r.error){ if(/dash_counts|PGRST202|42883|could not find/i.test((r.error.code||'')+' '+(r.error.message||''))) window._dcMissing=true; return null; }
           return r.data; }).catch(()=>null);
     const sgP = _hs0 ? Promise.resolve(null) : ((typeof supplyGroups==='function') ? supplyGroups().catch(()=>null) : Promise.resolve(null));

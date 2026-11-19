@@ -104,7 +104,6 @@ function osMark(){
 
 async function osSave(){
   if(_osBusy) return;
-  if(!IS_ONLINE){ toast('الحفظ يحتاج اتصالاً بالإنترنت','error'); return; }
   const ct=_osComp, changes=[];
   osBts(ct).forEach((bt,i)=>{
     const raw=G('os-i-'+i)?.value; if(raw==null||raw==='') return;
@@ -221,7 +220,6 @@ async function osSubmit(){
   const need={}; items.forEach(x=>{ need[x.c+'|'+x.b]=(need[x.c+'|'+x.b]||0)+x.n; });
   const over=Object.entries(need).find(([k,n])=>n>osLeft(...k.split('|')));
   if(over){ toast('العدد أكبر من المتبقي: '+over[0].replace('|',' '),'error'); return; }
-  if(!IS_ONLINE){ toast('العملية تحتاج اتصالاً بالإنترنت','error'); return; }
   const tot=items.reduce((a,x)=>a+x.n,0);
   if(!(await bbConfirm('تأكيد '+OS_KIND[kind]+' ('+tot+' قنينة) من الرصيد الخارجي'+(hosp?' إلى «'+hosp+'»':'')+(book?'\nكتاب رقم '+book:'')+(kind==='destroy'?'\nالسبب: '+note:'')+'؟'))) return;
   _osBusy=true; load(true);

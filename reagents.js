@@ -52,7 +52,7 @@ function rgAsk(kind,id){
   else rgForm(esc(r.name)+' — حد التنبيه', `<div style="margin-bottom:8px;color:#6B7280">الحد الحالي: <b>${fnum(r.low_threshold)}</b> — يظهر الإشعار عند وصول الرصيد له أو أقل</div>`+_rgIn('rg-n','الحد الجديد'), `rgSave('thr','${id}')`);
 }
 async function rgSave(kind,id){
-  if(!rgCan()) return; if(!IS_ONLINE){ toast('يحتاج اتصالاً بالإنترنت','warning'); return; }
+  if(!rgCan()) return;
   const n=_rgNum('rg-n'), note=(G('rg-note')?.value||'').trim();
   if(!Number.isInteger(n)||n<0||(kind==='add'&&n<1)){ toast('اكتب رقماً صحيحاً','error'); return; }
   if(kind==='set' && !note){ toast('اكتب سبب التصحيح','error'); return; }
@@ -73,7 +73,7 @@ function rgNew(){
     +`<label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="rg-auto" checked style="width:18px;height:18px"> تُخصم تلقائياً مع كل قنينة تُفحص</label>`,'rgCreate()');
 }
 async function rgCreate(){
-  if(!rgCan()) return; if(!IS_ONLINE){ toast('يحتاج اتصالاً بالإنترنت','warning'); return; }
+  if(!rgCan()) return;
   const name=(G('rg-name').value||'').trim(), n=_rgNum('rg-n'), t=_rgNum('rg-t');
   if(!name){ toast('اكتب اسم المادة','error'); return; }
   load(true);

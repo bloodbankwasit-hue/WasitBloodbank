@@ -138,7 +138,6 @@ async function shSubmit(){
   if(!hosp){ toast('اختر المستشفى','error'); return; }
   if(!comp){ toast('اختر نوع التعويض','error'); return; }
   if(comp===SH_BOOK){
-    if(!IS_ONLINE){ toast('الحفظ يحتاج اتصالاً بالإنترنت','error'); return; }
     if(!(await bbConfirm('حفظ «تجهيز بكتاب» للمريض «'+pat+'» — '+hosp+'؟\nيُسجَّل بالإحصائيات فقط، ولا تُسحب أي قنينة من الرصيد.'))) return;
     _shBusy=true; load(true);
     try{

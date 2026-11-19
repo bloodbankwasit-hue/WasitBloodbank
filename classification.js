@@ -92,7 +92,6 @@ async function confirmBulkClassification(){
   const ids=G('bcm-ids').value.split(',').filter(Boolean);
   const bt=G('bcm-bt').value;
   if(!bt){ toast('يرجى اختيار فصيلة الدم','error'); return; }
-  if(!IS_ONLINE){ toast('التصنيف الجماعي يحتاج اتصال بالإنترنت (استخدم التصنيف الفردي بدون نت)','error'); return; }
   load(true);
   try{
     for(const id of ids){
@@ -176,7 +175,6 @@ async function saveClassification(){
   if(!bt){ toast('يرجى اختيار فصيلة الدم','error'); return; }
   const editOld=_cmEditOld;
   if(editOld && editOld===bt){ toast('الفصيلة لم تتغير','warning'); return; }
-  if(editOld && !IS_ONLINE){ toast('تعديل الفصيلة يحتاج اتصال بالإنترنت','error'); return; }
   load(true);
   try{
     if(IS_ONLINE){
@@ -200,6 +198,7 @@ async function saveClassification(){
       // completion/rejection decision needs the real server state and is only made for real
       // when syncQueue() replays this through applyLabUpdate() once back online.
       await enqueueOp('lab', {donation_id:id, fieldUpdates:{blood_type:bt, blood_type_date:labToday()}});
+      if(editOld){ try{ await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,old_values:{blood_type:editOld},new_values:{blood_type:bt,note:'تعديل فصيلة (بدون اتصال)'}}); }catch(e){} }
       try{ if(window.bbm) await bbm.applyLocal('blood_donations',[['update',[{blood_type:bt, blood_type_date:labToday()}]],['eq',['id',id]]]); }catch(e){}
       const q = await getPendingQueue();
       updateOfflineBar('offline', q.length+' عملية معلّقة');

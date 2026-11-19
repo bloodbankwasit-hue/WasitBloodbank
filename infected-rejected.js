@@ -123,7 +123,6 @@ async function openUnInfect(id){
 
 async function confirmUnInfect(){
   if(!_canUnInfect()){ toast('⛔ هذا الإجراء لموظفي وحدة الفيروسات','error'); return; }
-  if(!IS_ONLINE){ toast('هذا الإجراء يحتاج اتصالاً بالإنترنت','warning'); return; }
   const id=G('ui-id').value, reason=G('ui-reason').value.trim();
   const unblock=G('ui-unblock').checked, keep=G('ui-keep').checked;
   if(!reason){ toast('اكتب سبب الإلغاء (مثلاً: فحص ثانٍ سالب بتاريخ ...)','error'); return; }
@@ -306,7 +305,6 @@ function rjRemove(id,name){
 async function rjRemoveGo(id){
   const reason=(G('rjr-reason').value||'').trim();
   if(!reason){ toast('اكتب سبب الإزالة','error'); return; }
-  if(!IS_ONLINE){ toast('هذا الإجراء يحتاج اتصالاً بالإنترنت','warning'); return; }
   load(true);
   try{
     const{data:old,error:oe}=await db.from('rejected_donors').select('*').eq('id',id).single();

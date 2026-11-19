@@ -6,6 +6,10 @@
 (function(){
   if(window.bbm) return;
   const DBN='bloodbank_mirror', PAGE=1000, OVERLAP_MS=10*60*1000, SYNC_EVERY=5*60*1000;
+  // جداول صغيرة تُنسخ كاملةً (v131): تُقرأ وتُكتب محلياً بدون نت
+  const ST=['rejected_donors','campaign_slots','bottle_sequences','user_profiles','bottle_number_pool','lab_reagents','destruction_reports','campaigns','opening_stock','store_items','opening_dispatch','lab_reagent_log','dispatch_book_records','app_settings','store_moves','store_lots'];
+  const EMB={lab_reagent_log:{lab_reagents:'reagent_id'},store_moves:{store_items:'item_id'},campaign_slots:{campaigns:'campaign_id'}};
+  const TB={};
   let DALL=null, BALL=null; let idb=null, D=null /*donors array*/, LAST=null /*donor_id -> last donation*/, running=false, timer=null;
 
   function open(){
@@ -88,12 +92,34 @@
     return n;
   }
 
+  async function loadTB(name){ if(!TB[name]){ const v=await metaGet('tb_'+name); if(Array.isArray(v)) TB[name]=v; } return TB[name]||null; }
+  async function syncTable(name){
+    let rows=[], ordered=true;
+    for(let p=0;;p+=PAGE){
+      let r=await (ordered?_rawDb.from(name).select('*').order('id',{ascending:true}):_rawDb.from(name).select('*')).range(p,p+PAGE-1);
+      if(r.error && ordered && p===0){ ordered=false; r=await _rawDb.from(name).select('*').range(p,p+PAGE-1); }
+      if(r.error) throw r.error;
+      rows=rows.concat(r.data||[]); if(!r.data||r.data.length<PAGE) break;
+    }
+    await metaSet('tb_'+name,rows); await metaSet('tbat_'+name,Date.now()); TB[name]=rows; return rows.length;
+  }
+  async function syncTables(){
+    const out={}; const dirty=await metaGet('tbl_dirty'); let bad=0;
+    for(const t of ST){
+      try{ const at=await metaGet('tbat_'+t); if(!dirty && at && Date.now()-at<9*60e3) continue; out[t]=await syncTable(t); }
+      catch(e){ out[t]='err'; bad++; }
+    }
+    if(dirty && !bad) await metaSet('tbl_dirty',0);
+    return out;
+  }
+
   async function sync(){
     if(running||!navigator.onLine) return {skipped:true};
     try{ if(typeof getPendingQueue==='function'){ const q=await getPendingQueue(); if(q&&q.length) return {skipped:'pending'}; } }catch(e){}   // لا نكتب فوق التعديلات المحلية قبل إرسالها
     running=true; const out={};
     try{
       for(const k of ['donors','donations']){ out[k]=await syncKind(k); }
+      try{ out.tables=await syncTables(); }catch(e){ console.log('[mirror] tables',e); }
       try{ if(typeof cacheRejectedDonors==='function') await cacheRejectedDonors(); }catch(e){}
       try{ await syncBN(); }catch(e){ console.log('[mirror] bn state',e); }
       try{ await metaSet('bn_local',{used:[],next:{}}); }catch(e){}   // كل ما استُعمل محلياً أُرسل (لا يوجد طابور معلّق هنا) فصار ضمن بيانات السيرفر
@@ -134,6 +160,7 @@
 
   // ───────── محرك استعلام محلي (يحاكي PostgREST للحالات الشائعة) ─────────
   async function loadAll(table){
+    if(ST.includes(table)) return (await loadTB(table))||[];
     if(table==='donors'){ if(!DALL) DALL=await all('donors'); return DALL; }
     if(!BALL) BALL=await all('donations'); return BALL;
   }
@@ -142,16 +169,18 @@
   function same(a,b){ if(a==null||b==null) return a==b; return String(a)===String(b); }
   const OK_OPS=new Set(['select','eq','neq','gt','gte','lt','lte','in','is','not','order','limit','range','single','maybeSingle','ilike']);
   // يرجع null إذا وُجد شيء غير مدعوم (فيُستعمل الكاش القديم أو يظهر الخطأ)
-  async function runQuery(name,ops){
+  async function runQuery(name,ops,_raw){
     const kind = name==='donors' ? 'donors' : (name==='blood_donations' ? 'donations' : null);
-    if(!kind || !(await metaGet('lastSync'))) return null;
+    const isST = ST.includes(name);
+    if(isST){ if(!(await loadTB(name))) return null; }
+    else if(!kind || !(await metaGet('lastSync'))) return null;
     if(!ops.length || ops[0][0]!=='select') return null;
     for(const o of ops) if(!OK_OPS.has(o[0])) return null;
     let cols=ops[0][1][0]||'*', opts=ops[0][1][1]||{};
     const parts=splitTop(cols), proj=[], embeds=[];
     for(const c of parts){
       const m=c.match(/^([a-z_]+)(!inner)?\((.*)\)$/i);
-      if(m){ if(!(kind==='donations' && m[1]==='donors')) return null; embeds.push({alias:'donors',inner:!!m[2],cols:splitTop(m[3])}); }
+      if(m){ const fkm = isST ? (EMB[name]||{}) : (kind==='donations' ? {donors:'donor_id'} : {}); if(!fkm[m[1]]) return null; embeds.push({tbl:m[1],fk:fkm[m[1]],inner:!!m[2],cols:splitTop(m[3])}); }
       else proj.push(c);
     }
     let rows=await loadAll(name), res=rows, single=null, ord=[], lim=null, rng=null;
@@ -181,9 +210,8 @@
       else if(m==='maybeSingle') single='maybe';
     }
     res=rows.filter(r=>ft.every(f=>f(r)));
-    const needDonors=embeds.length>0;
-    let dmap=null;
-    if(needDonors){ dmap=new Map((await loadAll('donors')).map(d=>[d.id,d])); if(embeds.some(e=>e.inner)) res=res.filter(r=>dmap.has(r.donor_id)); }
+    if(_raw) return res;
+    for(const e of embeds){ const src=await loadAll(e.tbl); if(e.tbl!=='donors' && !(await loadTB(e.tbl))) return null; e.map=new Map(src.map(d=>[d.id,d])); if(e.inner) res=res.filter(r=>e.map.has(r[e.fk])); }
     const total=res.length;
     if(opts.head) return {data:null,error:null,count:total,status:200,_local:true};
     if(ord.length) res=res.slice().sort((x,y)=>{ for(const o of ord){ const c=cmp(x[o.c],y[o.c]); if(c) return o.asc?c:-c*1; } return 0; });
@@ -193,8 +221,8 @@
     const star=proj.includes('*');
     const out=res.map(r=>{
       let o; if(star) o={...r}; else { o={}; for(const c of proj){ const k=c.split(':').pop().trim(); o[k]=r[k]===undefined?null:r[k]; } }
-      for(const e of embeds){ const d=dmap.get(r.donor_id); if(!d){ o.donors=null; continue; }
-        if(e.cols.includes('*')) o.donors={...d}; else { const x={}; for(const c of e.cols){ x[c]=d[c]===undefined?null:d[c]; } o.donors=x; } }
+      for(const e of embeds){ const d=e.map.get(r[e.fk]); if(!d){ o[e.tbl]=null; continue; }
+        if(e.cols.includes('*')) o[e.tbl]={...d}; else { const x={}; for(const c of e.cols){ x[c]=d[c]===undefined?null:d[c]; } o[e.tbl]=x; } }
       return o; });
     if(single){
       if(out.length===1) return {data:out[0],error:null,status:200,_local:true,count:total};
@@ -214,6 +242,86 @@
       for(const r of rows){ if(set.has(String(r.id))){ Object.assign(r,u[1][0]); changed.push(r); } }
       if(changed.length){ await putMany(kind,changed,false); D=null; LAST=null; }
     }catch(e){ console.log('[mirror] applyLocal',e); }
+  }
+  const rnd=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+  // كتابة عامة محلياً (insert/update/delete/upsert) على الجداول المنسوخة. ترجع {touched,lids} أو null إن لم تُدعم
+  async function applyWrite(name,ops){
+    try{
+      const isST=ST.includes(name), kind=name==='blood_donations'?'donations':(name==='donors'?'donors':null);
+      if(!isST&&!kind) return null;
+      const w=ops[0]; if(!w) return null; const m=w[0];
+      if(!isST && !(await metaGet('lastSync'))) return null;
+      const rows=await loadAll(name); if(isST && !(await loadTB(name))) return null;
+      const touched=[], lids=[];
+      if(m==='insert'||m==='upsert'){
+        const arr=Array.isArray(w[1][0])?w[1][0]:[w[1][0]]; const key=(w[1][1]&&w[1][1].onConflict)||'id';
+        for(const x of arr){
+          const row={...x}; let ex=null;
+          if(m==='upsert') ex=rows.find(r=>r[key]!=null && same(r[key],row[key]));
+          if(ex){ Object.assign(ex,row); touched.push(ex); lids.push(null); continue; }
+          let lid=null; if(row.id==null){ lid='local-'+rnd(); row.id=lid; }
+          if(row.created_at==null) row.created_at=new Date().toISOString();
+          rows.push(row); touched.push(row); lids.push(lid);
+        }
+      } else if(m==='update'||m==='delete'){
+        const flt=ops.slice(1).filter(o=>!['select','single','maybeSingle','order','limit'].includes(o[0]));
+        const sel=await runQuery(name,[['select',['*']],...flt],true); if(sel==null) return null;
+        if(m==='update') for(const r of sel){ Object.assign(r,w[1][0]); touched.push(r); }
+        else { for(const r of sel) touched.push({...r}); const set=new Set(sel); const keep=rows.filter(r=>!set.has(r)); rows.length=0; keep.forEach(r=>rows.push(r)); }
+      } else return null;
+      if(isST){ await metaSet('tb_'+name,rows); await metaSet('tbl_dirty',1); }
+      else if(m!=='delete'){ await putMany(kind,touched,false); D=null; LAST=null; }
+      return {touched,lids};
+    }catch(e){ console.log('[mirror] applyWrite',e); return null; }
+  }
+  // الأثر المحلي لدوال السيرفر الكاتبة (تقريب لما يفعله السيرفر؛ يُصحَّح بإعادة الجلب بعد المزامنة). ترجع {error} إن رُفضت محلياً
+  async function applyRpc(name,a){
+    a=a||{};
+    try{
+      const now=new Date().toISOString(), today=now.slice(0,10);
+      const ins=async(t,row)=>{ await applyWrite(t,[['insert',[row]]]); };
+      if(name==='soft_delete_donations'){
+        await applyWrite('blood_donations',[['update',[{is_deleted:true,exit_reason:a.p_reason||null}]],['in',['id',a.p_ids||[]]]]);
+      } else if(name==='lab_reagent_add'||name==='lab_reagent_set'){
+        const rg=(await loadAll('lab_reagents')).find(r=>String(r.id)===String(a.p_id)); if(!rg) return null;
+        const q=name==='lab_reagent_add'?(Number(rg.qty)||0)+Number(a.p_n):Number(a.p_qty);
+        const d=q-(Number(rg.qty)||0);
+        await applyWrite('lab_reagents',[['update',[{qty:q,updated_at:now}]],['eq',['id',rg.id]]]);
+        await ins('lab_reagent_log',{reagent_id:rg.id,delta:d,qty_after:q,kind:name==='lab_reagent_add'?'add':'set',note:a.p_note||null});
+      } else if(name==='lab_reagent_use'){
+        for(const rg of (await loadAll('lab_reagents')).filter(r=>r.is_active&&r.per_test)){
+          const q=Math.max(0,(Number(rg.qty)||0)-Number(a.p_n||1));
+          await applyWrite('lab_reagents',[['update',[{qty:q,updated_at:now}]],['eq',['id',rg.id]]]);
+          await ins('lab_reagent_log',{reagent_id:rg.id,delta:q-(Number(rg.qty)||0),qty_after:q,kind:'use',note:null});
+        }
+      } else if(name==='store_add'){
+        await ins('store_lots',{item_id:a.p_item,qty_in:a.p_qty,qty_left:a.p_qty,expiry_date:a.p_expiry||null,received_date:a.p_date||today,note:a.p_note||null});
+        await ins('store_moves',{item_id:a.p_item,kind:'in',reason:null,qty:a.p_qty,move_date:a.p_date||today,expiry_date:a.p_expiry||null,note:a.p_note||null,created_by_name:a.p_by||null});
+      } else if(name==='store_withdraw'){
+        const lots=(await loadAll('store_lots')).filter(l=>String(l.item_id)===String(a.p_item)&&Number(l.qty_left)>0);
+        let use;
+        if(a.p_lot){ use=lots.filter(l=>String(l.id)===String(a.p_lot)); }
+        else use=lots.filter(l=>!l.expiry_date||String(l.expiry_date)>=today).sort((x,y)=>String(x.expiry_date||'9999').localeCompare(String(y.expiry_date||'9999')));
+        const avail=use.reduce((t,l)=>t+Number(l.qty_left),0);
+        if(avail<a.p_qty) return {error:{message:'INSUFFICIENT'}};
+        let need=a.p_qty;
+        for(const l of use){ if(need<=0) break; const t=Math.min(need,Number(l.qty_left)); need-=t;
+          await applyWrite('store_lots',[['update',[{qty_left:Number(l.qty_left)-t}]],['eq',['id',l.id]]]); }
+        await ins('store_moves',{item_id:a.p_item,kind:'out',reason:a.p_reason||null,qty:a.p_qty,move_date:a.p_date||today,note:a.p_note||null,created_by_name:a.p_by||null});
+      } else if(name==='opening_dispatch_do'){
+        const rows=await loadAll('opening_stock');
+        for(const it of (a.p_items||[])){
+          const r=rows.find(x=>x.component_type===it.c&&x.blood_type===it.b);
+          if(!r||Number(r.qty_left)<it.n) return {error:{message:'الرصيد الخارجي غير كاف'}};
+        }
+        for(const it of (a.p_items||[])){
+          const r=rows.find(x=>x.component_type===it.c&&x.blood_type===it.b);
+          await applyWrite('opening_stock',[['update',[{qty_left:Number(r.qty_left)-it.n,updated_at:now}]],['eq',['id',r.id]]]);
+          await ins('opening_dispatch',{kind:a.p_kind,component_type:it.c,blood_type:it.b,qty:it.n,hospital_name:a.p_hosp||null,patient:a.p_patient||null,book_no:a.p_book||null,note:a.p_note||null,dispatch_date:a.p_date||today});
+        }
+      }
+    }catch(e){ console.log('[mirror] applyRpc',e); }
+    return null;
   }
   // إعادة جلب صفوف محددة من السيرفر (بعد فشل عملية معلّقة، لتصحيح التعديل المحلي المتفائل)
   async function refreshIds(name,ids){
@@ -303,8 +411,8 @@
     timer=setInterval(()=>{ if(navigator.onLine) sync(); else render(); }, SYNC_EVERY);
     setInterval(render,30000); render();
   }
-  async function reset(){ const d=await open(); for(const s of ['donors','donations','meta']){ const tx=d.transaction(s,'readwrite'); tx.objectStore(s).clear(); } D=null; LAST=null; return sync(); }
-  window.bbm={start,sync,searchDonors,exactDonor,lastDonation,render,reset,runQuery,applyLocal,refreshIds,allocBN,commitBN,addLocal,removeLocal,syncBN,
+  async function reset(){ for(const k in TB) delete TB[k]; const d=await open(); for(const s of ['donors','donations','meta']){ const tx=d.transaction(s,'readwrite'); tx.objectStore(s).clear(); } D=null; LAST=null; return sync(); }
+  window.bbm={start,sync,applyWrite,applyRpc,syncTables,searchDonors,exactDonor,lastDonation,render,reset,runQuery,applyLocal,refreshIds,allocBN,commitBN,addLocal,removeLocal,syncBN,
     ready:async()=>!!(await metaGet('lastSync'))};
   window.bbmStart=start; window.bbmSync=sync;
 })();

@@ -308,6 +308,7 @@ async function saveDonorEdit(printAfter){
     // from the new type (pool first, then its sequence) — nothing is lost if it fails.
     const md=G('editDonorModal'), newType=G('ed-btyp').value;
     if(md.dataset.status==='pending_draw' && newType && newType!==md.dataset.origType){
+      if(!IS_ONLINE) throw new Error('تغيير نوع القنينة يحتاج اتصالاً بالإنترنت (يأخذ رقماً جديداً من السيرفر)');
       const{data:cr,error:ce}=await db.rpc('change_bottle_type',{p_donation:donId,p_new_type:newType});
       if(ce) throw new Error(ce.message||'تعذر تغيير نوع القنينة');
       G('ed-bnum').value=cr.bottle_number; delete G('ed-bnum').dataset.keep; md.dataset.origType=newType;

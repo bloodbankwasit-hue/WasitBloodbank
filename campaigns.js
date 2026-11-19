@@ -146,6 +146,7 @@ async function loadPendingRelease(){
     try{
       const r=await db.rpc('release_open',{p_nonsep:nonSeparableTypes});
       if(r.error) throw r.error;
+      if(r._cached) throw new Error('cached');   // بدون نت: نحسب من النسخة المحلية
       (r.data?.groups||[]).forEach(g=>{ counts[g.c]=(counts[g.c]||0)+(+g.n||0); });
       infectedCount=+r.data?.infected||0; ok=true; _prFull=false; _prAllRows=[];
     }catch(e){ if(/release_open|PGRST202|42883|could not find/i.test((e.code||'')+' '+(e.message||''))) window._roMissing=true; }
@@ -271,7 +272,6 @@ function prBulkDamage(){
 async function prBulkPool(){
   const ids=[...document.querySelectorAll('.pr-chk:checked')].map(c=>c.value);
   if(ids.length<2){ toast('اختر قنينتين صفيحات على الأقل للدمج','error'); return; }
-  if(!IS_ONLINE){ toast('الدمج يحتاج اتصالاً بالإنترنت','warning'); return; }
   const rows=_prAllRows.filter(r=>ids.includes(r.id));
   if(rows.length!==ids.length){ toast('تعذّر قراءة المحدد، حدّث الصفحة','error'); return; }
   if(rows.some(r=>r.component_type!=='صفائح دموية'||r.status!=='pending_release'||r.bottle_type==='تريما'||r.pool_numbers)){ toast('الدمج لصفيحات سليمة بالمخزن المؤقت فقط (غير التريما وغير المدموجة سابقاً)','error',6000); return; }

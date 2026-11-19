@@ -114,7 +114,6 @@ function dstOpenDestroy(){
 }
 async function dstConfirmDestroy(){
   if(!_dstCanUse()){ toast('⛔ ما عندك صلاحية','error'); return; }
-  if(!IS_ONLINE){ toast('الإتلاف يحتاج اتصالاً بالإنترنت','warning'); return; }
   const ids=[...document.querySelectorAll('.dst-chk:checked')].map(c=>c.value);
   const method=G('dsd-method').value, date=G('dsd-date').value, officer=G('dsd-officer').value.trim(), notes=G('dsd-notes').value.trim();
   if(!ids.length){ toast('لا توجد قناني محددة','error'); return; }
@@ -126,10 +125,11 @@ async function dstConfirmDestroy(){
     if(re) throw re;
     for(let i=0;i<ids.length;i+=100){
       const{error:ue}=await db.from('blood_donations').update({destruction_report_id:rep.id}).in('id',ids.slice(i,i+100)).is('destruction_report_id',null);
-      if(ue) throw new Error('تم إنشاء المحضر رقم '+rep.report_no+' لكن تعذّر ربط بعض القناني: '+ue.message);
+      if(ue) throw new Error('تم إنشاء المحضر رقم '+(rep.report_no||'—')+' لكن تعذّر ربط بعض القناني: '+ue.message);
     }
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'destruction_reports',record_id:rep.id,new_values:{report_no:rep.report_no,method,count:ids.length}});
     G('dstDestroyModal').classList.remove('on');
+    if(String(rep.id).startsWith('local-')){ toast('✅ حُفظ محضر الإتلاف محلياً — رقم المحضر يُعطى من النظام عند عودة الإنترنت، وتُطبع نسخته الرسمية بعد ذلك','success',9000); await dstLoadWaiting(); return; }
     toast('✅ تم إنشاء محضر الإتلاف رقم '+rep.report_no,'success',4500);
     await dstLoadWaiting();
     if((await bbConfirm('هل تريد طباعة المحضر الآن؟'))) dstPrintReport(rep.id);

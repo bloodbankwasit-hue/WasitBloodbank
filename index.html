@@ -2080,8 +2080,9 @@ async function bbrcRun(kind,name,ops,rpcArgs){
 }
 // ── طابور الكتابة بدون اتصال: يعمل فقط داخل عمليات أُعدّت لذلك صراحةً (bbWithQueue) ──
 const BBQ={depth:0,n:0};
-const BBQ_TABLES={blood_donations:['update','insert'],audit_log:['insert']};
-const BBQ_RPC=new Set(['dispatch_hospital','dispatch_bottles']);
+const BBQ_ALLOW=new Set(['blood_donations','audit_log','donors','rejected_donors','campaign_slots','bottle_sequences','user_profiles','bottle_number_pool','lab_reagents','destruction_reports','campaigns','opening_stock','store_items','opening_dispatch','lab_reagent_log','dispatch_book_records','app_settings','store_moves','store_lots']);
+// دوال السيرفر الكاتبة المسموح تخزينها بالطابور (لا نخزّن ما يُرجع قيمة يحتاجها المستخدم فوراً: claim_bottle_number / assign_donation_to_form / change_bottle_type)
+const BBQ_RPC=new Set(['dispatch_hospital','dispatch_bottles','dispatch_update','dispatch_update_book','dispatch_cancel','dispatch_cancel_book','dispatch_remove_bottle','soft_delete_donations','store_add','store_withdraw','lab_reagent_add','lab_reagent_set','lab_reagent_use','opening_dispatch_do','form_set_state']);
 function bbqEnter(){ BBQ.depth++; return BBQ.n; }
 async function bbqLeave(n0){
   BBQ.depth=Math.max(0,BBQ.depth-1);
@@ -2093,29 +2094,52 @@ async function bbqLeave(n0){
 async function bbWithQueue(fn){ const n0=bbqEnter(); try{ return await fn(); } finally{ await bbqLeave(n0); } }
 function bbqEligible(kind,name,ops){
   if(kind==='rpc') return BBQ_RPC.has(name);
-  const f=ops[0]&&ops[0][0]; const a=BBQ_TABLES[name];
-  if(!a||!a.includes(f)) return false;
-  return !ops.some(o=>o[0]==='select'||o[0]==='single'||o[0]==='maybeSingle');
+  const f=ops[0]&&ops[0][0];
+  return !!(BBQ_ALLOW.has(name) && ['insert','update','delete','upsert'].includes(f));
 }
+const BBQ_TN={campaigns:'حملة',campaign_slots:'حجز حملة',bottle_sequences:'تسلسل',user_profiles:'مستخدم',bottle_number_pool:'أرقام معادة',lab_reagents:'مادة فحص',destruction_reports:'محضر إتلاف',opening_stock:'رصيد خارجي',store_items:'مادة مخزن',opening_dispatch:'صرف رصيد خارجي',lab_reagent_log:'سجل مادة فحص',dispatch_book_records:'كتاب صرف',app_settings:'إعداد',store_moves:'حركة مخزن',store_lots:'دفعة مخزن',rejected_donors:'مرفوض',donors:'متبرع',blood_donations:'قنينة'};
 function bbqLabel(d){
-  if(d.kind==='rpc') return ({dispatch_hospital:'تجهيز لمستشفى (بكتاب)',dispatch_bottles:'تجهيز باي هاند'})[d.name]||d.name;
+  if(d.kind==='rpc') return ({dispatch_hospital:'تجهيز لمستشفى (بكتاب)',dispatch_bottles:'تجهيز باي هاند',dispatch_update:'تعديل صرف',dispatch_update_book:'تعديل كتاب صرف',dispatch_cancel:'إلغاء صرف',dispatch_cancel_book:'إلغاء كتاب',dispatch_remove_bottle:'إزالة قنينة من صرف',soft_delete_donations:'حذف تبرعات',store_add:'إضافة للمخزن',store_withdraw:'سحب من المخزن',lab_reagent_add:'إضافة مادة فحص',lab_reagent_set:'تصحيح رصيد مادة فحص',lab_reagent_use:'استهلاك مادة فحص',opening_dispatch_do:'عملية رصيد خارجي',form_set_state:'حالة استمارة'})[d.name]||d.name;
   if(d.name==='audit_log') return 'سجل تدقيق';
-  if(d.ops[0][0]==='insert') return 'إضافة مكوّنات قنينة (فصل)';
-  const v=(d.ops[0][1]&&d.ops[0][1][0])||{};
-  return 'تعديل قنينة ('+(v.status==='damaged'?'تلف':v.status==='separated'?'فصل':v.status==='dispatched'?'صرف':v.status||'تعديل')+')';
+  if(d.name==='blood_donations'){
+    if(d.ops[0][0]==='insert') return 'إضافة مكوّنات قنينة (فصل)';
+    const v=(d.ops[0][1]&&d.ops[0][1][0])||{};
+    return 'تعديل قنينة ('+(v.status==='damaged'?'تلف':v.status==='separated'?'فصل':v.status==='dispatched'?'صرف':v.status||'تعديل')+')';
+  }
+  const w=({insert:'إضافة',update:'تعديل',delete:'حذف',upsert:'حفظ'})[d.ops[0][0]]||'تعديل';
+  return w+' '+(BBQ_TN[d.name]||d.name);
 }
+let _bbqToastAt=0;
 async function bbqWrite(kind,name,ops,rpcArgs,build){
-  if(BBQ.depth<=0 || !bbqEligible(kind,name,ops)) return await build();
+  if(!bbqEligible(kind,name,ops)) return await build();
   let res=null, thrown=false;
   if(typeof IS_ONLINE!=='undefined' && !IS_ONLINE) thrown=true;
   else { try{ res=await build(); }catch(e){ thrown=true; } }
   if(!thrown && !(res && res.error && bbrcIsNetErr(res,false))) return res;
-  const d={kind,name,ops,args:kind==='rpc'?[rpcArgs[0]||null,rpcArgs[1]||null]:null};
+  // ── بدون اتصال: أثر محلي أولاً (قد يرفض، مثل نقص الرصيد)، ثم الطابور ──
+  const w=ops[0]&&ops[0][0], hasSel=ops.some(o=>o[0]==='select'), single=ops.some(o=>o[0]==='single'||o[0]==='maybeSingle');
+  let local=null, qops=ops;
+  if(kind==='rpc'){
+    if(window.bbm && bbm.applyRpc){ const r=await bbm.applyRpc(name,rpcArgs[0]||{}); if(r&&r.error) return {data:null,error:r.error,status:400}; }
+  } else if(window.bbm && bbm.applyWrite){
+    local=await bbm.applyWrite(name,ops);
+  }
+  // الأعمدة بلا اختيار/وحيد تُحذف من نسخة الطابور (التنفيذ الفعلي يطلب id فقط)
+  const clean=ops.filter(o=>!['select','single','maybeSingle'].includes(o[0]));
+  let lids=null;
+  if(local && (w==='insert') && local.lids.some(Boolean)) lids=local.lids;
+  else if(w==='insert' && !local){   // لا نسخة محلية لهذا الجدول: نولّد معرّفات محلية للإرجاع فقط
+    const arr=Array.isArray(ops[0][1][0])?ops[0][1][0]:[ops[0][1][0]]; lids=arr.map(x=>x&&x.id==null?('local-'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)):null);
+    local={touched:arr.map((x,i)=>Object.assign({},x,lids[i]?{id:lids[i]}:{})),lids};
+  }
+  const d={kind,name,ops:clean,lids,args:kind==='rpc'?[rpcArgs[0]||null,rpcArgs[1]||null]:null};
   d.label=bbqLabel(d);
   await enqueueOp('w',d);
   BBQ.n++;
-  if(kind==='from'){ try{ if(window.bbm) await bbm.applyLocal(name,ops); }catch(e){} }
-  return {data:null,error:null,status:202,statusText:'QUEUED',_queued:true};
+  if(BBQ.depth<=0 && Date.now()-_bbqToastAt>3000){ _bbqToastAt=Date.now(); toast('💾 حُفظ محلياً — يُرسل تلقائياً عند عودة الاتصال','warning',3500); try{ const q=await getPendingQueue(); updateOfflineBar('offline',q.length+' عملية معلّقة'); }catch(e){} }
+  let data=null;
+  if(local && (hasSel||single)){ data=local.touched.map(r=>({...r})); if(single) data=data[0]||null; }
+  return {data,error:null,status:202,statusText:'QUEUED',_queued:true};
 }
 let _bbrcNoticeAt=0;
 function bbrcNotice(){
@@ -3246,7 +3270,8 @@ function bbMapDeep(x,m){
 }
 async function processQueuedOp(op){
   let d = op.data;
-  if(op.type==='draw'||op.type==='lab'||op.type==='supply'||op.type==='w'){ d=bbMapDeep(d,bbIdMap()); }
+  if(op.type==='draw'||op.type==='lab'||op.type==='supply'){ d=bbMapDeep(d,bbIdMap()); }
+  else if(op.type==='w'){ const _l=d.lids; d=bbMapDeep(Object.assign({},d,{lids:null}),bbIdMap()); d.lids=_l; }
   if(op.type==='reception'){
     { const m=bbIdMap(); if(d.existing_donor_id && String(d.existing_donor_id).startsWith('local-')) d.existing_donor_id=m[d.existing_donor_id]||null; }
     // اربط بمتبرع موجود (المختار من القائمة، أو المطابق بالهوية/الموبايل/الاسم+السنة) بدل إنشاء سجل مكرر
@@ -3329,8 +3354,16 @@ async function processQueuedOp(op){
   } else if(op.type==='w'){
     let b;
     if(d.kind==='rpc') b=_rawDb.rpc(d.name,d.args&&d.args[0]||undefined,d.args&&d.args[1]||undefined);
-    else { b=_rawDb.from(d.name); for(const o of d.ops) b=b[o[0]](...o[1]); }
+    else {
+      b=_rawDb.from(d.name); for(const o of d.ops) b=b[o[0]](...o[1]);
+      if(d.lids && d.ops[0][0]==='insert') b=b.select('id');
+    }
     const r=await b; if(r&&r.error) throw new Error(r.error.message||'فشلت العملية');
+    if(d.lids && r && r.data){
+      const arr=Array.isArray(r.data)?r.data:[r.data];
+      d.lids.forEach((l,i)=>{ if(l && arr[i] && arr[i].id!=null) bbIdMapSet(l,arr[i].id); });
+      try{ if(window.bbm) await bbm.removeLocal(d.lids.filter(Boolean)); }catch(x){}
+    }
   } else if(op.type==='supply'){
     const{error}=await db.from('blood_donations').update({
       status:'dispatched',hospital_name:d.hospital_name,dispatch_date:d.dispatch_date||new Date().toISOString().split('T')[0]
@@ -3996,7 +4029,6 @@ function openExpiryCfg(){
 }
 function expCfgDefaults(){ document.querySelectorAll('#expCfgModal input[data-g]').forEach(i=>{ i.value=EXP_DEFAULTS[i.dataset.g][i.dataset.k]; }); }
 async function expCfgSave(){
-  if(!IS_ONLINE){ toast('الحفظ يحتاج اتصالاً بالإنترنت','error'); return; }
   const cfg={bottle:{},comp:{}};
   for(const i of document.querySelectorAll('#expCfgModal input[data-g]')){
     const v=parseInt(i.value);

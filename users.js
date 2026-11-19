@@ -89,6 +89,7 @@ function showAddUserModal(){
 }
 
 async function createUser(){
+  if(!IS_ONLINE){ toast('إنشاء حساب جديد يحتاج اتصالاً بالإنترنت (التسجيل يتم على السيرفر)','warning',5000); return; }
   const nm=G('au-name').value.trim(),em=G('au-email').value.trim(),pw=G('au-pw').value;
   if(!nm||!em||!pw){toast('يرجى تعبئة جميع الحقول','error');return;}
   if(pw.length<8){toast('كلمة المرور يجب أن تكون 8 أحرف على الأقل','error');return;}

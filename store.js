@@ -104,7 +104,7 @@ function stAddOpen(itemId){
       <div class="fgrp"><label>ملاحظة (اختياري)</label><input type="text" id="st-note" placeholder="${dev?'مثلاً: رقم تسلسلي أو مصدر الجهاز':'مثلاً: وصلت من المخزن المركزي'}"></div>`,'stAddSave()');
 }
 async function stAddSave(){
-  if(!stCan()) return; if(!IS_ONLINE){ toast('يحتاج اتصالاً بالإنترنت','warning'); return; }
+  if(!stCan()) return;
   const name=(G('st-name').value||'').trim().replace(/\s+/g,' '), qty=_stN('st-qty'), exp=G('st-exp')?.value||null, date=G('st-date').value||_stToday(), note=(G('st-note').value||'').trim()||null;
   if(!name){ toast('اكتب اسم المادة','error'); return; }
   if(!Number.isInteger(qty)||qty<1){ toast('اكتب عدداً صحيحاً أكبر من صفر','error'); return; }
@@ -143,7 +143,7 @@ function stOutInfo(){
   el.innerHTML = r ? (_stGrp==='device'?'':'يُسحب من أقرب إكسباير أولاً (المنتهي لا يُسحب تلقائياً). أقرب إكسباير: '+(r.exp?fd(r.exp):'—')) : '';
 }
 async function stOutSave(){
-  if(!stCan()) return; if(!IS_ONLINE){ toast('يحتاج اتصالاً بالإنترنت','warning'); return; }
+  if(!stCan()) return;
   const scrap=_stOutMode==='scrap';
   const item=G('st-item').value, qty=_stN('st-qty'), date=G('st-date').value||_stToday(), note=(G('st-note').value||'').trim()||null, lot=G('st-lot')?.value||null;
   if(!Number.isInteger(qty)||qty<1){ toast('اكتب عدداً صحيحاً أكبر من صفر','error'); return; }

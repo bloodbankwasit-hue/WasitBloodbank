@@ -158,7 +158,6 @@ let _colEditBusy=false;
 async function colEditMember(donationId){
   if(_colEditBusy) return; _colEditBusy=true;
   try{
-    if(!IS_ONLINE){ toast('التعديل يحتاج اتصالاً بالإنترنت','warning'); return; }
     if(!donationId){ toast('تعذّر تحديد السجل','error'); return; }
     if(String(donationId).startsWith('local-')){ toast('هذا الاسم لم يصل للسيرفر بعد — يُعدَّل بعد المزامنة','warning'); return; }
     await openEditDonation(donationId,{edit:true});
