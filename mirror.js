@@ -167,10 +167,38 @@
   function splitTop(str){ const out=[]; let d=0,cur=''; for(const ch of str){ if(ch==='(') d++; if(ch===')') d--; if(ch===','&&d===0){ out.push(cur.trim()); cur=''; } else cur+=ch; } if(cur.trim()) out.push(cur.trim()); return out; }
   function cmp(a,b){ if(a==null&&b==null) return 0; if(a==null) return 1; if(b==null) return -1; if(typeof a==='number'&&typeof b==='number') return a-b; return a<b?-1:(a>b?1:0); }
   function same(a,b){ if(a==null||b==null) return a==b; return String(a)===String(b); }
-  const OK_OPS=new Set(['select','eq','neq','gt','gte','lt','lte','in','is','not','order','limit','range','single','maybeSingle','ilike']);
+  const OK_OPS=new Set(['select','eq','neq','gt','gte','lt','lte','in','is','not','order','limit','range','single','maybeSingle','ilike','like','or']);
   // يرجع null إذا وُجد شيء غير مدعوم (فيُستعمل الكاش القديم أو يظهر الخطأ)
+  // مرشِّحات PostgREST محلياً: eq/neq/gt/gte/lt/lte/is/in/ilike/like (+ not و or)
+  function mkPred(col,op,v){
+    op=String(op).toLowerCase();
+    if(op==='eq') return r=>same(r[col],v);
+    if(op==='neq') return r=>!same(r[col],v);
+    if(op==='gt') return r=>r[col]!=null&&cmp(r[col],v)>0;
+    if(op==='gte') return r=>r[col]!=null&&cmp(r[col],v)>=0;
+    if(op==='lt') return r=>r[col]!=null&&cmp(r[col],v)<0;
+    if(op==='lte') return r=>r[col]!=null&&cmp(r[col],v)<=0;
+    if(op==='is'){ const t=(v==='null'||v===null)?null:(v==='true'||v===true)?true:(v==='false'||v===false)?false:undefined; if(t===undefined) return null; return r=>t===null? r[col]==null : r[col]===t; }
+    if(op==='in'){ let arr=v; if(typeof v==='string'){ const m=v.match(/^\((.*)\)$/); if(!m) return null; arr=splitTop(m[1]).map(x=>x.replace(/^"|"$/g,'')); } return r=>(arr||[]).some(x=>same(r[col],x)); }
+    if(op==='ilike'||op==='like'){
+      const pat=String(v).replace(/\*/g,'%'); if(/_/.test(pat)) return null;
+      const ci=op==='ilike', core=(ci?pat.toLowerCase():pat).replace(/^%|%$/g,''), st=!pat.startsWith('%'), en=!pat.endsWith('%');
+      if(/%/.test(core)) return null;
+      return r=>{ let x=String(r[col]==null?'':r[col]); if(ci) x=x.toLowerCase(); return st&&en? x===core : st? x.startsWith(core) : en? x.endsWith(core) : x.includes(core); };
+    }
+    return null;
+  }
+  function parseOr(str){
+    const preds=[];
+    for(const p of splitTop(String(str))){
+      const m=p.match(/^([a-z_]+)\.(eq|neq|gt|gte|lt|lte|ilike|like|is|in)\.(.*)$/i); if(!m) return null;
+      const pr=mkPred(m[1],m[2],m[3]); if(!pr) return null; preds.push(pr);
+    }
+    return preds.length? (r=>preds.some(f=>f(r))) : null;
+  }
   async function runQuery(name,ops,_raw){
-    const kind = name==='donors' ? 'donors' : (name==='blood_donations' ? 'donations' : null);
+    const isView = name==='donors_with_last_donation';
+    const kind = (name==='donors'||isView) ? 'donors' : (name==='blood_donations' ? 'donations' : null);
     const isST = ST.includes(name);
     if(isST){ if(!(await loadTB(name))) return null; }
     else if(!kind || !(await metaGet('lastSync'))) return null;
@@ -183,26 +211,21 @@
       if(m){ const fkm = isST ? (EMB[name]||{}) : (kind==='donations' ? {donors:'donor_id'} : {}); if(!fkm[m[1]]) return null; embeds.push({tbl:m[1],fk:fkm[m[1]],inner:!!m[2],cols:splitTop(m[3])}); }
       else proj.push(c);
     }
-    let rows=await loadAll(name), res=rows, single=null, ord=[], lim=null, rng=null;
+    let rows;
+    if(isView){
+      const LD=new Map(); for(const r of await loadAll('blood_donations')){ if(r.is_deleted||!r.donor_id) continue; const dt=r.donation_date||String(r.created_at||'').slice(0,10); if(dt && (!LD.has(r.donor_id)||dt>LD.get(r.donor_id))) LD.set(r.donor_id,dt); }
+      rows=(await loadAll('donors')).filter(d=>!d.is_deleted).map(d=>({...d,last_donation_date:LD.get(d.id)||null}));
+    }
+    else rows=await loadAll(name);
+    let res=rows, single=null, ord=[], lim=null, rng=null;
     const ft=[];
     for(let i=1;i<ops.length;i++){
       const [m,a]=ops[i];
-      if(['eq','neq','gt','gte','lt','lte','is','ilike'].includes(m) || m==='in' || m==='not'){
+      if(m==='or'){ const pr=parseOr(a[0]); if(!pr) return null; ft.push(pr); }
+      else if(['eq','neq','gt','gte','lt','lte','is','ilike','like','in','not'].includes(m)){
         const col=a[0]; if(typeof col!=='string'||col.indexOf('.')>=0) return null;
-        if(m==='eq') ft.push(r=>same(r[col],a[1]));
-        else if(m==='neq') ft.push(r=>!same(r[col],a[1]));
-        else if(m==='gt') ft.push(r=>r[col]!=null&&cmp(r[col],a[1])>0);
-        else if(m==='gte') ft.push(r=>r[col]!=null&&cmp(r[col],a[1])>=0);
-        else if(m==='lt') ft.push(r=>r[col]!=null&&cmp(r[col],a[1])<0);
-        else if(m==='lte') ft.push(r=>r[col]!=null&&cmp(r[col],a[1])<=0);
-        else if(m==='is') ft.push(r=>a[1]===null? r[col]==null : r[col]===a[1]);
-        else if(m==='in') ft.push(r=>(a[1]||[]).some(v=>same(r[col],v)));
-        else if(m==='ilike'){ const pat=String(a[1]).replace(/\*/g,'%'); if(/[_]/.test(pat)) return null; const core=pat.replace(/^%|%$/g,'').toLowerCase(); const st=!pat.startsWith('%'), en=!pat.endsWith('%');
-          ft.push(r=>{ const v=String(r[col]==null?'':r[col]).toLowerCase(); return st&&en? v===core : st? v.startsWith(core) : en? v.endsWith(core) : v.includes(core); }); }
-        else if(m==='not'){ const op=a[1], v=a[2];
-          if(op==='is') ft.push(r=> v===null? r[col]!=null : r[col]!==v);
-          else if(op==='eq') ft.push(r=>!same(r[col],v));
-          else return null; }
+        if(m==='not'){ const pr=mkPred(col,a[1],a[2]); if(!pr) return null; ft.push(r=> a[1]==='is' ? !pr(r) : (r[col]!=null && !pr(r))); }
+        else { const pr=mkPred(col,m,a[1]); if(!pr) return null; ft.push(pr); }
       } else if(m==='order'){ ord.push({c:a[0],asc:!(a[1]&&a[1].ascending===false)}); }
       else if(m==='limit') lim=a[0];
       else if(m==='range') rng=a;
