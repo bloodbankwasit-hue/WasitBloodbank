@@ -3169,6 +3169,11 @@ async function syncQueue(){
 
   SYNC_RUNNING = false;
   toast(`✅ تمت المزامنة — ${done}/${queue.length} عملية ناجحة`,'success',4000);
+  if(window.BB_SYNC_CONFLICTS&&window.BB_SYNC_CONFLICTS.length){
+    const _c=window.BB_SYNC_CONFLICTS.splice(0);
+    setTimeout(()=>{ try{ showIntervalBlockModal('⚠️ تنبيه: استقبالات حُفظت بدون إنترنت تبيّن بعد المزامنة أنها مخالفة — راجعها فوراً: '+_c.join(' | ')); }catch(e){ toast('⚠️ استقبالات مخالفة: '+_c.join(' | '),'error',20000); } },800);
+  }
+  try{ if(window.bbmSync) bbmSync(); }catch(e){}
   updateOfflineBar('online','');
   // Refresh current screen
   try{ await loadDash(); }catch(e){}
@@ -3178,13 +3183,38 @@ async function syncQueue(){
 async function processQueuedOp(op){
   const d = op.data;
   if(op.type==='reception'){
-    // Create donor + donation
-    const{data:dn,error:de}=await db.from('donors').insert({
-      full_name:d.full_name,birth_year:d.birth_year,gender:d.gender,
-      mother_name:d.mother_name,national_id:d.national_id,...(d.id_type?{id_type:d.id_type}:{}),mobile:d.mobile,
-      address:d.address,occupation:d.occupation,created_by:d.created_by
-    }).select().single();
-    if(de) throw de;
+    // اربط بمتبرع موجود (المختار من القائمة، أو المطابق بالهوية/الموبايل/الاسم+السنة) بدل إنشاء سجل مكرر
+    await loadOneScript('reception.js');
+    let dn=null, existing=null;
+    if(d.existing_donor_id){
+      const{data:ex}=await db.from('donors').select('id,full_name,national_id,mobile').eq('id',d.existing_donor_id).eq('is_deleted',false).limit(1);
+      if(ex&&ex.length) existing=ex[0];
+    }
+    if(!existing){ try{ existing=await _findExistingDonorFallback(d.full_name,d.birth_year,d.national_id,d.mobile); }catch(e){ existing=null; } }
+    if(existing){
+      dn={id:existing.id};
+      const uf={};
+      if(d.mother_name) uf.mother_name=d.mother_name;
+      if(d.national_id){ uf.national_id=d.national_id; if(d.id_type) uf.id_type=d.id_type; }
+      if(d.mobile) uf.mobile=d.mobile;
+      if(d.address) uf.address=d.address;
+      if(d.occupation) uf.occupation=d.occupation;
+      if(Object.keys(uf).length){ const{error:ue}=await db.from('donors').update(uf).eq('id',existing.id); if(ue) throw ue; }
+    } else {
+      const{data:nd,error:de}=await db.from('donors').insert({
+        full_name:d.full_name,birth_year:d.birth_year,gender:d.gender,
+        mother_name:d.mother_name,national_id:d.national_id,...(d.id_type?{id_type:d.id_type}:{}),mobile:d.mobile,
+        address:d.address,occupation:d.occupation,created_by:d.created_by
+      }).select().single();
+      if(de) throw de; dn=nd;
+    }
+    // فحص التعارض بعد عودة الاتصال: ربما صار مرفوضاً/مصاباً أو تبرع قبل فترة قصيرة من حاسبة ثانية
+    try{
+      window.BB_SYNC_CONFLICTS=window.BB_SYNC_CONFLICTS||[];
+      const _rj=await _queryRejectedMatch(d.full_name||'',d.national_id||'',d.mobile||'');
+      if(_rj) (window.BB_SYNC_CONFLICTS=window.BB_SYNC_CONFLICTS||[]).push(d.full_name+' — مرفوض/مصاب ('+(_rj.rejection_type||'')+')');
+      if(existing){ const _iv=await checkDonationInterval(existing.id); if(_iv&&!_iv.allowed) window.BB_SYNC_CONFLICTS.push(d.full_name+' — آخر تبرع منذ '+_iv.diffDays+' يوم فقط'); }
+    }catch(e){}
     // The number saved offline was only a preview: claim a real one from the server now (never rewinds the counter).
     const{data:cl,error:cle}=await db.rpc('claim_bottle_number',{p_type:d.bottle_type});
     if(cle||!cl||!cl.number) throw new Error('تعذر حجز رقم قنينة: '+((cle&&cle.message)||''));
@@ -3245,6 +3275,7 @@ async function onOnline(){
   updateOfflineBar('online','');
   await cacheRejectedDonors();
   await syncQueue();
+  try{ if(window.bbmSync) bbmSync(); }catch(e){}
   // Update queue badge
   const q = await getPendingQueue();
   if(q.length>0){
@@ -3452,6 +3483,7 @@ async function loadProf(){
     setTimeout(()=>toast('هذا الحساب معطّل أو غير مسجّل. تواصل مع مدير النظام.','error'),400);
     return;
   }
+  try{ if(data.role==='admin'||data.role==='reception'||hasPermission('reception')) setTimeout(()=>{ loadOneScript('mirror.js').then(()=>bbmStart()).catch(()=>{}); },2500); }catch(e){}
   const _nm = data.full_name || 'مستخدم';
   const _av = _nm.charAt(0);
   const _rl = {admin:'مدير النظام',tech:'فني سحب',reception:'موظف استقبال',lab:'فني مختبر',supply:'موظف تجهيز',viewer:'عرض فقط'};
@@ -5369,9 +5401,15 @@ function setAccTab(){
 async function checkIntervalBeforeSave(nid, mob){
   nid=(nid||'').trim(); mob=(mob||'').trim();
   if(nid.length<6 && mob.length<7) return null; // not enough info to identify the donor reliably
-  let q=db.from('donors').select('id').eq('is_deleted',false).limit(5);
-  q = nid.length>=6 ? q.eq('national_id',nid) : q.eq('mobile',mob);
-  const{data}=await q;
+  let data=null;
+  if(IS_ONLINE){
+    try{
+      let q=db.from('donors').select('id').eq('is_deleted',false).limit(5);
+      q = nid.length>=6 ? q.eq('national_id',nid) : q.eq('mobile',mob);
+      const r=await q; if(!r.error && !r._cached) data=r.data;
+    }catch(e){}
+  }
+  if(data==null){ try{ data=window.bbm? await bbm.exactDonor(nid,mob) : null; }catch(e){ data=null; } }
   // Only act when the match is unambiguous — a shared mobile number (e.g. family members)
   // could otherwise attribute someone else's recent donation to this person and block them wrongly.
   if(!data||data.length!==1) return null;
@@ -5390,12 +5428,21 @@ async function checkDonationInterval(donorId){
   // donation turned out usable. Excluding a rejected_positive donation here would make an
   // infected donor's own (only) donation invisible to this check, hiding the interval warning
   // entirely for them.
-  const{data}=await db.from('blood_donations')
-    .select('created_at, donation_date, draw_date, status')
-    .eq('donor_id', donorId)
-    .eq('is_deleted', false)
-    .order('created_at',{ascending:false})
-    .limit(1);
+  let data=null, _local=false;
+  if(IS_ONLINE){
+    try{
+      const r=await db.from('blood_donations')
+        .select('created_at, donation_date, draw_date, status')
+        .eq('donor_id', donorId)
+        .eq('is_deleted', false)
+        .order('created_at',{ascending:false})
+        .limit(1);
+      if(!r.error && !r._cached) data=r.data; else _local=true;
+    }catch(e){ _local=true; }
+  } else _local=true;
+  if(_local){ // لا اتصال بالسيرفر: نعتمد النسخة المحلية للتبرعات
+    try{ const l=(window.bbm && await bbm.lastDonation(donorId)); data=l?[l]:[]; }catch(e){ data=[]; }
+  }
   if(!data||!data.length) return null;
   // Use whichever date is available
   const raw = data[0].donation_date || data[0].draw_date || data[0].created_at;

@@ -1,10 +1,18 @@
 // مصرف الدم الرئيسي — واسط | Service Worker v4
-const CACHE = 'bloodbank-wasit-v124';
+const CACHE = 'bloodbank-wasit-v125';
 
 const CRITICAL = [
   './',
   './index.html'
 ];
+
+const CDN_LIBS = [
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+  'https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js',
+  'https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js'
+];
+const CDN_HOSTS = /^https:\/\/(cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com|fonts\.googleapis\.com|fonts\.gstatic\.com)\//;
 
 const OPTIONAL = [
   './icon.png',
@@ -28,7 +36,7 @@ const OPTIONAL = [
   './perf.js',
   './store.js',
   './rare.js',
-  './receipt-template.js','./label-template.js','./collection-template.js','./collection-form.js','./forms-view.js','./backup-auto.js','./supply-hand.js','./supply-hosp.js','./opening-stock.js','./supply-arch.js','./section-stats.js','./tabler/tabler-icons.min.css','./tabler/fonts/tabler-icons.woff2','./tabler/fonts/tabler-icons.woff',
+  './receipt-template.js','./label-template.js','./collection-template.js','./collection-form.js','./forms-view.js','./backup-auto.js','./supply-hand.js','./supply-hosp.js','./opening-stock.js','./mirror.js','./supply-arch.js','./section-stats.js','./tabler/tabler-icons.min.css','./tabler/fonts/tabler-icons.woff2','./tabler/fonts/tabler-icons.woff',
   './reception.js',
   './search.js',
   './sequences.js',
@@ -47,6 +55,10 @@ self.addEventListener('install', e=>{
       ));
       // خط الأيقونات وملف CSS الخاص به ثابتان (نسخة محددة): نعيد استعمالهما من الكاش القديم بدل تنزيلهما مع كل تحديث
       const reuse=async u=>{ const r=await caches.match(u,{ignoreSearch:true}); if(r){ await cache.put(u,r.clone()); return true; } return false; };
+      // مكتبات الإنترنت (supabase, jsPDF, JsBarcode, الخط): تُحفظ للتشغيل بدون إنترنت. الرد المعتم (no-cors) يكفي لوسوم script.
+      await Promise.all(CDN_LIBS.map(u=>
+        fetch(new Request(u,{mode:'no-cors'})).then(r=>cache.put(u,r)).catch(()=>console.log('CDN skipped:',u))
+      ));
       await Promise.all(OPTIONAL.map(u=>
         ((u.indexOf('/tabler/')>=0) ? reuse(u).then(ok=>ok||cache.add(new Request(u,{cache:'reload'}))) : cache.add(new Request(u, {cache:'reload'})))
           .catch(()=>console.log('Optional skipped:', u))
@@ -84,6 +96,15 @@ self.addEventListener('fetch', e=>{
       if(res.ok){ const cl=res.clone(); caches.open(CACHE).then(x=>x.put(e.request,cl)); }
       return res;
     })));
+    return;
+  }
+
+  // مكتبات/خطوط CDN: الكاش أولاً (نسخ ثابتة محددة الإصدار) وتُخزَّن حتى لو كانت opaque
+  if(CDN_HOSTS.test(url)){
+    e.respondWith(caches.match(e.request).then(c=> c || fetch(e.request).then(res=>{
+      if(res && (res.ok || res.type==='opaque')){ const cl=res.clone(); caches.open(CACHE).then(x=>x.put(e.request,cl)); }
+      return res;
+    }).catch(()=>new Response('',{status:504,statusText:'Offline'}))));
     return;
   }
 

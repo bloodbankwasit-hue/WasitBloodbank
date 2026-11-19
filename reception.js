@@ -72,14 +72,18 @@ async function donorSearch(field, val){
   clearTimeout(_acTimer);
   _acTimer = setTimeout(async()=>{
     try{
-      let q = db.from('donors')
-        .select('id,full_name,birth_year,gender,mother_name,national_id,id_type,mobile,address,occupation,donor_number')
-        .eq('is_deleted',false).limit(6);
-      if(field==='name') q=q.ilike('full_name','%'+val.trim().replace(/ة/g,'ه')+'%');
-      if(field==='nid')  q=q.eq('national_id',val.trim());
-      if(field==='mob')  q=q.eq('mobile',val.trim());
-
-      const{data}=await q;
+      let data=null;
+      if(IS_ONLINE){
+        let q = db.from('donors')
+          .select('id,full_name,birth_year,gender,mother_name,national_id,id_type,mobile,address,occupation,donor_number')
+          .eq('is_deleted',false).limit(6);
+        if(field==='name') q=q.ilike('full_name','%'+val.trim().replace(/ة/g,'ه')+'%');
+        if(field==='nid')  q=q.eq('national_id',val.trim());
+        if(field==='mob')  q=q.eq('mobile',val.trim());
+        try{ const r=await q; if(!r.error && !r._cached) data=r.data; }catch(e){}
+      }
+      // لا اتصال بالسيرفر: نبحث بالنسخة المحلية للمتبرعين
+      if(data==null && window.bbm){ try{ data=await bbm.searchDonors(field,val,6); }catch(e){ data=null; } }
       if(!data||!data.length){ list.classList.remove('show'); return; }
 
       // Auto-fill immediately if single match (NID or mobile)
@@ -185,7 +189,8 @@ async function _queryRejectedMatch(nm, nid, mob){
     const firstWord = nm.trim().split(/\s+/)[0];
     if(firstWord.length<3) return null;
     const{data,error}=await db.from('rejected_donors').select(SEL).eq('is_deleted',false).ilike('full_name','*'+firstWord+'*').limit(20);
-    if(error || !data || !data.length) return null;
+    if(error){ return await checkRejectedOffline(nm, nid, mob); } // السيرفر لا يستجيب: نفحص النسخة المحلية بدل التجاوز بصمت
+    if(!data || !data.length) return null;
     // A name match must NOT depend on exact whitespace/letter-variant matching — two
     // visually-identical Arabic names commonly differ in which letter variant was typed
     // (different alef forms, ى vs ي, ة vs ه) or in stray whitespace. normalizeAr() (used
@@ -363,6 +368,7 @@ async function saveReception(){
       hospital_name:getHospName()||null,
       donation_date:new Date().toISOString().split('T')[0],
       donation_time:new Date().toTimeString().substring(0,5),
+      existing_donor_id:G('s-reception')?.dataset?.existingDonorId||null,
       bottle_type:btype,
       bottle_number:bnum,
       seq_id:seqId,
