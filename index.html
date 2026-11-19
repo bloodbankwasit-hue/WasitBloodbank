@@ -1010,7 +1010,7 @@ tbody tr:hover td{background:#fafafa}
 <!-- ===== MAIN APP ===== -->
 <div id="app">
   <!-- OFFLINE STATUS BAR -->
-  <div class="offline-bar" id="offlineBar">
+  <div class="offline-bar" id="offlineBar" onclick="bbOpsOpen()" style="cursor:pointer">
     <div class="ob-left">
       <span class="ob-dot" id="obDot"></span>
       <span id="obMsg">لا يوجد اتصال بالإنترنت</span>
@@ -1061,6 +1061,7 @@ tbody tr:hover td{background:#fafafa}
         <div class="sf-av" id="sfAv">م</div>
         <div><div class="sf-name" id="sfName">...</div><div class="sf-role" id="sfRole">...</div></div>
       </div>
+      <button class="btn-out" id="opsBtn" onclick="bbOpsOpen()" style="margin-bottom:6px"><i class="ti ti-clock-up"></i> العمليات المعلّقة <span id="opsBadge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:0 7px;font-size:12px;margin-right:4px"></span></button>
       <button class="btn-out" onclick="doLogout()"><i class="ti ti-logout"></i> تسجيل الخروج</button>
     </div>
   </div>
@@ -2128,7 +2129,7 @@ async function bbqWrite(kind,name,ops,rpcArgs,build){
   const clean=ops.filter(o=>!['select','single','maybeSingle'].includes(o[0]));
   let lids=null;
   if(local && (w==='insert') && local.lids.some(Boolean)) lids=local.lids;
-  else if(w==='insert' && !local){   // لا نسخة محلية لهذا الجدول: نولّد معرّفات محلية للإرجاع فقط
+  else if(w==='insert' && !local && (hasSel||single)){   // لا نسخة محلية لهذا الجدول: نولّد معرّفات محلية للإرجاع فقط
     const arr=Array.isArray(ops[0][1][0])?ops[0][1][0]:[ops[0][1][0]]; lids=arr.map(x=>x&&x.id==null?('local-'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)):null);
     local={touched:arr.map((x,i)=>Object.assign({},x,lids[i]?{id:lids[i]}:{})),lids};
   }
@@ -3175,6 +3176,7 @@ async function enqueueOp(type, data){
     throw new Error('تعذّر الحفظ محلياً — ذاكرة الجهاز ممتلئة على الأغلب. أرسل أي عمليات معلّقة فوراً أو حرّر مساحة بالجهاز ('+(e?.message||'')+')');
   }
   checkStorageHeadroom(); // proactive — see comment on the function itself
+  try{ if(typeof bbOpsBadge==='function') bbOpsBadge(); }catch(e){}
   return id;
 }
 
@@ -3252,6 +3254,7 @@ async function syncQueue(){
     setTimeout(()=>{ try{ showIntervalBlockModal('⚠️ تنبيه: استقبالات حُفظت بدون إنترنت تبيّن بعد المزامنة أنها مخالفة — راجعها فوراً: '+_c.join(' | ')); }catch(e){ toast('⚠️ استقبالات مخالفة: '+_c.join(' | '),'error',20000); } },800);
   }
   try{ await bbofFinalize(); }catch(e){ console.log('bbofFinalize',e); }
+  try{ await bbOpsBadge(); }catch(e){}
   try{ if(window.bbmSync) bbmSync(); }catch(e){}
   updateOfflineBar('online','');
   // Refresh current screen
@@ -3390,9 +3393,93 @@ function updateOfflineBar(state, msg){
     dot.classList.add('sync');
     msgEl.textContent = msg||'جاري المزامنة...';
     if(bdg) bdg.textContent='';
+  } else if(state==='failed'){
+    bar.classList.add('show'); dot.classList.remove('sync');
+    msgEl.textContent = msg||'⚠️ عمليات فشلت — اضغط للمراجعة';
   } else {
     // online — hide bar
   }
+}
+
+// ── شاشة العمليات المعلّقة: ما لم يُرسل، وما فشل، وما أُرسل مؤخراً ──
+async function bbOpsAll(){
+  if(!offlineDB) return [];
+  return new Promise(res=>{ const r=offlineDB.transaction('op_queue','readonly').objectStore('op_queue').getAll(); r.onsuccess=e=>res(e.target.result||[]); r.onerror=()=>res([]); });
+}
+function bbOpsPut(op){ return new Promise((res,rej)=>{ const tx=offlineDB.transaction('op_queue','readwrite'); tx.objectStore('op_queue').put(op); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); }); }
+function bbOpsDel(id){ return new Promise(res=>{ const tx=offlineDB.transaction('op_queue','readwrite'); tx.objectStore('op_queue').delete(id); tx.oncomplete=res; tx.onerror=res; }); }
+function bbOpDesc(op){
+  const d=op.data||{};
+  if(op.type==='reception') return 'استقبال — '+(d.full_name||'')+(d.bottle_number?(' (قنينة '+d.bottle_number+')'):'');
+  if(op.type==='draw') return 'سحب دم';
+  if(op.type==='lab'){ const f=d.fieldUpdates||{}; return 'مختبر — '+('serology_result' in f?'نتيجة فيروسات':'')+(('serology_result' in f)&&('blood_type' in f)?' + ':'')+('blood_type' in f?('تصنيف فصيلة '+(f.blood_type||'')):''); }
+  if(op.type==='supply') return 'صرف قنينة';
+  if(op.type==='w') return d.label||d.name||'عملية';
+  return op.type;
+}
+const _bbOpsFmt=iso=>{ if(!iso) return ''; const d=new Date(iso), p=n=>String(n).padStart(2,'0'); return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes()); };
+// شارة عدد العمليات (الزر الجانبي) + شريط أحمر إن وُجدت عمليات فاشلة (حتى مع وجود الإنترنت)
+async function bbOpsBadge(){
+  try{
+    const ops=await bbOpsAll(); const pend=ops.filter(o=>o.status==='pending').length, fail=ops.filter(o=>o.status==='failed').length;
+    const b=document.getElementById('opsBadge'); if(b){ const n=pend+fail; b.style.display=n?'inline-block':'none'; b.textContent=n; b.style.background=fail?'#DC2626':'#D97706'; }
+    if(fail && !SYNC_RUNNING){ const bar=document.getElementById('offlineBar'); if(bar && (IS_ONLINE || !pend)) updateOfflineBar('failed','⚠️ '+fail+' عملية فشلت بعد المزامنة — اضغط للمراجعة'); }
+  }catch(e){}
+}
+async function bbOpsPurge(){   // تنظيف: المرسلة والملغاة أقدم من 30 يوماً
+  try{ const lim=Date.now()-30*86400e3; for(const o of await bbOpsAll()){ if((o.status==='done'||o.status==='discarded') && new Date(o.created_at).getTime()<lim) await bbOpsDel(o.id); } }catch(e){}
+}
+async function bbOpsOpen(){
+  let ov=document.getElementById('bbOpsOv'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='bbOpsOv';
+  ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:10px';
+  ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+  document.body.appendChild(ov);
+  await bbOpsRender();
+}
+async function bbOpsRender(){
+  const ov=document.getElementById('bbOpsOv'); if(!ov) return;
+  const ops=(await bbOpsAll()).sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)));
+  const pend=ops.filter(o=>o.status==='pending'), fail=ops.filter(o=>o.status==='failed');
+  const weekAgo=Date.now()-7*86400e3, done=ops.filter(o=>o.status==='done' && new Date(o.created_at).getTime()>weekAgo);
+  const row=(o,kind)=>{
+    const col=kind==='fail'?'#FEF2F2;border:1px solid #FECACA':(kind==='pend'?'#FFFBEB;border:1px solid #FDE68A':'#F9FAFB;border:1px solid #E5E7EB');
+    return '<div style="background:'+col+';border-radius:10px;padding:9px 11px;margin-bottom:7px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><b style="font-size:14.5px">'+esc(bbOpDesc(o))+'</b><span style="font-size:12px;color:#6B7280;white-space:nowrap">'+esc(_bbOpsFmt(o.created_at))+'</span></div>'
+      +(o.error?'<div style="font-size:12.5px;color:#991B1B;margin-top:4px;word-break:break-word">'+esc(o.error)+'</div>':'')
+      +(kind==='fail'?'<div style="display:flex;gap:6px;margin-top:7px"><button class="btn btn-p" style="flex:1;justify-content:center" onclick="bbOpsRetry('+o.id+')">🔁 إعادة المحاولة</button><button class="btn" style="flex:1;justify-content:center" onclick="bbOpsDiscard('+o.id+')">🗑 تجاهل</button></div>':'')+'</div>';
+  };
+  let h='<div class="modal" style="width:min(640px,97vw);max-height:92vh;display:flex;flex-direction:column"><div class="modal-title">🕓 العمليات المعلّقة</div><div style="overflow:auto;flex:1;padding:2px">';
+  h+='<div style="font-size:13.5px;color:#374151;margin-bottom:8px">'+(IS_ONLINE?'🟢 متصل':'🔴 بدون اتصال')+' — معلّقة: <b>'+pend.length+'</b> · فاشلة: <b style="color:'+(fail.length?'#B91C1C':'inherit')+'">'+fail.length+'</b> · أُرسلت (7 أيام): <b>'+done.length+'</b></div>';
+  if(fail.length) h+='<div style="font-weight:800;color:#B91C1C;margin:6px 0">⚠️ فاشلة — لم تُنفَّذ على السيرفر، راجعها</div>'+fail.map(o=>row(o,'fail')).join('');
+  if(pend.length) h+='<div style="font-weight:800;color:#B45309;margin:6px 0">⏳ بانتظار الإرسال</div>'+pend.map(o=>row(o,'pend')).join('');
+  if(done.length) h+='<div style="font-weight:800;color:#374151;margin:10px 0 6px">✅ أُرسلت مؤخراً</div>'+done.slice(0,40).map(o=>row(o,'done')).join('');
+  if(!ops.length) h+='<div style="text-align:center;padding:22px;color:#6B7280">لا توجد عمليات</div>';
+  h+='</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'
+    +(IS_ONLINE&&pend.length?'<button class="btn btn-p" style="flex:1;justify-content:center" onclick="bbOpsSyncNow()">⬆️ إرسال الآن</button>':'')
+    +'<button class="btn" style="flex:1;justify-content:center" onclick="bbOpsExport()">💾 تنزيل نسخة احتياطية</button>'
+    +'<button class="btn" style="flex:1;justify-content:center" onclick="document.getElementById(\'bbOpsOv\').remove()">إغلاق</button></div></div>';
+  ov.innerHTML=h;
+}
+async function bbOpsSyncNow(){ try{ await syncQueue(); }catch(e){ toast('تعذّرت المزامنة: '+(e.message||e),'error'); } await bbOpsRender(); await bbOpsBadge(); }
+async function bbOpsRetry(id){
+  const op=(await bbOpsAll()).find(o=>o.id===id); if(!op) return;
+  op.status='pending'; op.error=null; op.attempts=(op.attempts||0)+1; await bbOpsPut(op);
+  if(IS_ONLINE){ await bbOpsSyncNow(); } else { toast('ستُرسل عند عودة الإنترنت','info'); await bbOpsRender(); await bbOpsBadge(); }
+}
+async function bbOpsDiscard(id){
+  const op=(await bbOpsAll()).find(o=>o.id===id); if(!op) return;
+  if(!(await bbConfirm('تجاهل هذه العملية نهائياً؟\n«'+bbOpDesc(op)+'»\nلن تُرسل للسيرفر أبداً (احتفظ بنسخة احتياطية أولاً إن لزم).'))) return;
+  op.status='discarded'; op.discarded_at=new Date().toISOString(); await bbOpsPut(op);
+  await bbOpsRender(); await bbOpsBadge();
+  if(!(await bbOpsAll()).some(o=>o.status==='failed')){ try{ updateOfflineBar('online',''); }catch(e){} }
+}
+async function bbOpsExport(){
+  try{
+    const ops=(await bbOpsAll()).filter(o=>o.status!=='done');
+    const blob=new Blob([JSON.stringify({exported_at:new Date().toISOString(),user:UPROF?.full_name||null,ops},null,1)],{type:'application/json'});
+    const d=new Date(), p=n=>String(n).padStart(2,'0');
+    await shareOrDownloadFile(blob,'karrar-pending-ops-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes())+'.json','application/json');
+  }catch(e){ toast('تعذّر التنزيل: '+(e.message||e),'error'); }
 }
 
 // جلسة الدخول المحفوظة من Supabase بالمتصفح (تبقى حتى لو انتهت صلاحية رمز الدخول أثناء الانقطاع)
@@ -3426,6 +3513,7 @@ async function onOnline(){
   await cacheRejectedDonors();
   await syncQueue();
   try{ await bbofFinalize(); }catch(e){}
+  try{ await bbOpsBadge(); }catch(e){}
   try{ if(window.bbmSync) bbmSync(); }catch(e){}
   // Update queue badge
   const q = await getPendingQueue();
@@ -3549,7 +3637,7 @@ async function appInit(){
     return;
   }
   diag("appInit started");
-  try{ await initOfflineDB(); diag("IndexedDB OK"); }catch(e){ diag("IndexedDB failed: "+e.message, "#ffd700"); }
+  try{ await initOfflineDB(); diag("IndexedDB OK"); setTimeout(()=>{ bbOpsPurge().then(()=>bbOpsBadge()); },3000); }catch(e){ diag("IndexedDB failed: "+e.message, "#ffd700"); }
   // تحديث نسخة المرفوضين للعمل بدون إنترنت: يؤجَّل 8 ثوانٍ حتى لا ينافس طلبات بدء التشغيل (كان ~2 ثانية ويؤخّر الصلاحيات)
   try{ if(IS_ONLINE) setTimeout(()=>{ try{ cacheRejectedDonors(); }catch(e){} }, 8000); else onOffline(); }catch(e){}
   G('tbDate').textContent = new Date().toLocaleDateString('ar-IQ-u-nu-latn',{weekday:'long'})+'  '+bbDmy(new Date());
