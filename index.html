@@ -3214,6 +3214,7 @@ async function syncQueue(){
       const lbl=op.type==='w'?(op.data.label||op.data.name):({reception:'استقبال',draw:'سحب',lab:'مختبر',supply:'صرف'})[op.type]||op.type;
       _failed.push(lbl+(op.type==='reception'&&op.data.full_name?' — '+op.data.full_name:'')+': '+((e&&e.message)||e));
       if(op.type==='reception'){ try{ if(window.bbm) await bbm.removeLocal([op.data.local_id,op.data.local_donor_id]); }catch(x){} }
+      if(op.type==='reception' && op.data.local_id) bbofDrop(op.data.local_id);
       if(op.type==='w'&&op.data.kind==='from'){ for(const o of op.data.ops){ if((o[0]==='eq'&&o[1][0]==='id')) (_refresh[op.data.name]=_refresh[op.data.name]||[]).push(o[1][1]); if(o[0]==='in'&&o[1][0]==='id') (_refresh[op.data.name]=_refresh[op.data.name]||[]).push(...o[1][1]); } }
     }
   }
@@ -3226,6 +3227,7 @@ async function syncQueue(){
     const _c=window.BB_SYNC_CONFLICTS.splice(0);
     setTimeout(()=>{ try{ showIntervalBlockModal('⚠️ تنبيه: استقبالات حُفظت بدون إنترنت تبيّن بعد المزامنة أنها مخالفة — راجعها فوراً: '+_c.join(' | ')); }catch(e){ toast('⚠️ استقبالات مخالفة: '+_c.join(' | '),'error',20000); } },800);
   }
+  try{ await bbofFinalize(); }catch(e){ console.log('bbofFinalize',e); }
   try{ if(window.bbmSync) bbmSync(); }catch(e){}
   updateOfflineBar('online','');
   // Refresh current screen
@@ -3306,8 +3308,8 @@ async function processQueuedOp(op){
       }catch(x){}
     }
     if(newDon&&newDon.id){
-      await bbAssignForm(newDon.id,d.bottle_type);
       if(d.local_id) bbIdMapSet(d.local_id,newDon.id);
+      { const _fi=await bbAssignForm(newDon.id,d.bottle_type); if(d.local_id) bbofMarkSynced(d.local_id,_fi); }
       if(d.local_donor_id) bbIdMapSet(d.local_donor_id,dn.id);
       try{ if(window.bbm) await bbm.removeLocal([d.local_id,d.local_donor_id]); }catch(x){}
     }
@@ -3390,6 +3392,7 @@ async function onOnline(){
   updateOfflineBar('online','');
   await cacheRejectedDonors();
   await syncQueue();
+  try{ await bbofFinalize(); }catch(e){}
   try{ if(window.bbmSync) bbmSync(); }catch(e){}
   // Update queue badge
   const q = await getPendingQueue();
@@ -3609,6 +3612,7 @@ async function loadProf(){
     return;
   }
   try{ setTimeout(()=>{ loadOneScript('mirror.js').then(()=>bbmStart()).catch(()=>{}); },2500); }catch(e){}
+  try{ setTimeout(()=>{ bbofFinalize().catch(()=>{}).then(()=>bbofSnapRefresh()).catch(()=>{}); },7000); }catch(e){}
   const _nm = data.full_name || 'مستخدم';
   const _av = _nm.charAt(0);
   const _rl = {admin:'مدير النظام',tech:'فني سحب',reception:'موظف استقبال',lab:'فني مختبر',supply:'موظف تجهيز',viewer:'عرض فقط'};
@@ -5373,8 +5377,106 @@ async function bbAssignForm(donationId, bottleType){
   try{
     const r=await db.rpc('assign_donation_to_form',{p_donation:donationId,p_group:bbFormGroup(bottleType)});
     if(r.error){ console.log('assign form failed:', r.error.message); return null; }
+    try{ bbofSnapSoon(20000); }catch(x){}
     return r.data;
   }catch(e){ console.log('assign form failed:', e); return null; }
+}
+
+// ── استمارة سحب الدم بدون نت: حالة محلية للاستمارات (localStorage) تُدمج بالعرض والطباعة، وتُرسل للسيرفر بنفس الترتيب عند عودة الاتصال ──
+const BBOF_KEY='bb_offforms', BBOF_SNAP='bb_formsnap';
+function bbofLoad(){ try{ const s=JSON.parse(localStorage.getItem(BBOF_KEY)||'null'); return (s&&Array.isArray(s.forms))?s:{forms:[]}; }catch(e){ return {forms:[]}; } }
+function bbofSave(s){ try{ localStorage.setItem(BBOF_KEY,JSON.stringify(s)); }catch(e){ console.log('bbof save failed',e); } }
+function bbofSnap(){ try{ return JSON.parse(localStorage.getItem(BBOF_SNAP)||'{}')||{}; }catch(e){ return {}; } }
+function bbofHasPending(){ return bbofLoad().forms.length>0; }
+let _bbofSnapT=null;
+function bbofSnapSoon(ms){ clearTimeout(_bbofSnapT); _bbofSnapT=setTimeout(()=>{ bbofSnapRefresh().catch(()=>{}); },ms||20000); }
+// لقطة محلية: الاستمارة المفتوحة لكل قائمة + أسماؤها + آخر رقم استمارة (لتكملتها بدون نت)
+async function bbofSnapRefresh(){
+  if(!IS_ONLINE || bbofHasPending()) return;
+  if(UPROF?.role!=='admin' && !hasPermission('reception')) return;
+  try{ const q=await getPendingQueue(); if(q.length) return; }catch(e){ return; }
+  const snap={};
+  for(const g of ['T','R','B']){
+    const r=await db.rpc('forms_recent',{p_groups:[g],p_limit:30}); if(r.error) return;
+    const fl=r.data||[], open=fl.find(f=>f.status==='open');
+    const last=fl.reduce((a,f)=>Math.max(a,+f.form_no||0),0);
+    let mem=[];
+    if(open){
+      const m=await db.rpc('form_members',{p_forms:[open.id]}); if(m.error) return;
+      mem=(m.data||[]).map(x=>({full_name:x.full_name,bottle_number:x.bottle_number,bottle_type:x.bottle_type,hospital_name:x.hospital_name,patient_name:x.patient_name,exit_reason:x.exit_reason||null}));
+    }
+    snap[g]={open:open?{id:open.id,form_no:open.form_no,last_name_at:open.last_name_at}:null,last_no:last,members:mem};
+  }
+  snap.at=Date.now();
+  try{ localStorage.setItem(BBOF_SNAP,JSON.stringify(snap)); }catch(e){}
+}
+// إضافة اسم لاستمارة محلية (بدون نت). يرجع {closed,form_no,guessed}
+function bbofAssign(localId,bt,m){
+  const g=bbFormGroup(bt), s=bbofLoad(), sg=bbofSnap()[g]||null;
+  let f=s.forms.find(x=>x.group===g && x.status==='open');
+  if(!f){
+    const lastLocal=s.forms.filter(x=>x.group===g).reduce((a,x)=>Math.max(a,+x.form_no||0),0);
+    const rid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+    if(sg && sg.open && !s.forms.some(x=>x.server_id===sg.open.id)){
+      f={lid:rid(),group:g,status:'open',server_id:sg.open.id,form_no:sg.open.form_no,guessed:false,base:sg.members||[],members:[]};
+    } else {
+      f={lid:rid(),group:g,status:'open',server_id:null,form_no:sg?(Math.max(sg.last_no||0,lastLocal)+1):(lastLocal?lastLocal+1:null),guessed:true,base:[],members:[]};
+    }
+    s.forms.push(f);
+  }
+  f.members.push({did:localId,full_name:m.full_name||'',bottle_number:m.bottle_number||'',bottle_type:bt||'',hospital_name:m.hospital_name||'',patient_name:m.patient_name||'',synced:false});
+  f.last_name_at=new Date().toISOString();
+  const total=(f.base||[]).length+f.members.length;
+  if(total>=10) f.status='closed';
+  bbofSave(s);
+  return {closed:f.status==='closed',form_no:f.form_no,guessed:!!f.guessed,local:true};
+}
+// استقبال محلي فشل بالمزامنة → يُزال اسمه من الاستمارة المحلية
+function bbofDrop(localId){
+  try{
+    const s=bbofLoad(); let hit=false;
+    s.forms.forEach(f=>{ const n=f.members.length; f.members=f.members.filter(m=>m.did!==localId); if(f.members.length!==n) hit=true; });
+    s.forms=s.forms.filter(f=>f.members.length>0 || f.printed_at || f.waiting_print_at);
+    if(hit){ bbofSave(s); try{ toast('⚠️ أُزيل اسم من استمارة سحب محلية لأن استقباله لم يصل للسيرفر — راجع الاستمارات قبل الطباعة','warning',9000); }catch(e){} }
+  }catch(e){}
+}
+function bbofMarkSynced(localId,info){
+  try{
+    const s=bbofLoad(); let hit=false;
+    s.forms.forEach(f=>f.members.forEach(m=>{ if(m.did===localId){ hit=true; if(info){ m.synced=true; m.failed=false; m.real_no=info.form_no; } else { m.failed=true; } } }));
+    if(hit) bbofSave(s);
+  }catch(e){}
+}
+// بعد المزامنة: نُثبّت حالة (مطبوعة/انتظار) على الاستمارة الحقيقية ونقارن رقمها بما طُبع على الورق
+async function bbofFinalize(){
+  if(!IS_ONLINE) return;
+  const s=bbofLoad(); if(!s.forms.length) return;
+  const warns=[]; let changed=false;
+  for(const f of s.forms.slice()){
+    for(const m of f.members){
+      if(!m.synced && m.failed){
+        const rid=bbIdMap()[m.did];
+        if(rid){ const info=await bbAssignForm(rid,m.bottle_type); if(info){ m.synced=true; m.failed=false; m.real_no=info.form_no; changed=true; } }
+      }
+    }
+    if(f.members.some(m=>!m.synced)) continue;
+    const real=(f.members.find(m=>m.real_no!=null)||{}).real_no;
+    const act=f.printed_at?'printed':(f.waiting_print_at?'waiting':null);
+    if(act){
+      let rf=null;
+      try{
+        const r=await db.rpc('forms_recent',{p_groups:[f.group],p_limit:60});
+        if(!r.error) rf=(r.data||[]).find(x=>String(x.form_no)===String(real!=null?real:f.form_no)) || (f.server_id?(r.data||[]).find(x=>x.id===f.server_id):null);
+      }catch(e){}
+      if(!rf) continue;   // نحاول لاحقاً
+      try{ const r=await db.rpc('form_set_state',{p_form:rf.id,p_action:act}); if(r.error) continue; }catch(e){ continue; }
+      if(f.printed_at && f.form_no!=null && String(rf.form_no)!==String(f.form_no)) warns.push('استمارة طُبعت بدون نت برقم '+f.form_no+' لكن رقمها بالنظام '+rf.form_no+' — اكتب الرقم الصحيح على الورقة');
+    }
+    s.forms=s.forms.filter(x=>x!==f); changed=true;
+  }
+  if(changed) bbofSave(s);
+  if(warns.length) setTimeout(()=>{ try{ showIntervalBlockModal('⚠️ استمارات سحب الدم: '+warns.join(' | ')); }catch(e){ toast('⚠️ '+warns.join(' | '),'error',30000); } },800);
+  try{ bbofSnapSoon(4000); }catch(e){}
 }
 // notices shown in the bell, kept per account on this computer
 function _bbNKey(){ return 'bb_backup_notices_'+(SES?.user?.id||'x'); }

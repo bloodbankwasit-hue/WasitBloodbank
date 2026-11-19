@@ -416,10 +416,14 @@ async function saveReception(){
         hospital_name:payload.hospital_name||'', blood_pressure:payload.blood_pressure||'', pulse:payload.pulse||'', temperature:payload.temperature||'',
         weight:payload.weight||'', hemoglobin:payload.hemoglobin||'', expiry_date:''
       };
+      // الاسم ينضم لاستمارة سحب الدم المحلية (تُغلق عند 10 أسماء وتُطبع بدون نت)
+      let _formInfo=null;
+      try{ _formInfo=bbofAssign(payload.local_id,btype,{full_name:nm,bottle_number:bnum||'',hospital_name:payload.hospital_name||'',patient_name:payload.patient_name||''}); }catch(e){ console.log('offline form assign failed',e); }
       toast('💾 حُفظ بدون اتصال — يمكنك الطباعة الآن، والإرسال تلقائي عند عودة الإنترنت'+(bnum?(' (رقم القنينة '+bnum+')'):''),'warning',6000);
       G('rcPrintModal').classList.add('on');
       { const eb=G('rcEditBtn'); if(eb) eb.style.display='none'; }
       resetReception();
+      if(_formInfo && typeof colSchedulePopup==='function') colSchedulePopup(_formInfo, bbFormGroup(btype));
       G('rcSaveBtn').style.display='flex';
     } else {
       // Online: send directly

@@ -17,6 +17,46 @@ async function colMembers(ids){
   return by;
 }
 
+// ── الاستمارات المحلية (بدون نت): تُدمج مع استمارات السيرفر بالعرض والطباعة (الحالة بـ bbofLoad في index.html) ──
+function colOffFind(id){
+  if(!id || typeof bbofLoad!=='function') return null;
+  return bbofLoad().forms.find(x=>('lf:'+x.lid)===id || (x.server_id && x.server_id===id && (x.printed_at||x.waiting_print_at||x.members.some(m=>!m.synced)))) || null;
+}
+async function _colLocalStatus(ids){   // حالة سجلات محلية (رفض طبي...) من النسخة المحلية
+  const out={}; if(!ids.length || !window.bbm) return out;
+  try{
+    const r=await bbm.runQuery('blood_donations',[['select',['id,is_deleted,exit_reason']],['in',['id',ids]]]);
+    ((r&&r.data)||[]).forEach(x=>{ out[x.id]=x; });
+  }catch(e){}
+  return out;
+}
+async function colOffMembers(lf){
+  let base=lf.base||[];
+  if(IS_ONLINE && lf.server_id){ try{ const by=await colMembers([lf.server_id]); if((by[lf.server_id]||[]).length) base=by[lf.server_id]; }catch(e){} }
+  const mine=lf.members.filter(m=>!m.synced || !(IS_ONLINE && lf.server_id));
+  const st=await _colLocalStatus(mine.map(m=>m.did));
+  const loc=mine.map(m=>({id:m.did,form_id:lf.server_id||('lf:'+lf.lid),full_name:m.full_name,bottle_number:m.bottle_number,bottle_type:m.bottle_type,hospital_name:m.hospital_name,patient_name:m.patient_name,
+    exit_reason:(st[m.did]&&st[m.did].exit_reason)||null}));
+  return base.concat(loc);
+}
+// دمج الاستمارات المحلية بقائمة السيرفر: يرجع نسخة جديدة من (forms, by)
+function colOverlay(forms, by, groups){
+  const s=bbofLoad(), out=forms.map(f=>Object.assign({},f)), b=Object.assign({},by||{});
+  s.forms.filter(lf=>groups.includes(lf.group)).forEach(lf=>{
+    const unsynced=lf.members.filter(m=>!m.synced);
+    const flags={status:lf.status,printed_at:lf.printed_at||null,waiting_print_at:lf.waiting_print_at||null,last_name_at:lf.last_name_at,__off:true};
+    let f=lf.server_id?out.find(x=>x.id===lf.server_id):null;
+    const loc=unsynced.map(m=>({id:m.did,form_id:lf.server_id||('lf:'+lf.lid),full_name:m.full_name,bottle_number:m.bottle_number,bottle_type:m.bottle_type,hospital_name:m.hospital_name,patient_name:m.patient_name,exit_reason:null}));
+    if(f){
+      const have=(b[f.id]&&b[f.id].length)?b[f.id]:(lf.base||[]);
+      Object.assign(f,flags); b[f.id]=have.concat(loc); f.names_count=b[f.id].length;
+    } else {
+      f=Object.assign({id:lf.server_id||('lf:'+lf.lid),form_no:lf.form_no,form_group:lf.group},flags);
+      b[f.id]=(lf.base||[]).concat(loc); f.names_count=b[f.id].length; out.push(f);
+    }
+  });
+  return {forms:out,by:b};
+}
 function _colMetaFor(rows, formNo, dateStr){
   const bags = [...new Set(rows.map(r=>r.bagType).filter(Boolean))].join(' / ');
   const d = new Date();
@@ -45,14 +85,23 @@ async function colPrintRows(items, formNo, dateStr){
 async function colPrintForm(formId, formNo, dateStr, alreadyPrinted){
   if(_colBusy) return; _colBusy = true;
   try{
-    if(!IS_ONLINE){ toast('الطباعة تحتاج اتصالاً بالإنترنت','warning'); return; }
+    const lf = colOffFind(formId);
+    if(!lf && !IS_ONLINE){ toast('الطباعة تحتاج اتصالاً بالإنترنت','warning'); return; }
     load(true);
-    const by = await colMembers([formId]);
-    const items = (by[formId]||[]).filter(m=>m.exit_reason!=='medical_reject');
+    let items;
+    if(lf) items = (await colOffMembers(lf)).filter(m=>m.exit_reason!=='medical_reject');
+    else { const by = await colMembers([formId]); items = (by[formId]||[]).filter(m=>m.exit_reason!=='medical_reject'); }
     load(false);
     if(!items.length){ toast('لا توجد أسماء بهذه الاستمارة','info'); return; }
-    const ok = await colPrintRows(items, formNo, dateStr);
-    if(ok && !alreadyPrinted) await _colRpc('form_set_state',{p_form:formId,p_action:'printed'});
+    const ok = await colPrintRows(items, lf?lf.form_no:formNo, dateStr);
+    if(ok && !alreadyPrinted){
+      if(lf){
+        const s=bbofLoad(), x=s.forms.find(y=>y.lid===lf.lid);
+        if(x){ x.printed_at=new Date().toISOString(); x.waiting_print_at=null; if(x.status==='open') x.status='closed'; bbofSave(s); }
+        if(lf.guessed) toast('⚠️ رقم الاستمارة '+(lf.form_no!=null?lf.form_no:'—')+' مؤقت (طُبعت بدون نت) — يُؤكَّد عند عودة الإنترنت','warning',7000);
+        if(IS_ONLINE){ try{ await bbofFinalize(); }catch(e){} }
+      } else await _colRpc('form_set_state',{p_form:formId,p_action:'printed'});
+    }
     try{ await colRender(); }catch(e){}
     try{ refreshExpiryNotifications(); }catch(e){}
   }catch(e){ load(false); toast('خطأ: '+(e.message||e),'error',6000); }
@@ -62,8 +111,10 @@ async function colPrintForm(formId, formNo, dateStr, alreadyPrinted){
 async function colPreviewForm(formId, formNo, dateStr, printed){
   try{
     load(true);
-    const by = await colMembers([formId]);
-    const items = (by[formId]||[]).filter(m=>m.exit_reason!=='medical_reject');
+    const _lf = colOffFind(formId);
+    let items;
+    if(_lf){ items=(await colOffMembers(_lf)).filter(m=>m.exit_reason!=='medical_reject'); formNo=_lf.form_no; }
+    else { const by = await colMembers([formId]); items = (by[formId]||[]).filter(m=>m.exit_reason!=='medical_reject'); }
     await loadOneScript('collection-template.js');
     load(false);
     if(!items.length){ toast('لا توجد أسماء بهذه الاستمارة','info'); return; }
@@ -81,7 +132,9 @@ async function colPreviewForm(formId, formNo, dateStr, printed){
 }
 async function colMoveWaiting(formId){
   try{
-    await _colRpc('form_set_state',{p_form:formId,p_action:'waiting'});
+    const _lf=colOffFind(formId);
+    if(_lf){ const st=bbofLoad(), x=st.forms.find(y=>y.lid===_lf.lid); if(x){ x.waiting_print_at=new Date().toISOString(); if(x.status==='open') x.status='closed'; bbofSave(st); } if(IS_ONLINE){ try{ await bbofFinalize(); }catch(e){} } }
+    else await _colRpc('form_set_state',{p_form:formId,p_action:'waiting'});
     toast('⏳ نُقلت الاستمارة للانتظار — تجدها بالأرشيف وسيصلك تنبيه','success',4000);
     try{ refreshExpiryNotifications(); }catch(e){}
     G('collectionModal').classList.remove('on');
@@ -107,6 +160,7 @@ async function colEditMember(donationId){
   try{
     if(!IS_ONLINE){ toast('التعديل يحتاج اتصالاً بالإنترنت','warning'); return; }
     if(!donationId){ toast('تعذّر تحديد السجل','error'); return; }
+    if(String(donationId).startsWith('local-')){ toast('هذا الاسم لم يصل للسيرفر بعد — يُعدَّل بعد المزامنة','warning'); return; }
     await openEditDonation(donationId,{edit:true});
   }catch(e){ toast('تعذّر فتح التعديل: '+(e.message||e),'error',5000); }
   finally{ _colEditBusy=false; }
@@ -138,16 +192,21 @@ async function colRender(){
   box.innerHTML = '<div style="text-align:center;padding:20px;color:#6B7280">جاري التحميل...</div>';
   try{
     if(COL_LISTS.includes(_colTab)){
-      const g=_colTab, forms=(await colForms([g],30)).filter(f=>f.status==='open' || (f.status==='closed' && !f.printed_at && !f.waiting_print_at));
-      const by=await colMembers(forms.map(f=>f.id));
+      const g=_colTab, _pred=f=>f.status==='open' || (f.status==='closed' && !f.printed_at && !f.waiting_print_at);
+      let _raw=[]; try{ _raw=await colForms([g],30); }catch(e){ if(IS_ONLINE && !bbofHasPending()) throw e; }
+      let forms=_raw.filter(_pred), by={};
+      try{ by=await colMembers(forms.map(f=>f.id)); }catch(e){ if(IS_ONLINE && !bbofHasPending()) throw e; }
+      { const o=colOverlay(forms,by,[g]); forms=o.forms.filter(_pred); by=o.by; }
+      forms.sort((a,b)=>(+b.form_no||0)-(+a.form_no||0));
       let h = `<div style="font-size:13px;color:#374151;margin-bottom:8px">استمارة <b>${COL_GROUPS[g].name}</b>: تُفتح تلقائياً مع أول متبرع، وتُغلق عند اكتمال ${COLLECTION_SIZE} أسماء أو عند طباعتها. بعد الطباعة لا تُضاف لها أسماء.</div>`;
       h += forms.length ? forms.map(f=>_colFormBlock(f,by[f.id]||[],'print')).join('') : '<div style="text-align:center;padding:18px;color:#6B7280">لا توجد استمارة مفتوحة — تُفتح عند تسجيل أول متبرع</div>';
       h += `<button class="btn" onclick="colPrintBlank()" style="width:100%;justify-content:center;margin-top:4px">📄 طباعة استمارة فارغة (معاينة)</button>`;
       box.innerHTML = h;
     } else {
-      const forms = await colForms(['T','R','B','A'],80);
+      let forms=[]; try{ forms = await colForms(['T','R','B','A'],80); }catch(e){ if(IS_ONLINE && !bbofHasPending()) throw e; }
+      forms = colOverlay(forms,{},['T','R','B']).forms;
       const waiting = forms.filter(f=>f.waiting_print_at && !f.printed_at), printed = forms.filter(f=>f.printed_at);
-      const by = await colMembers(waiting.map(f=>f.id));
+      let by={}; try{ by = await colMembers(waiting.map(f=>f.id)); }catch(e){}
       const row = f=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #F3F4F6;font-size:14px"><b>#${f.form_no}</b><span style="flex:1;color:#374151">${esc((COL_GROUPS[f.form_group]||{}).name||'')} — ${f.names_count} أسماء — ${esc(_colDate(f.last_name_at||f.printed_at))}</span><button class="btn" onclick="colPrintForm('${f.id}',${f.form_no},'${_colDate(f.last_name_at||f.printed_at)}',${f.printed_at?'true':'false'})">🖨️ ${f.printed_at?'إعادة طباعة':'طباعة'}</button></div>`;
       let h = '';
       if(waiting.length) h += `<div style="font-weight:700;color:#B45309;margin-bottom:6px">⏳ بانتظار الطباعة (${waiting.length})</div><div style="border:1px solid #FDE68A;background:#FFFBEB;border-radius:10px;margin-bottom:12px">${waiting.map(row).join('')}</div>`;
