@@ -156,16 +156,16 @@ async function shSubmit(){
   if(empty){ toast('أكمل الصف: '+(empty.num?'اختر نوع التجهيز للقنينة '+empty.num:'اكتب رقم القنينة'),'error'); return; }
   const ids=_shRows.map(r=>r.pick).filter(Boolean);
   if(!ids.length){ toast('أضف قنينة واحدة على الأقل','error'); return; }
-  if(!IS_ONLINE){ toast('التجهيز يحتاج اتصالاً بالإنترنت','error'); return; }
   if(!(await bbConfirm('تأكيد تجهيز '+ids.length+' قنينة للمريض «'+pat+'»؟ ستُسحب من الرصيد.'))) return;
   _shBusy=true; load(true);
+  const _q0=bbqEnter();
   try{
-    const{data,error}=await db.rpc('dispatch_bottles',{p_ids:ids,p_patient:pat,p_hospital:hosp,p_comp:comp,p_note:note});
+    const{data,error,_queued}=await db.rpc('dispatch_bottles',{p_ids:ids,p_patient:pat,p_hospital:hosp,p_comp:comp,p_note:note});
     if(error) throw error;
     try{ await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:ids[0],new_values:{status:'dispatched',dispatch_count:ids.length,patient:pat,hospital:hosp,compensation:comp+(note?': '+note:'')}}); }catch(e){}
-    toast('✅ تم تجهيز '+ids.length+' قنينة وسُحبت من الرصيد','success',5000);
+    if(!_queued) toast('✅ تم تجهيز '+ids.length+' قنينة وسُحبت من الرصيد','success',5000);
     G('supplyHandModal').classList.remove('on');
     if(typeof _supplyRefreshCurrentLevel==='function') await _supplyRefreshCurrentLevel();
   }catch(e){ toast('⛔ '+(e.message||e),'error',8000); }
-  finally{ _shBusy=false; load(false); }
+  finally{ _shBusy=false; load(false); await bbqLeave(_q0); }
 }

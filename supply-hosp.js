@@ -184,16 +184,16 @@ async function shpSubmit(){
   const ids=_shpRows.map(r=>r.pick).filter(Boolean);
   if(!ids.length || ids.length!==_shpRows.length || ids.length!==h.cnt){ toast('أكمل كل الأسطر ليتطابق العدد','error'); return; }
   if(new Set(ids).size!==ids.length){ toast('قنينة مكررة بأكثر من سطر','error'); return; }
-  if(!IS_ONLINE){ toast('التجهيز يحتاج اتصالاً بالإنترنت','error'); return; }
   if(!(await bbConfirm('تأكيد تجهيز '+ids.length+' قنينة ('+shpLbl(h.comp)+') إلى «'+h.hosp+'»\nكتاب رقم '+h.book+' بتاريخ '+bbDmy(h.bdate)+'؟ ستُسحب من الرصيد.'))) return;
   _shpBusy=true; shpProgress(); load(true);
+  const _q0=bbqEnter();
   try{
-    const{error}=await db.rpc('dispatch_hospital',{p_ids:ids,p_hospital:h.hosp,p_book:h.book,p_bdate:h.bdate});
+    const{error,_queued}=await db.rpc('dispatch_hospital',{p_ids:ids,p_hospital:h.hosp,p_book:h.book,p_bdate:h.bdate});
     if(error) throw error;
     try{ await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:ids[0],new_values:{status:'dispatched',dispatch_count:ids.length,hospital:h.hosp,book_no:h.book,book_date:h.bdate,component:h.comp}}); }catch(e){}
-    toast('✅ تم تجهيز '+ids.length+' قنينة لـ '+h.hosp+' وسُحبت من الرصيد','success',5000);
+    if(!_queued) toast('✅ تم تجهيز '+ids.length+' قنينة لـ '+h.hosp+' وسُحبت من الرصيد','success',5000);
     G('supplyHospModal').classList.remove('on');
     if(typeof _supplyRefreshCurrentLevel==='function') await _supplyRefreshCurrentLevel();
   }catch(e){ toast('⛔ '+(e.message||e),'error',8000); }
-  finally{ _shpBusy=false; load(false); shpProgress(); }
+  finally{ _shpBusy=false; load(false); shpProgress(); await bbqLeave(_q0); }
 }

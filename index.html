@@ -2052,23 +2052,70 @@ async function bbrcRun(kind,name,ops,rpcArgs){
     if(kind==='rpc') b=_rawDb.rpc(name,rpcArgs[0],rpcArgs[1]); else { b=_rawDb.from(name); for(const o of ops) b=b[o[0]](...o[1]); }
     return b;
   };
-  const cacheable = kind==='rpc' ? BBRC_RPC_READ.has(name)
-    : (ops.length>0 && ops[0][0]==='select' && !ops.some(o=>o[0]==='ilike'||o[0]==='like'||o[0]==='textSearch'));
-  if(!cacheable) return await build();
+  const isRead = kind==='rpc' ? BBRC_RPC_READ.has(name) : (ops.length>0 && ops[0][0]==='select');
+  if(!isRead) return await bbqWrite(kind,name,ops,rpcArgs,build);
+  const cacheable = kind==='rpc' ? true : !ops.some(o=>o[0]==='ilike'||o[0]==='like'||o[0]==='textSearch');
   const key = bbrcKey(kind,name, kind==='rpc'?rpcArgs:ops);
   let res=null, thrown=false;
-  try{ res=await build(); }catch(e){ thrown=true; }
-  if(!thrown && res && !res.error){ bbrcPut(key,res); return res; }
+  if(typeof IS_ONLINE!=='undefined' && !IS_ONLINE) thrown=true;   // نعرف أنه لا اتصال: لا ننتظر مهلة الشبكة
+  else { try{ res=await build(); }catch(e){ thrown=true; } }
+  if(!thrown && res && !res.error){ if(cacheable) bbrcPut(key,res); return res; }
   if(bbrcIsNetErr(res,thrown)){
-    const c=await bbrcGet(key);
-    if(c){
-      BBRC_SERVED.n++; BBRC_SERVED.last=Date.now(); if(!BBRC_SERVED.oldest||c.ts<BBRC_SERVED.oldest) BBRC_SERVED.oldest=c.ts;
-      try{ bbrcNotice(); }catch(e){}
-      return {data:c.data,error:null,count:c.count,status:200,statusText:'OFFLINE_CACHE',_cached:true,_ts:c.ts};
+    // 1) النسخة المحلية للمتبرعين/التبرعات (محرك استعلام محلي — تشمل العمليات المعلّقة)
+    if(kind==='from' && window.bbm){
+      try{ const l=await bbm.runQuery(name,ops); if(l){ BBRC_SERVED.n++; BBRC_SERVED.last=Date.now(); try{ bbrcNotice(); }catch(e){} return l; } }catch(e){}
+    }
+    // 2) آخر نتيجة محفوظة لنفس الطلب
+    if(cacheable){
+      const c=await bbrcGet(key);
+      if(c){
+        BBRC_SERVED.n++; BBRC_SERVED.last=Date.now(); if(!BBRC_SERVED.oldest||c.ts<BBRC_SERVED.oldest) BBRC_SERVED.oldest=c.ts;
+        try{ bbrcNotice(); }catch(e){}
+        return {data:c.data,error:null,count:c.count,status:200,statusText:'OFFLINE_CACHE',_cached:true,_ts:c.ts};
+      }
     }
   }
-  if(thrown) throw new Error('تعذر الاتصال بالسيرفر ولا توجد نسخة محفوظة لهذه البيانات على الجهاز');
+  if(thrown||!res) return {data:null,error:{message:'تعذر الاتصال بالسيرفر ولا توجد نسخة محفوظة لهذه البيانات على الجهاز'},status:0};
   return res;
+}
+// ── طابور الكتابة بدون اتصال: يعمل فقط داخل عمليات أُعدّت لذلك صراحةً (bbWithQueue) ──
+const BBQ={depth:0,n:0};
+const BBQ_TABLES={blood_donations:['update','insert'],audit_log:['insert']};
+const BBQ_RPC=new Set(['dispatch_hospital','dispatch_bottles']);
+function bbqEnter(){ BBQ.depth++; return BBQ.n; }
+async function bbqLeave(n0){
+  BBQ.depth=Math.max(0,BBQ.depth-1);
+  if(BBQ.n>n0){
+    toast('💾 '+(BBQ.n-n0)+' عملية حُفظت محلياً — ستُرسل تلقائياً عند عودة الاتصال','warning',6000);
+    try{ const q=await getPendingQueue(); updateOfflineBar('offline',q.length+' عملية معلّقة'); }catch(e){}
+  }
+}
+async function bbWithQueue(fn){ const n0=bbqEnter(); try{ return await fn(); } finally{ await bbqLeave(n0); } }
+function bbqEligible(kind,name,ops){
+  if(kind==='rpc') return BBQ_RPC.has(name);
+  const f=ops[0]&&ops[0][0]; const a=BBQ_TABLES[name];
+  if(!a||!a.includes(f)) return false;
+  return !ops.some(o=>o[0]==='select'||o[0]==='single'||o[0]==='maybeSingle');
+}
+function bbqLabel(d){
+  if(d.kind==='rpc') return ({dispatch_hospital:'تجهيز لمستشفى (بكتاب)',dispatch_bottles:'تجهيز باي هاند'})[d.name]||d.name;
+  if(d.name==='audit_log') return 'سجل تدقيق';
+  if(d.ops[0][0]==='insert') return 'إضافة مكوّنات قنينة (فصل)';
+  const v=(d.ops[0][1]&&d.ops[0][1][0])||{};
+  return 'تعديل قنينة ('+(v.status==='damaged'?'تلف':v.status==='separated'?'فصل':v.status==='dispatched'?'صرف':v.status||'تعديل')+')';
+}
+async function bbqWrite(kind,name,ops,rpcArgs,build){
+  if(BBQ.depth<=0 || !bbqEligible(kind,name,ops)) return await build();
+  let res=null, thrown=false;
+  if(typeof IS_ONLINE!=='undefined' && !IS_ONLINE) thrown=true;
+  else { try{ res=await build(); }catch(e){ thrown=true; } }
+  if(!thrown && !(res && res.error && bbrcIsNetErr(res,false))) return res;
+  const d={kind,name,ops,args:kind==='rpc'?[rpcArgs[0]||null,rpcArgs[1]||null]:null};
+  d.label=bbqLabel(d);
+  await enqueueOp('w',d);
+  BBQ.n++;
+  if(kind==='from'){ try{ if(window.bbm) await bbm.applyLocal(name,ops); }catch(e){} }
+  return {data:null,error:null,status:202,statusText:'QUEUED',_queued:true};
 }
 let _bbrcNoticeAt=0;
 function bbrcNotice(){
@@ -3135,14 +3182,14 @@ async function getPendingQueue(){
 }
 
 // ── Mark op as done/failed ──
-async function updateOpStatus(id, status){
+async function updateOpStatus(id, status, err){
   if(!offlineDB) return;
   const tx = offlineDB.transaction('op_queue','readwrite');
   const st = tx.objectStore('op_queue');
   const r  = st.get(id);
   r.onsuccess = e=>{
     const op = e.target.result;
-    if(op){ op.status=status; st.put(op); }
+    if(op){ op.status=status; if(err) op.error=String(err).slice(0,300); st.put(op); }
   };
 }
 
@@ -3155,7 +3202,7 @@ async function syncQueue(){
   SYNC_RUNNING = true;
   updateOfflineBar('syncing', `جاري المزامنة... (${queue.length} عملية)`);
 
-  let done=0;
+  let done=0; const _failed=[]; const _refresh={};
   for(const op of queue){
     try{
       await processQueuedOp(op);
@@ -3163,12 +3210,17 @@ async function syncQueue(){
       done++;
     }catch(e){
       console.log('[Sync] Op failed:',op.type,e);
-      await updateOpStatus(op.id,'failed');
+      await updateOpStatus(op.id,'failed',(e&&e.message)||e);
+      const lbl=op.type==='w'?(op.data.label||op.data.name):({reception:'استقبال',draw:'سحب',lab:'مختبر',supply:'صرف'})[op.type]||op.type;
+      _failed.push(lbl+(op.type==='reception'&&op.data.full_name?' — '+op.data.full_name:'')+': '+((e&&e.message)||e));
+      if(op.type==='w'&&op.data.kind==='from'){ for(const o of op.data.ops){ if((o[0]==='eq'&&o[1][0]==='id')) (_refresh[op.data.name]=_refresh[op.data.name]||[]).push(o[1][1]); if(o[0]==='in'&&o[1][0]==='id') (_refresh[op.data.name]=_refresh[op.data.name]||[]).push(...o[1][1]); } }
     }
   }
+  try{ if(window.bbm) for(const t in _refresh) await bbm.refreshIds(t,_refresh[t]); }catch(e){}
 
   SYNC_RUNNING = false;
   toast(`✅ تمت المزامنة — ${done}/${queue.length} عملية ناجحة`,'success',4000);
+  if(_failed.length) setTimeout(()=>toast('⛔ فشلت '+_failed.length+' عملية بعد المزامنة (لم تُنفَّذ على السيرفر) — أعد إدخالها يدوياً: '+_failed.join(' | '),'error',30000),1200);
   if(window.BB_SYNC_CONFLICTS&&window.BB_SYNC_CONFLICTS.length){
     const _c=window.BB_SYNC_CONFLICTS.splice(0);
     setTimeout(()=>{ try{ showIntervalBlockModal('⚠️ تنبيه: استقبالات حُفظت بدون إنترنت تبيّن بعد المزامنة أنها مخالفة — راجعها فوراً: '+_c.join(' | ')); }catch(e){ toast('⚠️ استقبالات مخالفة: '+_c.join(' | '),'error',20000); } },800);
@@ -3239,6 +3291,11 @@ async function processQueuedOp(op){
     // rejected_donors, rather than a second, separately-maintained copy of that decision.
     await loadSectionScript('virology'); // pulls in lab-shared.js (defines applyLabUpdate) + virology.js
     await applyLabUpdate(d.donation_id, d.fieldUpdates); // throws on its own failure — caught by syncQueue's per-op try/catch
+  } else if(op.type==='w'){
+    let b;
+    if(d.kind==='rpc') b=_rawDb.rpc(d.name,d.args&&d.args[0]||undefined,d.args&&d.args[1]||undefined);
+    else { b=_rawDb.from(d.name); for(const o of d.ops) b=b[o[0]](...o[1]); }
+    const r=await b; if(r&&r.error) throw new Error(r.error.message||'فشلت العملية');
   } else if(op.type==='supply'){
     const{error}=await db.from('blood_donations').update({
       status:'dispatched',hospital_name:d.hospital_name,dispatch_date:d.dispatch_date||new Date().toISOString().split('T')[0]
@@ -3483,7 +3540,7 @@ async function loadProf(){
     setTimeout(()=>toast('هذا الحساب معطّل أو غير مسجّل. تواصل مع مدير النظام.','error'),400);
     return;
   }
-  try{ if(data.role==='admin'||data.role==='reception'||hasPermission('reception')) setTimeout(()=>{ loadOneScript('mirror.js').then(()=>bbmStart()).catch(()=>{}); },2500); }catch(e){}
+  try{ setTimeout(()=>{ loadOneScript('mirror.js').then(()=>bbmStart()).catch(()=>{}); },2500); }catch(e){}
   const _nm = data.full_name || 'مستخدم';
   const _av = _nm.charAt(0);
   const _rl = {admin:'مدير النظام',tech:'فني سحب',reception:'موظف استقبال',lab:'فني مختبر',supply:'موظف تجهيز',viewer:'عرض فقط'};
@@ -4728,7 +4785,7 @@ async function supplyGroups(force){
   if(!force && c && c.w===w && Date.now()-c.t<30000) return c.v;
   let v=null;
   try{
-    const{data,error}=await db.rpc('supply_open'); if(error) throw error;
+    const{data,error,_cached}=await db.rpc('supply_open'); if(error||_cached) throw (error||new Error('cached'));
     v={groups:(data.groups||[]).map(x=>({c:x.c||'دم كامل',b:x.b,n:Number(x.n)})),damaged:Number(data.damaged||0),expired:Number(data.expired||0)};
   }catch(e){   // الدالة غير منفذة بعد → الطريقة القديمة (أبطأ لكنها تعمل)
     const rows=await bbFetchAll(()=>db.from('blood_donations').select('id,component_type,blood_type,expiry_date').eq('status','in_stock').eq('is_deleted',false));
@@ -4955,6 +5012,7 @@ async function confirmSeparate(){
   const checked=[...document.querySelectorAll('.sep-comp:checked')];
   if(!checked.length){ toast('يرجى تحديد مكوّن واحد على الأقل','error'); return; }
   load(true);
+  const _q0=bbqEnter();
   try{
     let totalRows=0;
     for(const id of ids){
@@ -4998,7 +5056,7 @@ async function confirmSeparate(){
     else
       await withScrollPreserved(_supplyRefreshCurrentLevel);
   }catch(e){ toast('خطأ: '+e.message,'error'); }
-  finally{ load(false); }
+  finally{ load(false); await bbqLeave(_q0); }
 }
 
 // «لم تُفصل»: القنينة تبقى دم كامل وتكمل مسارها (المخزن المؤقت ← الرصيد) كدم طبيعي. لا تُنشأ مكوّنات.
@@ -5047,6 +5105,7 @@ async function confirmDamage(){
   const note=G('dmg-note').value.trim();
   if(!reason){ toast('يرجى إدخال سبب التلف','error'); return; }
   load(true);
+  const _q0=bbqEnter();
   try{
     const upd={status:'damaged', damage_reason:reason, damaged_date:new Date().toISOString().split('T')[0]};
     if(note) upd.bottle_note=note;     // only sent when written, so saving without a note never depends on the column
@@ -5063,7 +5122,7 @@ async function confirmDamage(){
     else
       await withScrollPreserved(_supplyRefreshCurrentLevel);
   }catch(e){ toast('خطأ: '+e.message,'error'); }
-  finally{ load(false); }
+  finally{ load(false); await bbqLeave(_q0); }
 }
 
 // ── الصفيحات الدموية: إدارتها (تلف، انتهاء...) من مسؤولية حساب الفصل؛ التجهيز يصرفها فقط ويرى رصيدها ──
@@ -5173,68 +5232,18 @@ async function saveDispatch(){
   const id=G('disp-id').value, hosp=G('disp-hosp').value.trim();
   if(!hosp){ toast('يرجى إدخال اسم المستشفى','error'); return; }
   load(true);
-  if(!IS_ONLINE){
-    await enqueueOp('supply',{donation_id:id,hospital_name:hosp,dispatch_date:new Date().toISOString().split('T')[0]});
-    const q=await getPendingQueue();
-    updateOfflineBar('offline',q.length+' عملية معلّقة');
-    load(false);
-    toast('💾 حُفظ بدون اتصال — سيُرسل تلقائياً','warning',5000);
-  } else {
-    const{error}=await db.from('blood_donations').update({status:'dispatched',hospital_name:hosp,dispatch_date:new Date().toISOString().split('T')[0]}).eq('id',id);
-    load(false);
-    if(error){ toast('خطأ: '+error.message,'error'); return; }
-    await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'dispatched',hospital:hosp}});
-    toast('✅ تم صرف القنينة لـ'+hosp,'success');
-  }
+  let r=null; const _q0=bbqEnter();
+  try{
+    const _d=new Date().toISOString().split('T')[0];
+    r=await db.from('blood_donations').update({status:'dispatched',hospital_name:hosp,dispatch_date:_d}).eq('id',id);
+    if(!r.error) await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'blood_donations',record_id:id,new_values:{status:'dispatched',hospital:hosp}});
+  }finally{ load(false); await bbqLeave(_q0); }
+  if(r.error){ toast('خطأ: '+r.error.message,'error'); return; }
+  if(!r._queued) toast('✅ تم صرف القنينة لـ'+hosp,'success');
   G('dispModal').classList.remove('on');
   await loadSupply();
 }
 
-// [تسلسلات القناني: js/sequences.js] — يُحمّل عند فتح شاشة الإعدادات لأول مرة
-// [الصلاحيات وإدارة المستخدمين: js/users.js] — يُحمّل عند فتح شاشة المستخدمين لأول مرة
-
-// ================================================================
-// MAIN TAB SYSTEM
-// ================================================================
-const WORK_CARDS = [
-  {key:'reception', icon:'➕', name:'إضافة متبرع',  desc:'تسجيل متبرع جديد'},
-  {key:'collection', icon:'📋', name:'استمارة التبرع بالدم', desc:'طباعة استمارة السحب A4 وأرشيفها'},
-  {key:'campaigns', icon:'🚐', name:'حملات التبرع',  desc:'تسلسلات ومتابعة الحملات'},
-  {key:'draw',      icon:'💉', name:'السحب',        desc:'وحدة سحب الدم'},
-  {key:'trima',     icon:'🩸', name:'وحدة التريما',  desc:'سحب التريما: دم مضغوط أو صفائح'},
-  {key:'virology',      icon:'🧪', name:'وحدة الفيروسات', desc:'فحص العينات'},
-  {key:'classification',icon:'🩸', name:'وحدة التصنيف',  desc:'تحديد فصيلة القناني'},
-  {key:'separation',icon:'🧬', name:'الفصل',        desc:'متابعة القناني من السحب لحد الفصل'},
-  {key:'pending_release', icon:'⏳', name:'المخزن المؤقت', desc:'تأكيد القناني قبل دخولها للتجهيز'},
-  {key:'supply',    icon:'📦', name:'التجهيز',      desc:'الخزين والصرف'},
-  {key:'donors',    icon:'👥', name:'المتبرعون',    desc:'سجل التبرعات'},
-  {key:'globalsearch', icon:'🔍', name:'البحث والأرشيف', desc:'بحث سريع أو متقدم بكل البيانات'},
-  {key:'infected',  icon:'⚠️', name:'المصابون والمرفوضون', desc:'الحالات الإيجابية والمرفوضون مؤقتاً ودائماً'},
-  {key:'rare',      icon:'💎', name:'الفصائل النادرة', desc:'O− و AB−'},
-  {key:'damaged_store', icon:'🗑️', name:'مخزن القناني التالفة', desc:'استلام التالف وإتلافه بمحضر وأرشيفه'},
-  {key:'store',     icon:'🏬', name:'المخزن',        desc:'مواد المصرف: إضافة وسحب وأرشيف'},
-  {key:'stats',     icon:'📈', name:'الإحصائيات',  desc:'تقارير وطباعة'},
-  {key:'backup',    icon:'💾', name:'النسخ الاحتياطي', desc:'تلقائي كل 3 أيام على هذه الحاسبة'},
-];
-
-const ADMIN_ONLY_CARDS = [
-  {key:'audit',    icon:'🔒', name:'سجل التتبع',    desc:'جميع العمليات'},
-  {key:'settings', icon:'⚙️', name:'الإعدادات',    desc:'إعدادات النظام'},
-  {key:'users',    icon:'👥', name:'إدارة الحسابات', desc:'الموظفون والصلاحيات'},
-];
-
-// nav(name) target -> the permission key required to reach it. Built from the same cards that
-// already control which tiles show, so the two can never drift apart.
-const SECTION_PERM = {};
-[...WORK_CARDS, ...ADMIN_ONLY_CARDS].forEach(c=>{ SECTION_PERM[c.key]=c.key; });
-SECTION_PERM.add = 'reception';
-SECTION_PERM.collection = 'reception'; // the A4 draw form is a reception task
-function cardVisible(c,isAdmin,perms){
-  if(c.key==='backup') return !!window.nativeBackup && (isAdmin || perms.includes('backup')); // desktop app only
-  return isAdmin || perms.includes(c.key) || (c.key==='collection' && perms.includes('reception'));
-}
-// ── Automatic backup (desktop app only): launcher, notices, startup hook ──────────────────────
-function canAutoBackup(){ return !!window.nativeBackup && !!UPROF && (UPROF.role==='admin' || hasPermission('backup')); }
 async function openBackupAutoFromNav(){
   if(!canAutoBackup()){ toast('⛔ النسخ الاحتياطي متاح في تطبيق الويندوز للحسابات المصرّح لها فقط','error'); return; }
   try{ await loadSectionScript('backup'); }catch(e){ toast('تعذر تحميل هذا القسم — تحقق من الاتصال بالإنترنت','error',4000); return; }

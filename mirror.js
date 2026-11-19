@@ -6,7 +6,7 @@
 (function(){
   if(window.bbm) return;
   const DBN='bloodbank_mirror', PAGE=1000, OVERLAP_MS=10*60*1000, SYNC_EVERY=5*60*1000;
-  let idb=null, D=null /*donors array*/, LAST=null /*donor_id -> last donation*/, running=false, timer=null;
+  let DALL=null, BALL=null; let idb=null, D=null /*donors array*/, LAST=null /*donor_id -> last donation*/, running=false, timer=null;
 
   function open(){
     if(idb) return Promise.resolve(idb);
@@ -29,16 +29,13 @@
   }
   async function all(store){ const d=await open(); return await P(d.transaction(store).objectStore(store).getAll()); }
 
-  const COLS={
-    donors:'id,full_name,birth_year,gender,mother_name,national_id,id_type,mobile,address,occupation,donor_number,blood_type,is_deleted,updated_at',
-    donations:'id,donor_id,status,donation_date,draw_date,created_at,is_deleted,updated_at'
-  };
+  const COLS={ donors:'*', donations:'*' };   // كل الأعمدة: كي تُجاب أي قراءة محلياً
   const TABLE={donors:'donors',donations:'blood_donations'};
 
   // جلب كامل بصفحات (عند أول مرة أو عند اختلاف العدد)
   async function fullPull(kind){
     let rows=[]; const noU=await metaGet('noUpdatedAt');
-    const cols=noU? COLS[kind].replace(',updated_at','') : COLS[kind];
+    const cols=COLS[kind];
     for(let p=0;;p+=PAGE){
       const{data,error}=await _rawDb.from(TABLE[kind]).select(cols).order('id',{ascending:true}).range(p,p+PAGE-1);
       if(error) throw error;
@@ -93,12 +90,13 @@
 
   async function sync(){
     if(running||!navigator.onLine) return {skipped:true};
+    try{ if(typeof getPendingQueue==='function'){ const q=await getPendingQueue(); if(q&&q.length) return {skipped:'pending'}; } }catch(e){}   // لا نكتب فوق التعديلات المحلية قبل إرسالها
     running=true; const out={};
     try{
       for(const k of ['donors','donations']){ out[k]=await syncKind(k); }
       try{ if(typeof cacheRejectedDonors==='function') await cacheRejectedDonors(); }catch(e){}
       await metaSet('lastSync',Date.now());
-      D=null; LAST=null; out.ok=true;
+      D=null; LAST=null; DALL=null; BALL=null; out.ok=true;
     }catch(e){ out.error=e&&e.message; console.log('[mirror] sync failed',e); }
     running=false; render(); return out;
   }
@@ -131,6 +129,102 @@
   }
   async function lastDonation(donorId){ const m=await ensureLast(); return m.get(donorId)||null; }
 
+
+  // ───────── محرك استعلام محلي (يحاكي PostgREST للحالات الشائعة) ─────────
+  async function loadAll(table){
+    if(table==='donors'){ if(!DALL) DALL=await all('donors'); return DALL; }
+    if(!BALL) BALL=await all('donations'); return BALL;
+  }
+  function splitTop(str){ const out=[]; let d=0,cur=''; for(const ch of str){ if(ch==='(') d++; if(ch===')') d--; if(ch===','&&d===0){ out.push(cur.trim()); cur=''; } else cur+=ch; } if(cur.trim()) out.push(cur.trim()); return out; }
+  function cmp(a,b){ if(a==null&&b==null) return 0; if(a==null) return 1; if(b==null) return -1; if(typeof a==='number'&&typeof b==='number') return a-b; return a<b?-1:(a>b?1:0); }
+  function same(a,b){ if(a==null||b==null) return a==b; return String(a)===String(b); }
+  const OK_OPS=new Set(['select','eq','neq','gt','gte','lt','lte','in','is','not','order','limit','range','single','maybeSingle','ilike']);
+  // يرجع null إذا وُجد شيء غير مدعوم (فيُستعمل الكاش القديم أو يظهر الخطأ)
+  async function runQuery(name,ops){
+    const kind = name==='donors' ? 'donors' : (name==='blood_donations' ? 'donations' : null);
+    if(!kind || !(await metaGet('lastSync'))) return null;
+    if(!ops.length || ops[0][0]!=='select') return null;
+    for(const o of ops) if(!OK_OPS.has(o[0])) return null;
+    let cols=ops[0][1][0]||'*', opts=ops[0][1][1]||{};
+    const parts=splitTop(cols), proj=[], embeds=[];
+    for(const c of parts){
+      const m=c.match(/^([a-z_]+)(!inner)?\((.*)\)$/i);
+      if(m){ if(!(kind==='donations' && m[1]==='donors')) return null; embeds.push({alias:'donors',inner:!!m[2],cols:splitTop(m[3])}); }
+      else proj.push(c);
+    }
+    let rows=await loadAll(name), res=rows, single=null, ord=[], lim=null, rng=null;
+    const ft=[];
+    for(let i=1;i<ops.length;i++){
+      const [m,a]=ops[i];
+      if(['eq','neq','gt','gte','lt','lte','is','ilike'].includes(m) || m==='in' || m==='not'){
+        const col=a[0]; if(typeof col!=='string'||col.indexOf('.')>=0) return null;
+        if(m==='eq') ft.push(r=>same(r[col],a[1]));
+        else if(m==='neq') ft.push(r=>!same(r[col],a[1]));
+        else if(m==='gt') ft.push(r=>r[col]!=null&&cmp(r[col],a[1])>0);
+        else if(m==='gte') ft.push(r=>r[col]!=null&&cmp(r[col],a[1])>=0);
+        else if(m==='lt') ft.push(r=>r[col]!=null&&cmp(r[col],a[1])<0);
+        else if(m==='lte') ft.push(r=>r[col]!=null&&cmp(r[col],a[1])<=0);
+        else if(m==='is') ft.push(r=>a[1]===null? r[col]==null : r[col]===a[1]);
+        else if(m==='in') ft.push(r=>(a[1]||[]).some(v=>same(r[col],v)));
+        else if(m==='ilike'){ const pat=String(a[1]).replace(/\*/g,'%'); if(/[_]/.test(pat)) return null; const core=pat.replace(/^%|%$/g,'').toLowerCase(); const st=!pat.startsWith('%'), en=!pat.endsWith('%');
+          ft.push(r=>{ const v=String(r[col]==null?'':r[col]).toLowerCase(); return st&&en? v===core : st? v.startsWith(core) : en? v.endsWith(core) : v.includes(core); }); }
+        else if(m==='not'){ const op=a[1], v=a[2];
+          if(op==='is') ft.push(r=> v===null? r[col]!=null : r[col]!==v);
+          else if(op==='eq') ft.push(r=>!same(r[col],v));
+          else return null; }
+      } else if(m==='order'){ ord.push({c:a[0],asc:!(a[1]&&a[1].ascending===false)}); }
+      else if(m==='limit') lim=a[0];
+      else if(m==='range') rng=a;
+      else if(m==='single') single='single';
+      else if(m==='maybeSingle') single='maybe';
+    }
+    res=rows.filter(r=>ft.every(f=>f(r)));
+    const needDonors=embeds.length>0;
+    let dmap=null;
+    if(needDonors){ dmap=new Map((await loadAll('donors')).map(d=>[d.id,d])); if(embeds.some(e=>e.inner)) res=res.filter(r=>dmap.has(r.donor_id)); }
+    const total=res.length;
+    if(opts.head) return {data:null,error:null,count:total,status:200,_local:true};
+    if(ord.length) res=res.slice().sort((x,y)=>{ for(const o of ord){ const c=cmp(x[o.c],y[o.c]); if(c) return o.asc?c:-c*1; } return 0; });
+    // PostgREST: تصاعدياً الفارغ أخيراً، وتنازلياً الفارغ أولاً (يطابقه cmp وعكسه)
+    if(rng) res=res.slice(rng[0],rng[1]+1);
+    if(lim!=null) res=res.slice(0,lim);
+    const star=proj.includes('*');
+    const out=res.map(r=>{
+      let o; if(star) o={...r}; else { o={}; for(const c of proj){ const k=c.split(':').pop().trim(); o[k]=r[k]===undefined?null:r[k]; } }
+      for(const e of embeds){ const d=dmap.get(r.donor_id); if(!d){ o.donors=null; continue; }
+        if(e.cols.includes('*')) o.donors={...d}; else { const x={}; for(const c of e.cols){ x[c]=d[c]===undefined?null:d[c]; } o.donors=x; } }
+      return o; });
+    if(single){
+      if(out.length===1) return {data:out[0],error:null,status:200,_local:true,count:total};
+      if(out.length===0 && single==='maybe') return {data:null,error:null,status:200,_local:true,count:0};
+      return {data:null,error:{message:'JSON object requested, multiple (or no) rows returned',code:'PGRST116'},status:406,_local:true};
+    }
+    return {data:out,error:null,status:200,count:opts.count?total:null,_local:true};
+  }
+  // تطبيق كتابة معلّقة على النسخة المحلية فوراً (كي تعكسها القراءات التالية)
+  async function applyLocal(name,ops){
+    try{
+      const kind=name==='blood_donations'?'donations':(name==='donors'?'donors':null); if(!kind) return;
+      const u=ops.find(o=>o[0]==='update'); if(!u) return;
+      let ids=null; for(const o of ops){ if(o[0]==='eq'&&o[1][0]==='id') ids=[o[1][1]]; if(o[0]==='in'&&o[1][0]==='id') ids=o[1][1]; }
+      if(!ids||!ids.length) return;
+      const rows=await loadAll(name), set=new Set(ids.map(String)), changed=[];
+      for(const r of rows){ if(set.has(String(r.id))){ Object.assign(r,u[1][0]); changed.push(r); } }
+      if(changed.length){ await putMany(kind,changed,false); D=null; LAST=null; }
+    }catch(e){ console.log('[mirror] applyLocal',e); }
+  }
+  // إعادة جلب صفوف محددة من السيرفر (بعد فشل عملية معلّقة، لتصحيح التعديل المحلي المتفائل)
+  async function refreshIds(name,ids){
+    try{
+      const kind=name==='blood_donations'?'donations':'donors'; ids=[...new Set((ids||[]).map(String))];
+      for(let i=0;i<ids.length;i+=150){
+        const{data,error}=await _rawDb.from(name).select('*').in('id',ids.slice(i,i+150));
+        if(!error&&data&&data.length) await putMany(kind,data,false);
+      }
+      DALL=null; BALL=null; D=null; LAST=null;
+    }catch(e){}
+  }
+
   // شريط حالة بشاشة الاستقبال
   async function render(){
     try{
@@ -154,7 +248,7 @@
     setInterval(render,30000); render();
   }
   async function reset(){ const d=await open(); for(const s of ['donors','donations','meta']){ const tx=d.transaction(s,'readwrite'); tx.objectStore(s).clear(); } D=null; LAST=null; return sync(); }
-  window.bbm={start,sync,searchDonors,exactDonor,lastDonation,render,reset,
+  window.bbm={start,sync,searchDonors,exactDonor,lastDonation,render,reset,runQuery,applyLocal,refreshIds,
     ready:async()=>!!(await metaGet('lastSync'))};
   window.bbmStart=start; window.bbmSync=sync;
 })();
