@@ -112,11 +112,26 @@ async function saveEditSeq(){
 }
 
 
+
+// فحص سلامة محلي (بدون نت): تكرار أرقام القناني ضمن النسخة المحلية + العمليات المعلّقة والفاشلة
+async function _localIntegrity(){
+  const issues=[];
+  if(window.bbm){
+    const r=await bbm.runQuery('blood_donations',[['select',['id,bottle_number,bottle_type']],['eq',['is_deleted',false]]]);
+    const seen=new Map(), dup=new Set();
+    ((r&&r.data)||[]).forEach(x=>{ if(x.bottle_number==null) return; const k=x.bottle_number+'|'+(x.bottle_type==='تريما'?'T':'N'); if(seen.has(k)) dup.add(x.bottle_number); else seen.set(k,1); });
+    if(dup.size) issues.push({level:'error',msg:'أرقام قناني مكررة محلياً: '+[...dup].slice(0,30).join('، ')+(dup.size>30?' …':'')});
+  }
+  try{ const q=await getPendingQueue(); if(q.length) issues.push({level:'warn',msg:q.length+' عملية معلّقة لم تُرسل للسيرفر بعد'}); }catch(e){}
+  issues.push({level:'warn',msg:'هذا فحص محلي مبسّط (بدون اتصال) — أعد الفحص الكامل عند عودة الإنترنت'});
+  return {ok:false,issues};
+}
 // فحص سلامة النظام: يطلب تقريراً من قاعدة البيانات (تكرار أرقام، عدّاد متأخر، تسلسلات متداخلة، حجوزات متعارضة...)
 async function runIntegrityCheck(){
   load(true);
   let rep=null, err=null;
-  try{ const r=await db.rpc('integrity_report'); if(r.error) err=r.error.message; else rep=r.data; }catch(e){ err=e.message; }
+  let _localChk=false;
+  try{ const r=await db.rpc('integrity_report'); if(r.error) err=r.error.message; else if(r._cached){ rep=await _localIntegrity(); _localChk=true; } else rep=r.data; }catch(e){ err=e.message; }
   load(false);
   let ov=G('integrityModal'); if(ov) ov.remove();
   ov=document.createElement('div'); ov.className='overlay on'; ov.id='integrityModal';
