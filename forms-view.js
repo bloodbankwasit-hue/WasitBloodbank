@@ -66,6 +66,12 @@ const FV = (function(){
         // الطبقة الأولى: الاستمارات + أعدادها (جاهز/غير جاهز/أُنجز/خرج) محسوبة بالسيرفر، بدون أسماء
         const forms = await rpc('forms_overview',{p_unit:u.cfg.unit,p_groups:u.cfg.groups,p_limit:60,p_types:u.cfg.types?u.cfg.types():[]});
         u.forms = forms||[]; u.by = {};
+        if(u.forms.length && u.forms.some(f=>f.c===undefined)){   // محلي (بدون نت): نحسب الأعداد من أسماء الاستمارات
+          const ids=u.forms.map(f=>f.id), by={};
+          ((await rpc('form_members',{p_forms:ids}))||[]).forEach(m=>{ (by[m.form_id]=by[m.form_id]||[]).push(m); });
+          ids.forEach(id=>{ u.by[id]=shape(u,by[id]||[]); });
+          return;
+        }
         if(u.view==='detail' && u.formId) await loadMembers(u,u.formId);
         return;
       }catch(e){

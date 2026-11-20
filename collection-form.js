@@ -45,11 +45,11 @@ function colOverlay(forms, by, groups){
   s.forms.filter(lf=>groups.includes(lf.group)).forEach(lf=>{
     const unsynced=lf.members.filter(m=>!m.synced);
     const flags={status:lf.status,printed_at:lf.printed_at||null,waiting_print_at:lf.waiting_print_at||null,last_name_at:lf.last_name_at,__off:true};
-    let f=lf.server_id?out.find(x=>x.id===lf.server_id):null;
+    let f=out.find(x=>x.id===(lf.server_id||('lf:'+lf.lid)));
     const loc=unsynced.map(m=>({id:m.did,form_id:lf.server_id||('lf:'+lf.lid),full_name:m.full_name,bottle_number:m.bottle_number,bottle_type:m.bottle_type,hospital_name:m.hospital_name,patient_name:m.patient_name,exit_reason:null}));
     if(f){
-      const have=(b[f.id]&&b[f.id].length)?b[f.id]:(lf.base||[]);
-      Object.assign(f,flags); b[f.id]=have.concat(loc); f.names_count=b[f.id].length;
+      const have=(b[f.id]&&b[f.id].length)?b[f.id]:(lf.base||[]), seen=new Set(have.map(x=>x.id));
+      Object.assign(f,flags); b[f.id]=have.concat(loc.filter(x=>!seen.has(x.id))); f.names_count=b[f.id].length;
     } else {
       f=Object.assign({id:lf.server_id||('lf:'+lf.lid),form_no:lf.form_no,form_group:lf.group},flags);
       b[f.id]=(lf.base||[]).concat(loc); f.names_count=b[f.id].length; out.push(f);

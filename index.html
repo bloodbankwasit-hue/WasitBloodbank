@@ -2000,7 +2000,7 @@ const _rawDb = createClient(SURL, SKEY);
 // طبقة القراءة المحلية (v124): كل قراءة ناجحة تُحفظ بالجهاز؛ إذا انقطعت الشبكة تُعاد آخر نسخة محفوظة
 // بدل الخطأ. لا تتدخل أبداً والإنترنت شغّال (النتيجة الحية دائماً). الكتابة لا تُلمس هنا.
 // ════════════════════════════════════════════════════════════════
-const BBRC_RPC_READ = new Set(['form_members','dispatch_archive','supply_open','stats_report','release_open','my_waiting_forms','integrity_report','forms_recent','donation_exit_counts','dispatch_stats','dash_counts']);
+const BBRC_RPC_READ = new Set(['form_members','dispatch_archive','supply_open','stats_report','release_open','my_waiting_forms','integrity_report','forms_recent','donation_exit_counts','dispatch_stats','dash_counts','forms_overview','search_form_members']);
 const BBRC_MAX_ENTRIES = 4000, BBRC_MAX_BYTES = 6*1024*1024;
 let _bbrcDB = null, _bbrcOpening = null, BBRC_SERVED = {n:0, oldest:0, last:0};
 function bbrcOpen(){
@@ -2063,6 +2063,11 @@ async function bbrcRun(kind,name,ops,rpcArgs){
   if(!thrown && res && !res.error){ if(cacheable) bbrcPut(key,res); return res; }
   if(bbrcIsNetErr(res,thrown)){
     try{ if(typeof IS_ONLINE!=='undefined' && IS_ONLINE && window.bbNoteNetFail) bbNoteNetFail(); }catch(e){}
+    // 0) استمارات العمل: تُبنى محلياً (الحالة الحالية للقنينة + الاستمارات المحلية الجديدة)
+    if(kind==='rpc' && BBF_RPC.has(name) && window.bbm){
+      let base=null; if(cacheable){ try{ const c=await bbrcGet(key); if(c) base=c.data; }catch(e){} }
+      try{ const out=await bbfOff(name,rpcArgs[0],base); if(out!=null){ BBRC_SERVED.n++; BBRC_SERVED.last=Date.now(); try{ bbrcNotice(); }catch(e){} return {data:out,error:null,status:200,statusText:'OFFLINE_LOCAL',_cached:true}; } }catch(e){ console.log('[bbf]',e); }
+    }
     // 1) النسخة المحلية للمتبرعين/التبرعات (محرك استعلام محلي — تشمل العمليات المعلّقة)
     if(kind==='from' && window.bbm){
       try{ const l=await bbm.runQuery(name,ops); if(l){ BBRC_SERVED.n++; BBRC_SERVED.last=Date.now(); try{ bbrcNotice(); }catch(e){} return l; } }catch(e){}
@@ -2081,6 +2086,47 @@ async function bbrcRun(kind,name,ops,rpcArgs){
   return res;
 }
 // ── طابور الكتابة بدون اتصال: يعمل فقط داخل عمليات أُعدّت لذلك صراحةً (bbWithQueue) ──
+// ── استمارات العمل (السحب/التصنيف/الفيروسات/الفصل) بدون نت: تُبنى من النسخة المحلية + الاستمارات المحلية ──
+const BBF_RPC=new Set(['form_members','forms_recent','forms_overview','search_form_members']);
+async function bbfMembers(ids){
+  ids=(ids||[]).filter(Boolean); if(!ids.length || !window.bbm) return [];
+  const r=await bbm.runQuery('blood_donations',[['select',['*']],['in',['collection_form_id',ids]]]); if(!r) return null;
+  const rows=(r.data||[]).slice().sort((a,b)=>String(a.created_at||'').localeCompare(String(b.created_at||'')));
+  const dids=[...new Set(rows.map(x=>x.donor_id).filter(Boolean))], dm=new Map();
+  if(dids.length){ const d=await bbm.runQuery('donors',[['select',['id,full_name']],['in',['id',dids]]]); ((d&&d.data)||[]).forEach(x=>dm.set(x.id,x.full_name)); }
+  return rows.map(x=>({...x,form_id:x.collection_form_id,full_name:dm.get(x.donor_id)||''}));
+}
+function bbfOverlayForms(base,groups){
+  const forms=(base||[]).map(f=>{ const x={...f}; delete x.c; return x; });
+  bbofLoad().forms.filter(lf=>!groups.length||groups.includes(lf.group)).forEach(lf=>{
+    const id=lf.server_id||('lf:'+lf.lid), cnt=(lf.base||[]).length+lf.members.length;
+    const flags={status:lf.status,printed_at:lf.printed_at||null,waiting_print_at:lf.waiting_print_at||null,last_name_at:lf.last_name_at,names_count:cnt};
+    const f=forms.find(x=>x.id===id);
+    if(f) Object.assign(f,flags); else forms.unshift(Object.assign({id,form_no:lf.form_no,form_group:lf.group},flags));
+  });
+  return forms;
+}
+async function bbfOff(fn,args,base){
+  args=args||{}; const groups=args.p_groups||[];
+  if(fn==='form_members'){ const m=await bbfMembers(args.p_forms); return m==null?base:m; }
+  if(fn==='forms_recent'||fn==='forms_overview') return bbfOverlayForms(base,groups);
+  if(fn==='search_form_members'){
+    const q=String(args.p_q||'').trim(); if(q.length<2) return [];
+    const fr=await db.rpc('forms_recent',{p_groups:groups,p_limit:300}); const meta=new Map(((fr&&fr.data)||[]).map(f=>[f.id,f]));
+    const out=[]; const push=(m)=>{ const f=meta.get(m.form_id); if(f && (!groups.length||groups.includes(f.form_group))) out.push({...m,form_no:f.form_no,form_group:f.form_group,last_name_at:f.last_name_at}); };
+    const dn=await bbm.runQuery('donors',[['select',['id,full_name']],['ilike',['full_name','*'+q+'*']],['limit',60]]);
+    const ids=((dn&&dn.data)||[]).map(x=>x.id);
+    let rows=[]; if(ids.length){ const r=await bbm.runQuery('blood_donations',[['select',['*']],['in',['donor_id',ids]]]); rows=rows.concat((r&&r.data)||[]); }
+    if(/^\d+$/.test(q)){ const r=await bbm.runQuery('blood_donations',[['select',['*']],['eq',['bottle_number',+q]]]); rows=rows.concat((r&&r.data)||[]); }
+    const nm=new Map(((dn&&dn.data)||[]).map(x=>[x.id,x.full_name]));
+    const seen=new Set();
+    for(const x of rows){ if(!x.collection_form_id||seen.has(x.id)) continue; seen.add(x.id);
+      if(!nm.has(x.donor_id)){ const d=await bbm.runQuery('donors',[['select',['id,full_name']],['eq',['id',x.donor_id]],['limit',1]]); nm.set(x.donor_id,((d&&d.data&&d.data[0])||{}).full_name||''); }
+      push({...x,form_id:x.collection_form_id,full_name:nm.get(x.donor_id)}); }
+    return out.slice(0,50);
+  }
+  return base;
+}
 const BBQ={depth:0,n:0};
 const BBQ_ALLOW=new Set(['blood_donations','audit_log','donors','rejected_donors','campaign_slots','bottle_sequences','user_profiles','bottle_number_pool','lab_reagents','destruction_reports','campaigns','opening_stock','store_items','opening_dispatch','lab_reagent_log','dispatch_book_records','app_settings','store_moves','store_lots']);
 // دوال السيرفر الكاتبة المسموح تخزينها بالطابور (لا نخزّن ما يُرجع قيمة يحتاجها المستخدم فوراً: claim_bottle_number / assign_donation_to_form / change_bottle_type)
@@ -5614,6 +5660,7 @@ function bbofAssign(localId,bt,m){
   const total=(f.base||[]).length+f.members.length;
   if(total>=10) f.status='closed';
   bbofSave(s);
+  try{ if(window.bbm && bbm.applyWrite) bbm.applyWrite('blood_donations',[['update',[{collection_form_id:f.server_id||('lf:'+f.lid)}]],['eq',['id',localId]]]); }catch(e){}
   return {closed:f.status==='closed',form_no:f.form_no,guessed:!!f.guessed,local:true};
 }
 // استقبال محلي فشل بالمزامنة → يُزال اسمه من الاستمارة المحلية
