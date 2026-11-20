@@ -238,7 +238,9 @@ async function saRemove(id,batch,num){
     toast('✅ رجعت القنينة '+num+' للرصيد','success'); await saRefreshAll();
   }catch(e){ toast('⛔ '+(e.message||e),'error',7000); } finally{ _saBusy=false; load(false); }
 }
+function saLocalGuard(batch){ if(String(batch).startsWith('local-')){ toast('⏳ هذا التجهيز لم يُرسل للسيرفر بعد — يمكن تعديله أو إلغاؤه بعد المزامنة','warning',6000); return true; } return false; }
 async function saCancel(batch){
+  if(saLocalGuard(batch)) return;
   if(_saBusy) return;
   const b=_saData.find(x=>x.batch===batch); if(!b) return;
   if(!(await bbConfirm('إلغاء عملية التجهيز كاملة؟\n'+(_saTab==='hospital'?b.hospital+' — كتاب '+b.book_no:b.patient)+'\nترجع '+b.count+' قنينة إلى الرصيد.'))) return;
@@ -250,6 +252,7 @@ async function saCancel(batch){
 }
 
 function saEdit(batch){
+  if(saLocalGuard(batch)) return;
   const b=_saData.find(x=>x.batch===batch); if(!b) return; const h=b.kind==='hospital';
   let m=G('supplyArchEdit'); if(m) m.remove();
   m=document.createElement('div'); m.className='overlay'; m.id='supplyArchEdit'; m.style.zIndex=9100;

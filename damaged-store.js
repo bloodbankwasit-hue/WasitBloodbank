@@ -129,7 +129,7 @@ async function dstConfirmDestroy(){
     }
     await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'destruction_reports',record_id:rep.id,new_values:{report_no:rep.report_no,method,count:ids.length}});
     G('dstDestroyModal').classList.remove('on');
-    if(String(rep.id).startsWith('local-')){ toast('✅ حُفظ محضر الإتلاف محلياً — رقم المحضر يُعطى من النظام عند عودة الإنترنت، وتُطبع نسخته الرسمية بعد ذلك','success',9000); await dstLoadWaiting(); return; }
+    if(String(rep.id).startsWith('local-')){ toast('✅ حُفظ محضر الإتلاف محلياً — رقم المحضر الرسمي يُعطى عند عودة الإنترنت','success',9000); await dstLoadWaiting(); if((await bbConfirm('هل تريد طباعة نسخة مؤقتة الآن (بدون رقم رسمي)؟'))) dstPrintReport(rep.id); return; }
     toast('✅ تم إنشاء محضر الإتلاف رقم '+rep.report_no,'success',4500);
     await dstLoadWaiting();
     if((await bbConfirm('هل تريد طباعة المحضر الآن؟'))) dstPrintReport(rep.id);
@@ -143,12 +143,12 @@ async function dstPrintReport(id){
     const{data:rep,error}=await db.from('destruction_reports').select('*').eq('id',id).single(); if(error) throw error;
     const rows=await _dstFetchAll(()=>db.from('blood_donations').select('id,bottle_number,bottle_type,blood_type,component_type,damage_reason,damaged_date').eq('destruction_report_id',id).order('bottle_number').order('id'));
     const tr=rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.bottle_number)}</td><td>${esc(r.bottle_type||'—')}</td><td>${esc(r.blood_type||'—')}</td><td>${esc(r.component_type||'دم كامل')}</td><td>${esc(r.damage_reason||'—')}</td><td>${fd(r.damaged_date)}</td></tr>`).join('');
-    printHtmlDocument(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>محضر إتلاف رقم ${rep.report_no}</title>
+    printHtmlDocument(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>محضر إتلاف رقم ${rep.report_no||'(مؤقت)'}</title>
     <style>body{font-family:'Segoe UI',Arial,sans-serif;direction:rtl;padding:24px;font-size:15px}h1{text-align:center;font-size:22px;margin:0 0 4px}h2{text-align:center;font-size:16px;font-weight:400;color:#555;margin:0 0 18px}
     .meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;margin-bottom:14px}.meta div{border-bottom:1px dotted #aaa;padding:4px 0}
     table{width:100%;border-collapse:collapse;font-size:13.5px}th,td{border:1px solid #888;padding:5px 6px;text-align:center}th{background:#eee}
     .sig{display:flex;justify-content:space-between;margin-top:50px}.sig div{width:30%;text-align:center;border-top:1px solid #000;padding-top:6px}@media print{@page{margin:12mm}}</style></head><body>
-    <h1>محضر إتلاف طبي رقم (${rep.report_no})</h1><h2>مصرف الدم الرئيسي — واسط</h2>
+    <h1>محضر إتلاف طبي رقم (${rep.report_no||'مؤقت — يُعطى الرقم الرسمي عند المزامنة'})</h1><h2>مصرف الدم الرئيسي — واسط</h2>
     <div class="meta"><div>تاريخ الإتلاف: <b>${fd(rep.report_date)}</b></div><div>طريقة الإتلاف: <b>${esc(rep.method)}</b></div>
     <div>المسؤول: <b>${esc(rep.officer_name)}</b></div><div>عدد القناني: <b>${rep.bottle_count}</b></div>${rep.notes?`<div style="grid-column:1/-1">ملاحظات: ${esc(rep.notes)}</div>`:''}</div>
     <table><thead><tr><th>#</th><th>رقم القنينة</th><th>النوع</th><th>الفصيلة</th><th>المكوّن</th><th>سبب التلف</th><th>تاريخ التلف</th></tr></thead><tbody>${tr}</tbody></table>

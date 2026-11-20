@@ -383,8 +383,8 @@ async function saveReception(){
       created_by:SES?.user?.id
     };
 
-    if(!IS_ONLINE){
-      // بدون اتصال: يُحفظ بالطابور + سجل محلي مؤقت (يراه السحب والمختبر) + تُطبع الأوراق بشكل طبيعي
+    if(!IS_ONLINE || (typeof SYNC_RUNNING!=='undefined' && SYNC_RUNNING)){
+      // بدون اتصال (أو أثناء المزامنة، حفاظاً على الترتيب): يُحفظ بالطابور + سجل محلي مؤقت (يراه السحب والمختبر) + تُطبع الأوراق بشكل طبيعي
       const _rnd=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
       payload.local_id='local-'+_rnd();
       payload.local_donor_id = payload.existing_donor_id ? null : 'local-d-'+_rnd();
