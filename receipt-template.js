@@ -42,8 +42,18 @@ const RECEIPT_MAIN = `<main class="sheet"><div class="frame"><header class="head
 //         patientName, hospitalName, bloodPressure, pulse, temperature, weight, hemoglobin }
 function buildReceiptHtml(data){
   const json = JSON.stringify(data||{}).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
+  // الباركود يُرسم هنا (الصفحة الرئيسية عندها المكتبة محفوظة) فلا تنتظر نافذة الطباعة تحميل مكتبة من الإنترنت (كان يسبب تأخير ~15 ثانية بدون نت)
+  let pre='';
+  try{ if(data && data.barcodeValue && typeof JsBarcode!=='undefined'){
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    JsBarcode(svg,String(data.barcodeValue),{format:'CODE128',displayValue:false,height:40,width:2,margin:0});
+    const w=parseFloat(svg.getAttribute('width')), h=parseFloat(svg.getAttribute('height'));
+    if(w&&h){ svg.setAttribute('viewBox','0 0 '+w+' '+h); svg.removeAttribute('width'); svg.removeAttribute('height'); }
+    svg.setAttribute('preserveAspectRatio','none'); svg.setAttribute('shape-rendering','crispEdges');
+    pre=svg.outerHTML;
+  } }catch(e){ pre=''; }
   return '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>استمارة التبرع بالدم ومشتقاته</title>'
-  + '<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script>'
+  + (pre ? ('<script>window.__BCSVG='+JSON.stringify(pre).replace(/</g,'\\u003c')+';<\/script>') : '<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script>')
   + '<style>' + RECEIPT_CSS + '</style></head><body>' + RECEIPT_MAIN
   + '<script>' + RECEIPT_SCRIPT.replace('__DATA__', function(){ return json; }) + '<\/script></body></html>';
 }
@@ -57,6 +67,7 @@ const RECEIPT_SCRIPT = [
 "function renderBarcode(value){",
 "  var target=document.getElementById('barcode'); target.innerHTML='';",
 "  if(!value) return;",
+"  if(window.__BCSVG){ target.innerHTML=window.__BCSVG; return; }",
 "  var JB=window.JsBarcode||(window.parent&&window.parent.JsBarcode); if(!JB) return;",
 "  var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');",
 "  try{ JB(svg,value,{format:'CODE128',displayValue:false,height:40,width:2,margin:0}); }catch(e){ return; }",

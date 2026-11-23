@@ -6036,6 +6036,14 @@ async function fetchNextBN(){
   // First offer a number released earlier (e.g. a donor rejected medically at the draw stage
   // after a number was already reserved for them) before drawing a fresh one from the sequence.
   const sqk=seqKey(btype);
+  // بدون اتصال: الرقم من الحاسبة المحلية دائماً (تراعي ما حُجز محلياً قبل قليل) — القراءة من النسخة المحفوظة كانت تُرجع نفس الرقم للاسم التالي (v138)
+  if(!IS_ONLINE && window.bbm){
+    try{
+      const a=await bbm.allocBN(sqk);
+      if(a && a.finished){ inp.value=''; showSeqEndModal(sqk,true); return; }
+      if(a && a.number){ inp.value=a.number; inp.dataset.local='1'; if(a.poolId) inp.dataset.poolId=a.poolId; if(a.seqId) inp.dataset.seqId=a.seqId; return; }
+    }catch(e){}
+  }
   const{data:pooled}=await db.from('bottle_number_pool')
     .select('id,bottle_number').eq('bottle_type',sqk)
     .order('bottle_number',{ascending:true}).limit(1);
