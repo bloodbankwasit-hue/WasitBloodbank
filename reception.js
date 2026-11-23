@@ -197,7 +197,7 @@ async function _queryRejectedMatch(nm, nid, mob){
     // elsewhere in the app, e.g. rare-donor search) already collapses exactly these variants.
     const norm=s=>normalizeAr((s||'').replace(/\s+/g,' '));
     const nmNorm=norm(nm);
-    const exact = data.find(r=> norm(r.full_name)===nmNorm || norm(r.full_name).includes(nmNorm) || nmNorm.includes(norm(r.full_name)));
+    const exact = data.find(r=>bbRejNameMatch(r.full_name,nm));
     return exact || null;
   }
   return await checkRejectedOffline(nm, nid, mob);
