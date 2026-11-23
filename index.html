@@ -3235,6 +3235,15 @@ async function cacheRejectedDonors(){
 // ── Check name against local cache (rejected_donors has no national_id/mobile columns —
 // name is the only field to match on, same as the online check) ──
 // مطابقة اسم مرفوض بالكلمات (v138): تطابق كامل أو تسلسل كلمات متجاور (لا تطابق حروف داخل كلمات، ولا كلمة مفردة قصيرة داخل اسم طويل)
+// الرفض المؤقت ينتهي بعد مدة (افتراضياً 120 يوماً من تاريخ الرفض) — لا يمنع التبرع بعدها (v140)
+const BB_TEMP_REJECT_DAYS=120;
+function bbRejActive(r){
+  if(!r) return false;
+  if(r.rejection_type==='مؤقت' && r.rejection_date){
+    const d=new Date(String(r.rejection_date).slice(0,10)+'T00:00:00'); if(!isNaN(d)){ if((Date.now()-d.getTime())/86400000 > BB_TEMP_REJECT_DAYS) return false; }
+  }
+  return true;
+}
 function bbRejNameMatch(rn, nm){
   const A=normalizeAr((rn||'').replace(/\s+/g,' ')).split(' ').filter(Boolean), B=normalizeAr((nm||'').replace(/\s+/g,' ')).split(' ').filter(Boolean);
   if(!A.length||!B.length) return false;
@@ -3254,7 +3263,7 @@ async function checkRejectedOffline(name, nid, mobile){
       const rows = e.target.result||[];
       const norm = s=>normalizeAr((s||'').replace(/\s+/g,' '));
       const nmNorm = norm(name);
-      const hit = nmNorm ? rows.find(r=>bbRejNameMatch(r.full_name,name)) : null;
+      const hit = nmNorm ? rows.find(r=>bbRejActive(r) && bbRejNameMatch(r.full_name,name)) : null;
       res(hit||null);
     };
     all.onerror = ()=>res(null);
@@ -3450,9 +3459,14 @@ async function processQueuedOp(op){
     if(!_adopted){
       if(!cl){
         const r=await db.rpc('claim_bottle_number',{p_type:d.bottle_type});
-        if(r.error||!r.data||!r.data.number) throw new Error('تعذر حجز رقم قنينة: '+((r.error&&r.error.message)||''));
-        cl=r.data;
-      if(d.local_bn && d.bottle_number>0 && cl.number!==d.bottle_number){ window.BB_SYNC_CONFLICTS=window.BB_SYNC_CONFLICTS||[]; window.BB_SYNC_CONFLICTS.push(d.full_name+' — رقم القنينة المطبوع '+d.bottle_number+' كان مستخدماً، الرقم الجديد '+cl.number+' (أعد طباعة الملصق)'); }
+        if(r.error && /لا يوجد تسلسل/.test(r.error.message||'') && d.bottle_number>0){
+          // الدالة لا ترى التسلسل: نعتمد الرقم المطبوع، فإن كان مأخوذاً (اسمان أخذا نفس الرقم) نأخذ أول رقم حر بعده وننبّه
+          let n=d.bottle_number;
+          for(let k=0;k<60;k++){ const{data:u}=await db.from('blood_donations').select('id').eq('bottle_number',n).eq('is_deleted',false).limit(1); if(!u||!u.length) break; n++; }
+          cl={number:n,_fb:true}; _usedLocal=true;
+        }
+        else { if(r.error||!r.data||!r.data.number) throw new Error('تعذر حجز رقم قنينة: '+((r.error&&r.error.message)||'')); cl=r.data; }
+      if((d.local_bn||cl._fb) && d.bottle_number>0 && cl.number!==d.bottle_number){ window.BB_SYNC_CONFLICTS=window.BB_SYNC_CONFLICTS||[]; window.BB_SYNC_CONFLICTS.push(d.full_name+' — رقم القنينة المطبوع '+d.bottle_number+' كان مستخدماً، الرقم الجديد '+cl.number+' (أعد طباعة الملصق)'); }
       }
     const{data:_nd,error:doe}=await db.from('blood_donations').insert({
       donor_id:dn.id,bottle_type:d.bottle_type,bottle_number:cl.number,donation_type:d.donation_type,

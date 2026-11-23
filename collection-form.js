@@ -86,7 +86,6 @@ async function colPrintForm(formId, formNo, dateStr, alreadyPrinted){
   if(_colBusy) return; _colBusy = true;
   try{
     const lf = colOffFind(formId);
-    if(!lf && !IS_ONLINE){ toast('الطباعة تحتاج اتصالاً بالإنترنت','warning'); return; }
     load(true);
     let items;
     if(lf) items = (await colOffMembers(lf)).filter(m=>m.exit_reason!=='medical_reject');

@@ -185,7 +185,7 @@ async function _queryRejectedMatch(nm, nid, mob){
     // by name alone. (This was the actual root cause of every earlier attempt at this check
     // silently finding nothing: selecting/filtering on national_id/mobile against this table
     // always errored with "column does not exist", and that error was never being checked.)
-    const SEL='full_name,rejection_reason,rejection_type';
+    const SEL='full_name,rejection_reason,rejection_type,rejection_date';
     const firstWord = nm.trim().split(/\s+/)[0];
     if(firstWord.length<3) return null;
     const{data,error}=await db.from('rejected_donors').select(SEL).eq('is_deleted',false).ilike('full_name','*'+firstWord+'*').limit(20);
@@ -197,7 +197,7 @@ async function _queryRejectedMatch(nm, nid, mob){
     // elsewhere in the app, e.g. rare-donor search) already collapses exactly these variants.
     const norm=s=>normalizeAr((s||'').replace(/\s+/g,' '));
     const nmNorm=norm(nm);
-    const exact = data.find(r=>bbRejNameMatch(r.full_name,nm));
+    const exact = data.find(r=>bbRejActive(r) && bbRejNameMatch(r.full_name,nm));
     return exact || null;
   }
   return await checkRejectedOffline(nm, nid, mob);
@@ -471,6 +471,7 @@ async function saveReception(){
         const{data:cl,error:cle}=await db.rpc('claim_bottle_number',{p_type:btype});
         if(!cle && cl && cl.number){ bnum=cl.number; claimed=true;
           if(bnum!==shown) toast('ℹ️ رقم القنينة صار '+bnum+' (الرقم '+shown+' كان مستخدماً)','info',6000); }
+        else if(cle && /لا يوجد تسلسل/.test(cle.message||'') && bnum>0){ /* الدالة لا ترى التسلسل: نعتمد الرقم الظاهر ويُقدَّم العدّاد بعد الحفظ */ }
         else if(cle && !/claim_bottle_number|function|PGRST202/i.test(cle.message||'')) throw new Error(cle.message);
       }
       const{data:don,error:doe}=await db.from('blood_donations').insert({
