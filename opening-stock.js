@@ -14,7 +14,19 @@ const osEsc = s => (typeof esc==='function' ? esc(s) : String(s==null?'':s));
 const osBts = ct => (bbNoSign(ct) ? PLASMA_ABO : ['A+','A-','B+','B-','O+','O-','AB+','AB-']);
 const osToday = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const osAudit = (rid,vals) => db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'opening_stock',record_id:rid||null,new_values:vals}).then(()=>{},()=>{});
-const osLeft = (c,b) => (_osRows[c+'|'+b]?.qty_left)||0;
+// الدم الكامل + المضغوط + المفلتر = نفس القنينة: رقم واحد لكل فصيلة يُحفظ بالأسطر الثلاثة (v142)
+const OS_WB = ['دم كامل','دم مضغوط','دم مفلتر'];
+const osIsWB = c => OS_WB.includes(c);
+const osKey  = (c,b) => (osIsWB(c)?'دم كامل':c)+'|'+b;
+const osLeft = (c,b) => (_osRows[osKey(c,b)]?.qty_left)||0;
+// يضبط الرقم المشترك لفصيلة على الأسطر الثلاثة (ينشئ الناقص، ويعدّل المختلف) — بالتتابع للحفاظ على الترتيب بدون نت
+async function osSetWB(b,v,comps){
+  for(const c of (comps||OS_WB)){
+    const r=_osRows[c+'|'+b];
+    if(r){ if(+r.qty_left!==v){ const{error}=await db.from('opening_stock').update({qty_left:v,updated_at:new Date().toISOString()}).eq('id',r.id); if(error) throw error; } }
+    else { const{error}=await db.from('opening_stock').insert({component_type:c,blood_type:b,qty_in:v,qty_left:v}); if(error) throw error; }
+  }
+}
 const osCanUse = () => (UPROF?.role==='admin' || hasPermission('supply'));
 
 // ───────────── الشاشة الرئيسية ─────────────
@@ -71,21 +83,23 @@ async function osOpen(){
   try{ await osLoadRows(); }
   catch(e){ load(false); toast(osMissing(e) ? 'شغّل SQL الرصيد الخارجي أولاً' : 'تعذر التحميل: '+(e.message||e),'error',6000); return; }
   load(false);
+  try{ const odd=Object.values(_osRows).filter(r=>(r.component_type==='دم مضغوط'||r.component_type==='دم مفلتر')&&(+r.qty_left||0)>0&&(+r.qty_left||0)!==((_osRows['دم كامل|'+r.blood_type]||{}).qty_left||0)); if(odd.length) toast('⚠️ يوجد رصيد قديم منفصل للمضغوط/المفلتر لا يطابق الدم الكامل ('+odd.map(r=>r.component_type+' '+r.blood_type+':'+r.qty_left).join('، ')+') — الرقم المعتمد الآن هو رقم «دم كامل»؛ عدّله من التعديل إن لزم','warning',12000); }catch(e){}
   _osEdit=false; G('os-log').innerHTML=''; const dt=G('openingStockModal').querySelector('details'); if(dt) dt.open=false;
   osRender();
   G('openingStockModal').classList.add('on');
 }
 
 let _osComp = 'دم كامل';
-function osCompTotals(){ const t={}; OS_COMPS.forEach(c=>t[c]=0); Object.values(_osRows).forEach(r=>{ t[r.component_type]=(t[r.component_type]||0)+(+r.qty_left||0); }); return t; }
+function osCompTotals(){ const t={}; OS_COMPS.forEach(c=>t[c]=0); Object.values(_osRows).forEach(r=>{ if(osIsWB(r.component_type)) return; t[r.component_type]=(t[r.component_type]||0)+(+r.qty_left||0); }); const wb=Object.values(_osRows).filter(r=>r.component_type==='دم كامل').reduce((a,r)=>a+(+r.qty_left||0),0); OS_WB.forEach(c=>t[c]=wb); return t; }
 function osRender(){
-  const t=osCompTotals(), all=Object.values(t).reduce((a,b)=>a+b,0);
-  G('os-total').textContent='إجمالي الرصيد الخارجي: '+all+' قنينة';
+  const t=osCompTotals(), all=Object.entries(t).filter(([c])=>c!=='دم مضغوط'&&c!=='دم مفلتر').reduce((a,[c,b])=>a+b,0);
+  G('os-total').textContent='إجمالي الرصيد الخارجي: '+all+' قنينة'+(osIsWB(_osComp)?' — (الدم الكامل والمضغوط والمفلتر رقم واحد لنفس القنينة)':'');
   G('os-chips').innerHTML=OS_COMPS.map(c=>`<span class="os-chip ${c===_osComp?'on':''}" onclick="osPick('${c}')">${c}: ${t[c]||0}</span>`).join('');
   G('os-grid').innerHTML=osBts(_osComp).map((bt,i)=>{
     const n=osLeft(_osComp,bt);
+    const _row=_osRows[osKey(_osComp,bt)];
     return _osEdit
-      ? `<div class="os-cell" id="os-c-${i}"><div class="os-bt">${osEsc(bt)}</div><input type="text" inputmode="numeric" id="os-i-${i}" value="${_osRows[_osComp+'|'+bt]?n:''}" placeholder="0" oninput="this.value=normDigits(this.value).replace(/[^0-9]/g,'');osMark()"></div>`
+      ? `<div class="os-cell" id="os-c-${i}"><div class="os-bt">${osEsc(bt)}</div><input type="text" inputmode="numeric" id="os-i-${i}" value="${_row?n:''}" placeholder="0" oninput="this.value=normDigits(this.value).replace(/[^0-9]/g,'');osMark()"></div>`
       : `<div class="os-cell ${n===0?'zero':''}"><div class="os-bt">${osEsc(bt)}</div><div class="os-n">${n}</div></div>`;
   }).join('');
   G('os-editnote').style.display=_osEdit?'block':'none';
@@ -97,7 +111,7 @@ function osToggleEdit(){ _osEdit=!_osEdit; osRender(); }
 function osMark(){
   osBts(_osComp).forEach((bt,i)=>{
     const inp=G('os-i-'+i), c=G('os-c-'+i); if(!inp||!c) return;
-    const r=_osRows[_osComp+'|'+bt], cur=r?r.qty_left:null, v=inp.value===''?null:parseInt(inp.value);
+    const r=_osRows[osKey(_osComp,bt)], cur=r?r.qty_left:null, v=inp.value===''?null:parseInt(inp.value);
     c.classList.toggle('chg', v!==null && v!==cur);
   });
 }
@@ -108,7 +122,7 @@ async function osSave(){
   osBts(ct).forEach((bt,i)=>{
     const raw=G('os-i-'+i)?.value; if(raw==null||raw==='') return;
     const v=parseInt(raw); if(isNaN(v)||v<0||v>100000) return;
-    const r=_osRows[ct+'|'+bt], cur=r?r.qty_left:null;
+    const r=_osRows[osKey(ct,bt)], cur=r?r.qty_left:null;
     if(v!==cur && !(r==null && v===0)) changes.push({bt,v,r,cur});
   });
   if(!changes.length){ toast('لا يوجد تغيير للحفظ','info'); return; }
@@ -116,8 +130,12 @@ async function osSave(){
   if(!(await bbConfirm('تأكيد حفظ الرصيد الخارجي ('+ct+'):\n'+txt+'\nسيُسجَّل التعديل بسجل التدقيق.'))) return;
   _osBusy=true; load(true);
   try{
-    await Promise.all(changes.map(async c=>{
-      if(c.r){
+    for(const c of changes){
+      if(osIsWB(ct)){
+        await osSetWB(c.bt,c.v);
+        await osAudit(c.r?c.r.id:null,{action:c.r?'تعديل رصيد خارجي':'إدخال رصيد خارجي',component:'دم كامل/مضغوط/مفلتر',blood_type:c.bt,old:c.cur,new:c.v});
+        await osLoadRows();
+      } else if(c.r){
         const{error}=await db.from('opening_stock').update({qty_left:c.v,updated_at:new Date().toISOString()}).eq('id',c.r.id);
         if(error) throw error;
         await osAudit(c.r.id,{action:'تعديل رصيد خارجي',component:ct,blood_type:c.bt,old:c.cur,new:c.v});
@@ -126,7 +144,7 @@ async function osSave(){
         if(error) throw error;
         await osAudit(data?.id,{action:'إدخال رصيد خارجي',component:ct,blood_type:c.bt,old:null,new:c.v});
       }
-    }));
+    }
     await osLoadRows(); _osEdit=false; osRender();
     toast('✅ تم حفظ الرصيد الخارجي ('+changes.length+' فصيلة)','success',4000);
   }catch(e){ toast('⛔ تعذر الحفظ: '+(e.message||e),'error',8000); }
@@ -147,7 +165,7 @@ function osEnsureAct(){
   const hospSel=(id)=>`<select id="${id}" onchange="G('${id}-o').style.display=this.value==='أخرى'?'block':'none'"><option value="">— اختر —</option>${hosp.map(h=>`<option value="${osEsc(h)}">${osEsc(h)}</option>`).join('')}<option value="أخرى">أخرى</option></select><input type="text" id="${id}-o" placeholder="اكتب اسم المستشفى" style="display:none;margin-top:5px">`;
   const m=document.createElement('div'); m.className='overlay'; m.id='openingActModal';
   m.innerHTML=`<style>
-    #openingActModal .oa-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 90px 34px;gap:8px;align-items:center;margin-bottom:8px;direction:rtl}
+    #openingActModal .oa-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 80px minmax(0,1.4fr) 34px;gap:8px;align-items:center;margin-bottom:8px;direction:rtl}
     #openingActModal .oa-row>*{min-width:0;width:100%;box-sizing:border-box}
     @media(max-width:560px){#openingActModal .oa-row{grid-template-columns:1fr 1fr}}
   </style>
@@ -187,6 +205,7 @@ function osAddRow(){
   d.innerHTML=`<select id="oac-${id}" onchange="osRowComp(${id})">${OS_COMPS.map(c=>`<option value="${c}" ${c===c0?'selected':''}>${c}</option>`).join('')}</select>
     <select id="oab-${id}" onchange="osRowChg(${id})"></select>
     <input type="text" inputmode="numeric" id="oan-${id}" placeholder="العدد" oninput="this.value=normDigits(this.value).replace(/[^0-9]/g,'');osRowChg(${id})">
+    <input type="text" id="oaq-${id}" class="oa-no" placeholder="رقم القنينة (اختياري، يمكن أكثر من رقم)" oninput="this.value=normDigits(this.value)">
     <button class="btn" title="حذف" onclick="osDelRow(${id})" style="padding:3px 6px;color:#B91C1C"><i class="ti ti-trash"></i></button>`;
   G('oa-rows').appendChild(d); osRowComp(id);
 }
@@ -201,10 +220,10 @@ function osRowChg(id){
   r.c=G('oac-'+id).value; r.b=G('oab-'+id).value; r.n=parseInt(G('oan-'+id).value)||0; osSum();
 }
 function osSum(){
-  const need={}; _oaRows.forEach(r=>{ if(r.b&&r.n>0) need[r.c+'|'+r.b]=(need[r.c+'|'+r.b]||0)+r.n; });
+  const need={}; _oaRows.forEach(r=>{ if(r.b&&r.n>0){ const k=osKey(r.c,r.b); need[k]=(need[k]||0)+r.n; } });
   const bad=Object.entries(need).filter(([k,n])=>n>(_osRows[k]?.qty_left||0));
   const tot=Object.values(need).reduce((a,b)=>a+b,0);
-  G('oa-sum').innerHTML='المجموع: '+tot+' قنينة'+(bad.length?' <span style="color:#B91C1C">— العدد أكبر من المتبقي في: '+bad.map(([k])=>k.replace('|',' ')).join('، ')+'</span>':'');
+  G('oa-sum').innerHTML='المجموع: '+tot+' قنينة'+(bad.length?' <span style="color:#B91C1C">— العدد أكبر من المتبقي في: '+bad.map(([k])=>(k.startsWith('دم كامل')?'الدم (كامل/مضغوط/مفلتر) '+k.split('|')[1]:k.replace('|',' '))).join('، ')+'</span>':'');
 }
 
 async function osSubmit(){
@@ -216,16 +235,23 @@ async function osSubmit(){
   else { note=G('oa-reason').value; if(note==='أخرى') note=G('oa-reason-o').value.trim(); if(!note){ toast('اختر سبب الإتلاف','error'); return; } }
   _oaRows.forEach(r=>osRowChg(r.id));
   const items=_oaRows.filter(r=>r.b&&r.n>0).map(r=>({c:r.c,b:r.b,n:r.n}));
+  const nums=_oaRows.filter(r=>r.b&&r.n>0).map(r=>{ const q=(G('oaq-'+r.id)?.value||'').trim(); return q?(r.c+' '+r.b+': '+q):''; }).filter(Boolean);
+  if(nums.length){ note=(note?note+' | ':'')+'أرقام القناني: '+nums.join('؛ '); }
   if(!items.length || _oaRows.some(r=>(r.b&&!(r.n>0))||(!r.b&&r.n>0))){ toast('أكمل كل الأسطر (المحتوى، الفصيلة، العدد)','error'); return; }
-  const need={}; items.forEach(x=>{ need[x.c+'|'+x.b]=(need[x.c+'|'+x.b]||0)+x.n; });
-  const over=Object.entries(need).find(([k,n])=>n>osLeft(...k.split('|')));
+  const need={}; items.forEach(x=>{ const k=osKey(x.c,x.b); need[k]=(need[k]||0)+x.n; });
+  const over=Object.entries(need).find(([k,n])=>n>((_osRows[k]?.qty_left)||0));
   if(over){ toast('العدد أكبر من المتبقي: '+over[0].replace('|',' '),'error'); return; }
   const tot=items.reduce((a,x)=>a+x.n,0);
   if(!(await bbConfirm('تأكيد '+OS_KIND[kind]+' ('+tot+' قنينة) من الرصيد الخارجي'+(hosp?' إلى «'+hosp+'»':'')+(book?'\nكتاب رقم '+book:'')+(kind==='destroy'?'\nالسبب: '+note:'')+'؟'))) return;
   _osBusy=true; load(true);
   try{
+    // الدم الكامل/المضغوط/المفلتر رقم واحد: نوحّد الأسطر الثلاثة قبل الخصم ثم نعيد مساواتها بعده
+    const _wbB=[...new Set(items.filter(x=>osIsWB(x.c)).map(x=>x.b))], _wbOld={}; _wbB.forEach(b=>_wbOld[b]=osLeft('دم كامل',b));
+    for(const x of items.filter(x=>osIsWB(x.c))){ await osSetWB(x.b,_wbOld[x.b],[x.c]); }
+    if(_wbB.length) await osLoadRows();
     const{error}=await db.rpc('opening_dispatch_do',{p_kind:kind,p_items:items,p_hosp:hosp,p_book:book,p_bdate:bdate||null,p_patient:patient,p_note:note,p_date:osToday()});
     if(error) throw error;
+    for(const b of _wbB){ const used=items.filter(x=>osIsWB(x.c)&&x.b===b).reduce((a,x)=>a+x.n,0); await osLoadRows(); await osSetWB(b,Math.max(0,_wbOld[b]-used)); }
     try{ await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'opening_stock',record_id:null,new_values:{action:OS_KIND[kind]+' من رصيد خارجي',items:items.map(x=>x.c+' '+x.b+'×'+x.n).join('، '),hospital:hosp,patient,book_no:book,note}}); }catch(e){}
     toast('✅ تم ('+OS_KIND[kind]+') '+tot+' قنينة من الرصيد الخارجي','success',5000);
     G('openingActModal').classList.remove('on');
