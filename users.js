@@ -61,12 +61,16 @@ async function loadUsers(){
   const{data}=await db.from('user_profiles').select('id,full_name,role,is_active,created_at,permissions').order('created_at',{ascending:true});
   load(false);
   window._USERS_CACHE=data||[];
+  // اليوزر (الإيميل) من دالة للمدير فقط — إن لم يُشغَّل SQL بعد تبقى العمود فارغاً
+  window._USER_EMAILS={}; window._USERS_RPC_OK=false;
+  try{ const r=await db.rpc('admin_list_users'); if(!r.error){ window._USERS_RPC_OK=true; (r.data||[]).forEach(x=>{ window._USER_EMAILS[x.id]=x.email; }); } }catch(e){}
   const rl={admin:'مدير النظام',tech:'فني مختبر',reception:'موظف استقبال',viewer:'عرض فقط'};
   if(data&&data.length){
     G('usersTbl').innerHTML=`<div class="tw"><table><thead><tr>
-      <th>الاسم الكامل</th><th>الدور الوظيفي</th><th>الحالة</th><th>تاريخ الإنشاء</th><th>إجراءات</th>
+      <th>الاسم الكامل</th><th>اليوزر</th><th>الدور الوظيفي</th><th>الحالة</th><th>تاريخ الإنشاء</th><th>إجراءات</th>
     </tr></thead><tbody>${data.map(u=>`<tr>
       <td>${esc(u.full_name)}</td>
+      <td dir="ltr" style="text-align:right;font-size:14px">${esc((window._USER_EMAILS||{})[u.id]||'—')}</td>
       <td><span style='font-size:14px;color:#757575'>${u.role==='admin'?'مدير النظام ✅':((u.permissions||[]).filter(k=>k!=='hide_stock').length+' قسم')}</span></td>
       <td><span class="pill ${u.is_active?'pg':'pr'}">${u.is_active?'نشط':'معطّل'}</span></td>
       <td>${fd(u.created_at)}</td>
@@ -74,7 +78,9 @@ async function loadUsers(){
         <button class="ibtn" onclick="showEditUser('${u.id}')" title="تعديل"><i class="ti ti-edit"></i></button>
         <button class="ibtn" onclick="toggleUserActive('${u.id}',${u.is_active})" title="${u.is_active?'تعطيل':'تفعيل'}">
           <i class="ti ${u.is_active?'ti-user-off':'ti-user-check'}"></i>
-        </button>`:'<span style="font-size:13px;color:#9e9e9e">حسابك الحالي</span>'}
+        </button>
+        <button class="ibtn" onclick="adminSetPassword('${u.id}')" title="تغيير كلمة المرور"><i class="ti ti-key"></i></button>
+        <button class="ibtn" onclick="adminDeleteUser('${u.id}')" title="حذف الحساب" style="color:#BE123C"><i class="ti ti-trash"></i></button>`:'<span style="font-size:13px;color:#9e9e9e">حسابك الحالي</span>'}
       </td>
     </tr>`).join('')}</tbody></table></div>`;
   } else {
@@ -181,4 +187,49 @@ async function toggleUserActive(id,cur){
   await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'user_profiles',record_id:id,new_values:{is_active:!cur}});
   toast('تم '+act+' الحساب بنجاح','success');
   await loadUsers();
+}
+
+
+// ── تغيير كلمة مرور حساب / حذف حساب (مدير فقط، عبر دوال SQL محمية: admin_users.sql) ──
+function _adNeedSql(e){ const m=String(e&&e.message||e||''); return /Could not find the function|does not exist|schema cache/i.test(m); }
+function _adName(id){ const u=(window._USERS_CACHE||[]).find(x=>x.id===id); return u?u.full_name:''; }
+function bbAskPassword(title){
+  return new Promise(res=>{
+    const ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;z-index:99990;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
+    ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:20px 22px;max-width:420px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.3)"><div id="bapT" style="font-size:16px;font-weight:700;margin-bottom:12px"></div><input id="bapI" type="text" autocomplete="off" placeholder="كلمة المرور الجديدة (8 أحرف على الأقل)" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:15px;direction:ltr;margin-bottom:12px"><div style="display:flex;gap:8px"><button class="btn btn-p" id="bapY" style="flex:1;justify-content:center">حفظ</button><button class="btn" id="bapN" style="flex:1;justify-content:center">إلغاء</button></div></div>';
+    document.body.appendChild(ov); ov.querySelector('#bapT').textContent=title;
+    const i=ov.querySelector('#bapI'); i.focus();
+    const done=v=>{ ov.remove(); res(v); };
+    ov.querySelector('#bapY').onclick=()=>done(i.value);
+    ov.querySelector('#bapN').onclick=()=>done(null);
+    i.onkeydown=e=>{ if(e.key==='Enter') done(i.value); else if(e.key==='Escape') done(null); };
+  });
+}
+async function adminSetPassword(id){
+  if(!IS_ONLINE){ toast('تغيير كلمة المرور يحتاج اتصالاً بالإنترنت','warning',4000); return; }
+  const pw=await bbAskPassword('كلمة مرور جديدة لـ «'+_adName(id)+'»');
+  if(pw===null) return;
+  if(pw.length<8){ toast('كلمة المرور يجب أن تكون 8 أحرف على الأقل','error'); return; }
+  load(true);
+  try{
+    const r=await db.rpc('admin_set_password',{p_user:id,p_password:pw});
+    if(r.error) throw r.error;
+    try{ await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'UPDATE',table_name:'user_profiles',record_id:id,new_values:{password_changed:true}}); }catch(e){}
+    toast('✅ تم تغيير كلمة المرور — يدخل الحساب بالجديدة','success',5000);
+  }catch(e){ toast(_adNeedSql(e)?'شغّل ملف admin_users.sql في Supabase أولاً':'خطأ: '+(e.message||e),'error',6000); }
+  finally{ load(false); }
+}
+async function adminDeleteUser(id){
+  if(!IS_ONLINE){ toast('حذف الحساب يحتاج اتصالاً بالإنترنت','warning',4000); return; }
+  if(!(await bbConfirm('حذف حساب «'+_adName(id)+'» نهائياً؟\nلا يمكن التراجع. (إن أردت إيقافه فقط استخدم «تعطيل»)'))) return;
+  load(true);
+  try{
+    const r=await db.rpc('admin_delete_user',{p_user:id});
+    if(r.error) throw r.error;
+    try{ await db.from('audit_log').insert({user_id:SES?.user?.id,user_name:UPROF?.full_name,action:'DELETE',table_name:'user_profiles',record_id:id,new_values:{name:_adName(id)}}); }catch(e){}
+    toast('تم حذف الحساب','success');
+    await loadUsers();
+  }catch(e){ toast(_adNeedSql(e)?'شغّل ملف admin_users.sql في Supabase أولاً':'خطأ: '+(e.message||e),'error',7000); }
+  finally{ load(false); }
 }
