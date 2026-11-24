@@ -176,7 +176,7 @@ function _colFormBlock(f, members, mode){
   const names = members.map((m,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid #F3F4F6;font-size:14px"><b style="width:22px">${i+1}</b><span style="flex:1;${m.exit_reason==='medical_reject'?'color:#B91C1C;text-decoration:line-through':''}">${esc(bbTa(m.full_name||''))}</span><span style="color:#6B7280">${esc(m.bottle_type||'')} ${esc(m.bottle_number||'')}</span>${(m.id && !m.is_deleted && m.exit_reason!=='medical_reject')?`<button class="ibtn" title="تعديل الاسم / التفاصيل" onclick="colEditMember('${esc(m.id)}')" style="color:#BE123C;flex-shrink:0"><i class="ti ti-edit"></i></button>`:''}</div>`).join('');
   const dt = _colDate(f.last_name_at);
   const full = f.status==='closed';
-  const pill = f.status==='open' ? '<span style="background:#DCFCE7;color:#166534;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:700">مفتوحة</span>' : '<span style="background:#FEF3C7;color:#92400E;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:700">مكتملة</span>';
+  const pill = f.printed_at ? '<span style="background:#DBEAFE;color:#1E40AF;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:700">مطبوعة</span>' : (f.waiting_print_at ? '<span style="background:#FEF3C7;color:#92400E;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:700">بانتظار الطباعة</span>' : f.status==='open' ? '<span style="background:#DCFCE7;color:#166534;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:700">مفتوحة</span>' : '<span style="background:#FEF3C7;color:#92400E;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:700">مكتملة</span>');
   const head = `<summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 12px;list-style:none"><span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:16px">📅 ${esc(dt||'—')}</b><span style="color:#6B7280;font-size:13.5px">استمارة #${f.form_no}</span>${pill}</span><span style="font-size:13.5px;color:#374151;font-weight:700">${members.length} ${members.length===1?'اسم':'أسماء'} <span style="color:#9CA3AF">▾</span></span></summary>`;
   const args = `'${f.id}',${f.form_no},'${dt}',${f.printed_at?'true':'false'}`;
   const btns = `<div style="display:flex;gap:6px;margin-top:8px"><button class="btn" style="flex:1;justify-content:center" ${act.length?'':'disabled'} onclick="colPreviewForm('${f.id}',${f.form_no},'${dt}',${f.printed_at?'true':'false'})">👁 معاينة</button><button class="btn btn-p" style="flex:1;justify-content:center" ${act.length?'':'disabled'} onclick="colPrintForm(${args})">🖨️ طباعة (${act.length})</button>`
@@ -204,11 +204,16 @@ async function colRender(){
       let forms=[]; try{ forms = await colForms(['T','R','B','A'],80); }catch(e){ if(IS_ONLINE && !bbofHasPending()) throw e; }
       forms = colOverlay(forms,{},['T','R','B']).forms;
       const waiting = forms.filter(f=>f.waiting_print_at && !f.printed_at), printed = forms.filter(f=>f.printed_at);
-      let by={}; try{ by = await colMembers(waiting.map(f=>f.id)); }catch(e){}
-      const row = f=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #F3F4F6;font-size:14px"><b>#${f.form_no}</b><span style="flex:1;color:#374151">${esc((COL_GROUPS[f.form_group]||{}).name||'')} — ${f.names_count} أسماء — ${esc(_colDate(f.last_name_at||f.printed_at))}</span><button class="btn" onclick="colPrintForm('${f.id}',${f.form_no},'${_colDate(f.last_name_at||f.printed_at)}',${f.printed_at?'true':'false'})">🖨️ ${f.printed_at?'إعادة طباعة':'طباعة'}</button></div>`;
+      // الأرشيف: كل استمارة تُفتح كالمفتوحة — الأسماء + تعديل اسم + معاينة + طباعة/إعادة طباعة (v144)
+      const shown=waiting.concat(printed.slice(0,40)), srv=shown.filter(f=>!colOffFind(f.id)).map(f=>f.id);
+      let by={}; try{ by = await colMembers(srv); }catch(e){}
+      const blk = async f=>{ let ms; const lf=colOffFind(f.id); if(lf){ try{ ms=await colOffMembers(lf); }catch(e){ ms=[]; } } else ms=by[f.id]||[]; return _colFormBlock(f,ms,'arc'); };
       let h = '';
-      if(waiting.length) h += `<div style="font-weight:700;color:#B45309;margin-bottom:6px">⏳ بانتظار الطباعة (${waiting.length})</div><div style="border:1px solid #FDE68A;background:#FFFBEB;border-radius:10px;margin-bottom:12px">${waiting.map(row).join('')}</div>`;
-      h += printed.length ? `<div style="font-weight:700;margin-bottom:6px">المطبوعة</div><div style="max-height:46vh;overflow:auto;border:1px solid #E5E7EB;border-radius:10px">${printed.map(row).join('')}</div>` : (waiting.length?'':'<div style="text-align:center;padding:18px;color:#6B7280">لا توجد استمارات بالأرشيف بعد</div>');
+      if(waiting.length) h += `<div style="font-weight:700;color:#B45309;margin-bottom:6px">⏳ بانتظار الطباعة (${waiting.length})</div>`+(await Promise.all(waiting.map(blk))).join('');
+      if(printed.length){
+        h += `<div style="font-weight:700;margin:6px 0">المطبوعة</div>`+(await Promise.all(printed.slice(0,40).map(blk))).join('');
+        if(printed.length>40) h += `<div style="text-align:center;color:#6B7280;font-size:13px;padding:6px">يظهر آخر 40 استمارة مطبوعة</div>`;
+      } else if(!waiting.length) h += '<div style="text-align:center;padding:18px;color:#6B7280">لا توجد استمارات بالأرشيف بعد</div>';
       box.innerHTML = h;
     }
   }catch(e){ box.innerHTML = '<div style="color:#B91C1C;padding:14px;font-size:13px">تعذر التحميل: '+esc(e.message||String(e))+'</div>'; }
