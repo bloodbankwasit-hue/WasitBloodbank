@@ -2365,7 +2365,7 @@ function bbIdLenError(el){
   if(el.id==='rc-nid'||el.id==='ed-nid'){
     const ty=document.getElementById('rc-idtype');
     if(el.id==='rc-nid' && ty && ty.value!=='') return '';
-    if(el.id==='ed-nid' && /[A-Za-z]/.test(v)) return ''; // foreign document numbers are not length-checked
+    if(el.id==='ed-nid' && (el.dataset.idt || /[A-Za-z]/.test(v))) return ''; // foreign document numbers are not length-checked
     const d=v.replace(/\D/g,'');
     if(d.length<12) return 'رقم البطاقة الوطنية ناقص ('+d.length+' من 12 رقم)';
     if(d.length>12) return 'رقم البطاقة الوطنية أكثر من 12 رقم';
@@ -2764,6 +2764,15 @@ function sq(s){ return String(s??'').replace(/['"<>\\]/g,''); }
 // Iraqi mobile numbers are 11 digits starting with 0 (e.g. 07712345678). A common data-entry
 // mistake (especially numbers imported from Excel, which strips leading zeros from numeric
 // cells) leaves them at 10 digits starting with 7 — this restores the missing leading zero.
+// يحدّد الطول الأقصى للأرقام أثناء الكتابة (الهوية 12، الموبايل 11). الهوية التي فيها حروف (وثيقة أجنبية) لا تُقصّ.
+function bbCapDigits(el,max){
+  let v=String(el.value||'');
+  if(el.id==='ed-nid' && (el.dataset.idt || /[A-Za-z]/.test(v))) return;   // هوية غير الوطنية: بدون تحديد
+  v=v.replace(/[٠-٩]/g,d=>String(d.charCodeAt(0)-1632)).replace(/\D/g,'');
+  if(v.length>max) v=v.slice(0,max);
+  if(v!==el.value) el.value=v;
+}
+function edClose(){ try{ load(false); }catch(e){} const m=document.getElementById('editDonorModal'); if(m) m.classList.remove('on'); }
 function normIraqiMobile(v){
   const digits=String(v??'').replace(/\D/g,'');
   if(/^7[0-9]{9}$/.test(digits)) return '0'+digits;
@@ -6548,8 +6557,8 @@ if('serviceWorker' in navigator){
           <div class="fgrp"><label>سنة التولد *</label><input type="text" inputmode="numeric" id="ed-by" placeholder="1995" min="1920" max="2007" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
           <div class="fgrp"><label>الجنس *</label><select id="ed-gen"><option value="ذكر">ذكر</option><option value="أنثى">أنثى</option></select></div>
           <div class="fgrp"><label>اسم الأم الثلاثي</label><input type="text" id="ed-mom" placeholder="فاطمة حسن علي"></div>
-          <div class="fgrp"><label>رقم البطاقة الوطنية</label><input type="text" id="ed-nid" placeholder="19XXXXXXXXXX"></div>
-          <div class="fgrp"><label>رقم الموبايل</label><input type="tel" id="ed-mob" placeholder="07XXXXXXXXX" onblur="this.value=normIraqiMobile(this.value)"></div>
+          <div class="fgrp"><label>رقم البطاقة الوطنية</label><input type="text" id="ed-nid" placeholder="19XXXXXXXXXX" oninput="bbCapDigits(this,12)"></div>
+          <div class="fgrp"><label>رقم الموبايل</label><input type="tel" id="ed-mob" placeholder="07XXXXXXXXX" maxlength="11" oninput="bbCapDigits(this,11)" onblur="this.value=normIraqiMobile(this.value)"></div>
           <div class="fgrp s2"><label>عنوان السكن</label><input type="text" id="ed-addr" placeholder="المحلة / الحي / المدينة"></div>
           <div class="fgrp"><label>المهنة</label><select id="ed-job"><option value="">اختر...</option><option value="موظف">موظف</option><option value="كاسب">كاسب</option><option value="متقاعد">متقاعد</option><option value="عسكري">عسكري</option><option value="طالب">طالب</option></select></div>
         </div>
@@ -6583,7 +6592,7 @@ if('serviceWorker' in navigator){
       </div>
     </div>
     <div class="modal-foot">
-      <button class="btn" id="edBtnCancel" onclick="G('editDonorModal').classList.remove('on')"><i class="ti ti-x"></i> إلغاء</button>
+      <button class="btn" id="edBtnCancel" onclick="edClose()"><i class="ti ti-x"></i> إلغاء</button>
       <button class="btn" id="edBtnPrint" style="border-color:#BE123C;color:#BE123C" onclick="saveDonorEdit(true)"><i class="ti ti-printer"></i> حفظ وطباعة</button>
       <button class="btn btn-p" id="edBtnSave" onclick="saveDonorEdit()"><i class="ti ti-device-floppy"></i> حفظ التعديلات</button>
     </div>

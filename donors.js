@@ -229,6 +229,7 @@ async function editDonorRow(id,opts){
     G('ed-mom').value=r.donors?.mother_name||'';
     G('ed-nid').value=r.donors?.national_id||'';
     G('ed-mob').value=r.donors?.mobile||'';
+    G('ed-nid').dataset.idt=r.donors?.id_type||''; G('ed-nid').dataset.orig=G('ed-nid').value; G('ed-mob').dataset.orig=G('ed-mob').value;
     G('ed-addr').value=r.donors?.address||'';
     G('ed-job').value=r.donors?.occupation||'';
     G('ed-dtyp').value=r.donation_type||'تعويضي';
@@ -301,7 +302,7 @@ async function saveDonorEdit(printAfter){
   } else if(!dd){
     toast('يرجى تعبئة تاريخ التبرع','error'); return;
   }
-  { const _e=bbIdLenError(G('ed-mob'))||bbIdLenError(G('ed-nid')); if(_e){ toast('⚠️ '+_e,'error',3500); return; } }
+  { const _m=G('ed-mob'), _n=G('ed-nid'); const _e=(_m.value.trim()!==(_m.dataset.orig||'').trim()?bbIdLenError(_m):'')||(_n.value.trim()!==(_n.dataset.orig||'').trim()?bbIdLenError(_n):''); if(_e){ toast('⚠️ '+_e,'error',3500); return; } }
   load(true);
   try{
     // Bottle type changed before the draw: one atomic RPC returns the old number to the pool and takes a new one
