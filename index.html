@@ -3787,6 +3787,9 @@ async function bbAutoSync(){
   }catch(e){ console.log('[autosync]',e); }
 }
 setInterval(bbAutoSync,30000);
+// تحديث لقطة أرقام الاستمارات دورياً (حتى يكون التخمين بدون نت مبنياً على آخر رقم حقيقي)
+setInterval(()=>{ try{ if(typeof bbofSnapRefresh==='function') bbofSnapRefresh().catch(()=>{}); }catch(e){} },180000);
+setTimeout(()=>{ try{ if(typeof bbofSnapRefresh==='function') bbofSnapRefresh().catch(()=>{}); }catch(e){} },9000);
 setTimeout(bbAutoSync,6000);
 
 function diag(msg, color){
