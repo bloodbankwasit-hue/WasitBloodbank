@@ -3338,6 +3338,31 @@ async function updateOpStatus(id, status, err){
 }
 
 // ── Sync queue when online ──
+// سبب فشل العملية بلغة مفهومة (v145)
+function bbReason(m){
+  m=String(m||'');
+  if(/duplicate key|already exists|unique/i.test(m)) return 'مكرر — السجل موجود مسبقاً بالسيرفر (غالباً رُفع قبلاً)';
+  if(/foreign key|violates.*constraint|23503/i.test(m)) return 'مرتبط بسجل غير موجود بالسيرفر (ربما حُذف أو لم يُرفع)';
+  if(/row-level security|permission denied|42501|not allowed|صلاحية/i.test(m)) return 'الحساب لا يملك صلاحية تنفيذ هذه العملية';
+  if(/غير كاف|insufficient/i.test(m)) return 'الرصيد/العدد غير كاف بالسيرفر';
+  if(/لا يوجد تسلسل/.test(m)) return 'لا يوجد تسلسل أرقام لهذا النوع بالسيرفر';
+  if(/null value|not-null|23502/i.test(m)) return 'حقل مطلوب ناقص بالبيانات';
+  if(/invalid input|22P02|22007|syntax/i.test(m)) return 'قيمة غير صالحة بالبيانات';
+  if(/function .* does not exist|PGRST202|42883/i.test(m)) return 'دالة ناقصة بالسيرفر — ينقص تشغيل SQL';
+  if(/local-/.test(m)) return 'يعتمد على عملية سابقة لم تُرفع';
+  return m||'سبب غير معروف';
+}
+function bbFailNotice(list){
+  try{ bbNoticeAdd('sync','⛔ '+list.length+' عملية لم تُرفع للسيرفر',list.slice(0,3).join(' | ')); }catch(e){}
+  try{
+    document.getElementById('bbFailOv')?.remove();
+    const o=document.createElement('div'); o.id='bbFailOv'; o.className='overlay on'; o.style.zIndex=100000;
+    o.innerHTML='<div class="modal" style="width:min(620px,97vw);max-height:90vh;display:flex;flex-direction:column"><div class="modal-title" style="color:#B91C1C">⛔ '+list.length+' عملية لم تُرفع للسيرفر</div><div style="overflow:auto;flex:1;padding:2px"><div style="font-size:13.5px;color:#374151;margin-bottom:8px">لم تضِع: بقيت كلها محفوظة في «العمليات المعلّقة» مع سبب كل واحدة، وتبقى هناك حتى تعيد المحاولة أو تحذفها أنت.</div>'
+      +list.map(x=>'<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:13.5px;word-break:break-word">'+esc(x)+'</div>').join('')
+      +'</div><div class="modal-foot"><button class="btn" onclick="document.getElementById(\'bbFailOv\').remove()">إغلاق</button><button class="btn btn-p" onclick="document.getElementById(\'bbFailOv\').remove();bbOpsOpen()">🕓 فتح العمليات المعلّقة</button></div></div>';
+    document.body.appendChild(o);
+  }catch(e){ toast('⛔ '+list.length+' عملية لم تُرفع — افتح «العمليات المعلّقة»','error',30000); }
+}
 async function syncQueue(){
   if(!IS_ONLINE || SYNC_RUNNING) return;
   const queue = await getPendingQueue();
@@ -3364,7 +3389,7 @@ async function syncQueue(){
       if(window._bbSessionDead || navigator.onLine===false || /failed to fetch|networkerror|load failed|network request failed|timed? ?out|ECONN|jwt expired|PGRST30[0-9]/i.test(String((e&&e.message)||e))){ _netStop=true; break; }
       await updateOpStatus(op.id,'failed',(e&&e.message)||e);
       const lbl=op.type==='w'?(op.data.label||op.data.name):({reception:'استقبال',draw:'سحب',lab:'مختبر',supply:'صرف'})[op.type]||op.type;
-      _failed.push(lbl+(op.type==='reception'&&op.data.full_name?' — '+op.data.full_name:'')+': '+((e&&e.message)||e));
+      _failed.push(lbl+(op.type==='reception'&&op.data.full_name?' — '+op.data.full_name:'')+': '+bbReason((e&&e.message)||e));
       if(op.type==='reception'){ try{ if(window.bbm) await bbm.removeLocal([op.data.local_id,op.data.local_donor_id]); }catch(x){} }
       if(op.type==='reception' && op.data.local_id) bbofDrop(op.data.local_id);
       if(op.type==='w'&&op.data.kind==='from'){ for(const o of op.data.ops){ if((o[0]==='eq'&&o[1][0]==='id')) (_refresh[op.data.name]=_refresh[op.data.name]||[]).push(o[1][1]); if(o[0]==='in'&&o[1][0]==='id') (_refresh[op.data.name]=_refresh[op.data.name]||[]).push(...o[1][1]); } }
@@ -3384,7 +3409,7 @@ async function syncQueue(){
     clearTimeout(window._bbSyncRetryT); window._bbSyncRetryT=setTimeout(()=>{ if(navigator.onLine!==false){ IS_ONLINE=true; syncQueue(); } },30000);
   } else
   toast(`✅ تمت المزامنة — ${done}/${queue.length} عملية ناجحة`,'success',4000);
-  if(_failed.length) setTimeout(()=>toast('⛔ فشلت '+_failed.length+' عملية بعد المزامنة (لم تُنفَّذ على السيرفر) — أعد إدخالها يدوياً: '+_failed.join(' | '),'error',30000),1200);
+  if(_failed.length) setTimeout(()=>bbFailNotice(_failed.slice()),1200);
   if(window.BB_SYNC_CONFLICTS&&window.BB_SYNC_CONFLICTS.length){
     const _c=window.BB_SYNC_CONFLICTS.splice(0);
     setTimeout(()=>{ try{ showIntervalBlockModal('⚠️ تنبيه: استقبالات حُفظت بدون إنترنت تبيّن بعد المزامنة أنها مخالفة — راجعها فوراً: '+_c.join(' | ')); }catch(e){ toast('⚠️ استقبالات مخالفة: '+_c.join(' | '),'error',20000); } },800);
@@ -3392,6 +3417,8 @@ async function syncQueue(){
   try{ await bbofFinalize(); }catch(e){ console.log('bbofFinalize',e); }
   if(!_netStop){ try{ const q2=await getPendingQueue(); if(q2.length){ clearTimeout(window._bbSync2T); window._bbSync2T=setTimeout(()=>syncQueue(),800); } }catch(e){} }
   try{ await bbOpsBadge(); }catch(e){}
+  // انتهت كل العمليات المعلّقة: نفرّغ جدول مطابقة المعرّفات (يوفّر مساحة التخزين المحلي) (v145)
+  try{ if(!_netStop && !(await getPendingQueue()).length && !bbofHasPending() && !(await bbOpsAll()).some(o=>o.status==='failed')) localStorage.removeItem('bb_idmap'); }catch(e){}
   try{ if(window.bbmSync) bbmSync(); }catch(e){}
   if(!_netStop) updateOfflineBar('online','');
   // Refresh current screen
@@ -3609,7 +3636,7 @@ async function bbOpsRender(){
   const row=(o,kind)=>{
     const col=kind==='fail'?'#FEF2F2;border:1px solid #FECACA':(kind==='pend'?'#FFFBEB;border:1px solid #FDE68A':'#F9FAFB;border:1px solid #E5E7EB');
     return '<div style="background:'+col+';border-radius:10px;padding:9px 11px;margin-bottom:7px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><b style="font-size:14.5px">'+esc(bbOpDesc(o))+'</b><span style="font-size:12px;color:#6B7280;white-space:nowrap">'+esc(_bbOpsFmt(o.created_at))+'</span></div>'
-      +(o.error?'<div style="font-size:12.5px;color:#991B1B;margin-top:4px;word-break:break-word">'+esc(o.error)+'</div>':'')
+      +(o.error?'<div style="font-size:13px;color:#991B1B;margin-top:4px;word-break:break-word"><b>السبب:</b> '+esc(bbReason(o.error))+'<div style="font-size:11.5px;color:#9CA3AF;margin-top:2px;direction:ltr;text-align:left">'+esc(o.error)+'</div></div>':'')
       +(kind==='fail'?'<div style="display:flex;gap:6px;margin-top:7px"><button class="btn btn-p" style="flex:1;justify-content:center" onclick="bbOpsRetry('+o.id+')">🔁 إعادة المحاولة</button><button class="btn" style="flex:1;justify-content:center" onclick="bbOpsDiscard('+o.id+')">🗑 تجاهل</button></div>':'')+'</div>';
   };
   let h='<div class="modal" style="width:min(640px,97vw);max-height:92vh;display:flex;flex-direction:column"><div class="modal-title">🕓 العمليات المعلّقة</div><div style="overflow:auto;flex:1;padding:2px">';
@@ -3622,13 +3649,27 @@ async function bbOpsRender(){
     _st='<div style="font-size:12px;color:#6B7280;margin-top:10px">تخزين الجهاز: '+(per===true?'✅ دائم (لا يُمسح تلقائياً)':(per===false?'⚠️ غير مضمون — لا تمسح بيانات المتصفح/التطبيق':'—'))+(e&&e.quota?(' · المستخدم '+Math.round(e.usage/e.quota*100)+'٪ ('+Math.round(e.usage/1048576)+' MB)'):'')+'</div>'; }catch(x){}
   h+=_st;
   h+='</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'
-    +(IS_ONLINE&&pend.length?'<button class="btn btn-p" style="flex:1;justify-content:center" onclick="bbOpsSyncNow()">⬆️ إرسال الآن</button>':'')
+    +((pend.length||fail.length)?'<button class="btn btn-p" style="flex:1;justify-content:center" onclick="bbOpsSyncNow()">⬆️ رفع البيانات الآن</button>':'')+(fail.length?'<button class="btn" style="flex:1;justify-content:center" onclick="bbOpsRetryAll()">🔁 إعادة محاولة كل الفاشلة ('+fail.length+')</button>':'')
     +'<button class="btn" style="flex:1;justify-content:center" onclick="bbOpsExport()">💾 تنزيل نسخة احتياطية</button>'
     +'<button class="btn" style="flex:1;justify-content:center" onclick="bbOpsImport()">📥 استعادة من نسخة</button>'
     +'<button class="btn" style="flex:1;justify-content:center" onclick="document.getElementById(\'bbOpsOv\').remove()">إغلاق</button></div></div>';
   ov.innerHTML=h;
 }
-async function bbOpsSyncNow(){ try{ await syncQueue(); }catch(e){ toast('تعذّرت المزامنة: '+(e.message||e),'error'); } await bbOpsRender(); await bbOpsBadge(); }
+async function bbOpsSyncNow(){
+  try{
+    toast('جاري التحقق من الاتصال ورفع البيانات...','info',2500);
+    if(window.BB_OFFLINE_SESSION){ const ok=await bbRestoreAuth(); if(!ok) return; }
+    const reach = navigator.onLine===false ? false : await bbProbe();
+    if(!reach){ toast('لا يوجد اتصال بالسيرفر الآن — البيانات محفوظة ولن تضيع، وتُرفع تلقائياً عند عودته','warning',6000); await bbOpsRender(); return; }
+    if(!IS_ONLINE){ await onOnline(); } else { await syncQueue(); try{ await bbofFinalize(); }catch(e){} }
+  }catch(e){ toast('تعذّرت المزامنة: '+(e.message||e),'error'); }
+  await bbOpsRender(); await bbOpsBadge();
+}
+async function bbOpsRetryAll(){
+  const f=(await bbOpsAll()).filter(o=>o.status==='failed');
+  for(const op of f){ op.status='pending'; op.error=null; op.attempts=(op.attempts||0)+1; await bbOpsPut(op); }
+  await bbOpsSyncNow();
+}
 async function bbOpsRetry(id){
   const op=(await bbOpsAll()).find(o=>o.id===id); if(!op) return;
   op.status='pending'; op.error=null; op.attempts=(op.attempts||0)+1; await bbOpsPut(op);
@@ -3737,6 +3778,16 @@ async function bbNetTick(force){
 }
 window.bbNoteNetFail=()=>{ setTimeout(()=>bbNetTick(true),0); };
 setInterval(()=>{ bbNetTick(false); }, 15000);
+// رفع تلقائي: عند فتح التطبيق وهو متصل (لا يحدث «انتقال» اتصال فلا يُطلق onOnline) ثم كل نصف دقيقة إن بقي شيء معلّق (v145)
+async function bbAutoSync(){
+  try{
+    if(!SES || !IS_ONLINE || SYNC_RUNNING || window.BB_OFFLINE_SESSION || navigator.onLine===false) return;
+    const q=await getPendingQueue(); if(q.length){ await syncQueue(); }
+    else if(bbofHasPending()){ await bbofFinalize(); }
+  }catch(e){ console.log('[autosync]',e); }
+}
+setInterval(bbAutoSync,30000);
+setTimeout(bbAutoSync,6000);
 
 function diag(msg, color){
   const d = document.getElementById('diagLog');
@@ -5712,7 +5763,15 @@ async function bbAssignForm(donationId, bottleType){
 // ── استمارة سحب الدم بدون نت: حالة محلية للاستمارات (localStorage) تُدمج بالعرض والطباعة، وتُرسل للسيرفر بنفس الترتيب عند عودة الاتصال ──
 const BBOF_KEY='bb_offforms', BBOF_SNAP='bb_formsnap';
 function bbofLoad(){ try{ const s=JSON.parse(localStorage.getItem(BBOF_KEY)||'null'); return (s&&Array.isArray(s.forms))?s:{forms:[]}; }catch(e){ return {forms:[]}; } }
-function bbofSave(s){ try{ localStorage.setItem(BBOF_KEY,JSON.stringify(s)); }catch(e){ console.log('bbof save failed',e); } }
+function bbofSave(s){
+  const j=JSON.stringify(s);
+  try{ localStorage.setItem(BBOF_KEY,j); return; }catch(e){}
+  // الامتلاء: نفرّغ ما يمكن إعادة بنائه (مطابقة المعرّفات المنتهية + لقطة الاستمارات) ثم نعيد المحاولة — الاستمارات المحلية نفسها لا تُمس
+  try{ localStorage.removeItem(BBOF_SNAP); }catch(x){}
+  try{ localStorage.setItem(BBOF_KEY,j); return; }catch(e){}
+  try{ localStorage.removeItem('bb_idmap'); localStorage.setItem(BBOF_KEY,j); return; }catch(e){}
+  try{ toast('⛔ مساحة التخزين المحلي ممتلئة — أرسل البيانات للسيرفر أو نزّل نسخة احتياطية فوراً','error',20000); }catch(x){}
+}
 function bbofSnap(){ try{ return JSON.parse(localStorage.getItem(BBOF_SNAP)||'{}')||{}; }catch(e){ return {}; } }
 function bbofHasPending(){ return bbofLoad().forms.length>0; }
 let _bbofSnapT=null;
