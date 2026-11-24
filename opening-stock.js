@@ -93,8 +93,8 @@ let _osComp = 'دم كامل';
 function osCompTotals(){ const t={}; OS_COMPS.forEach(c=>t[c]=0); Object.values(_osRows).forEach(r=>{ if(osIsWB(r.component_type)) return; t[r.component_type]=(t[r.component_type]||0)+(+r.qty_left||0); }); const wb=Object.values(_osRows).filter(r=>r.component_type==='دم كامل').reduce((a,r)=>a+(+r.qty_left||0),0); OS_WB.forEach(c=>t[c]=wb); return t; }
 function osRender(){
   const t=osCompTotals(), all=Object.entries(t).filter(([c])=>c!=='دم مضغوط'&&c!=='دم مفلتر').reduce((a,[c,b])=>a+b,0);
-  G('os-total').textContent='إجمالي الرصيد الخارجي: '+all+' قنينة'+(osIsWB(_osComp)?' — (الدم الكامل والمضغوط والمفلتر رقم واحد لنفس القنينة)':'');
-  G('os-chips').innerHTML=OS_COMPS.map(c=>`<span class="os-chip ${c===_osComp?'on':''}" onclick="osPick('${c}')">${c}: ${t[c]||0}</span>`).join('');
+  G('os-total').textContent='إجمالي الرصيد الخارجي: '+all+' قنينة';
+  G('os-chips').innerHTML=OS_COMPS.filter(c=>c!=='دم مضغوط'&&c!=='دم مفلتر').map(c=>{ const wb=(c==='دم كامل'); return `<span class="os-chip ${(wb?osIsWB(_osComp):c===_osComp)?'on':''}" onclick="osPick('${c}')">${wb?'الدم':c}: ${t[c]||0}</span>`; }).join('');
   G('os-grid').innerHTML=osBts(_osComp).map((bt,i)=>{
     const n=osLeft(_osComp,bt);
     const _row=_osRows[osKey(_osComp,bt)];
