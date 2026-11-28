@@ -24,8 +24,8 @@ const BACKUP_RESTORE_ORDER = [
 ];
 
 async function exportFullBackup(){
-  if(UPROF?.role!=='admin'){ toast('تصدير النسخة الاحتياطية متاح لمدير النظام فقط','error'); return; }
-  if(!(await bbConfirm('سيتم تصدير كل بيانات النظام (المتبرعون، التبرعات، الحملات، المستخدمون، سجل التتبع...) بملف واحد. متابعة؟'))) return;
+  if(UPROF?.role!=='admin'){ toast('تصدير النسخة الاحتياطية متاح لمدير النظام فقط','error'); return false; }
+  if(!(await bbConfirm('سيتم تصدير كل بيانات النظام (المتبرعون، التبرعات، الحملات، المستخدمون، سجل التتبع...) بملف واحد. متابعة؟'))) return false;
   load(true);
   try{
     const backup = { exported_at: new Date().toISOString(), app: 'WasitBloodbank', version: 1, tables: {} };
@@ -49,8 +49,10 @@ async function exportFullBackup(){
     await shareOrDownloadFile(blob, filename, 'application/json');
     const total=Object.values(backup.tables).reduce((s,rows)=>s+rows.length,0);
     toast('✅ تم تصدير النسخة الاحتياطية بنجاح — '+total+' سجل','success',4500);
+    return true;
   }catch(e){
     toast('خطأ أثناء التصدير: '+e.message,'error',5000);
+    return false;
   }finally{
     load(false);
   }
