@@ -179,7 +179,7 @@ function osEnsureAct(){
     <div class="modal-body">
       <div id="oa-head"></div>
       <div id="oa-rows" style="margin-top:12px"></div>
-      <button class="btn" onclick="osAddRow()" style="margin-top:6px"><i class="ti ti-plus"></i> إضافة تجهيز</button>
+      <button class="btn" id="oa-add" onclick="osAddRow()" style="margin-top:6px"><i class="ti ti-plus"></i> إضافة تجهيز</button>
       <div id="oa-sum" style="margin-top:12px;padding:10px 12px;border:1px solid #BBF7D0;background:#F0FDF4;border-radius:10px;font-size:15px;line-height:1.9"></div>
     </div>
     <div class="modal-foot">
@@ -196,15 +196,17 @@ function osAct(kind){
   const hs=window._osHospSel;
   G('oa-title').innerHTML={hospital:'<i class="ti ti-building-hospital"></i> تجهيز مستشفيات — الرصيد الخارجي',hand:'<i class="ti ti-hand-grab"></i> تجهيز by hand — الرصيد الخارجي',destroy:'<i class="ti ti-trash"></i> إتلاف — من الرصيد الخارجي'}[kind];
   let head='';
-  if(kind==='hospital') head=`<div class="fgrid" style="grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr)"><div class="fgrp"><label>اسم المستشفى *</label>${hs('oa-hosp')}</div><div class="fgrp"><label>رقم الكتاب *</label><input type="text" id="oa-book" placeholder="رقم الكتاب"></div><div class="fgrp"><label>تاريخ الكتاب *</label><input type="date" id="oa-bdate"></div><div class="fgrp"><label>نوع التجهيز *</label>${osCompSel()}</div></div>`;
+  if(kind==='hospital') head=`<div class="fgrid" style="grid-template-columns:minmax(0,2fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,1.1fr) minmax(0,1.1fr)"><div class="fgrp"><label>اسم المستشفى *</label>${hs('oa-hosp')}</div><div class="fgrp"><label>عدد القناني *</label><input type="text" inputmode="numeric" id="oa-cnt" placeholder="مثال: 10" oninput="this.value=normDigits(this.value).replace(/[^0-9]/g,'');osHospBuild()"></div><div class="fgrp"><label>رقم الكتاب *</label><input type="text" id="oa-book" placeholder="رقم الكتاب"></div><div class="fgrp"><label>تاريخ الكتاب *</label><input type="date" id="oa-bdate"></div><div class="fgrp"><label>نوع التجهيز *</label>${osCompSel()}</div></div>`;
   else if(kind==='hand') head=`<div class="fgrid" style="grid-template-columns:repeat(3,minmax(0,1fr))"><div class="fgrp"><label>اسم المريض *</label><input type="text" id="oa-pat" placeholder="اسم المريض"></div><div class="fgrp"><label>المستشفى *</label>${hs('oa-hosp')}</div><div class="fgrp"><label>نوع التجهيز *</label>${osCompSel()}</div></div>`;
   else head=`<div class="fgrid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><div class="fgrp"><label>سبب الإتلاف *</label><select id="oa-reason" onchange="G('oa-reason-o').style.display=this.value==='أخرى'?'block':'none'"><option value="">— اختر —</option>${OS_DESTROY_REASONS.map(x=>`<option value="${x}">${x}</option>`).join('')}</select><input type="text" id="oa-reason-o" placeholder="اكتب السبب" style="display:none;margin-top:5px"></div></div>`;
   G('oa-head').innerHTML=head; G('oa-rows').innerHTML='';
-  osAddRow(); osSum();
+  G('oa-add').style.display=(kind==='hospital')?'none':'';
+  if(kind==='hospital') osHospBuild(); else osAddRow();
+  osSum();
   G('openingActModal').classList.add('on');
 }
 
-function osAddRow(){
+function osAddRow(noFocus){
   const id=++_oaSeq, c0=_osComp; _oaRows.push({id,c:c0,b:'',n:0,q:''});
   const d=document.createElement('div'); d.className='oa-row'; d.id='oar-'+id;
   d.innerHTML=`<div><label>رقم القنينة</label><input type="text" inputmode="numeric" id="oaq-${id}" class="oa-no" placeholder="رقم القنينة" oninput="this.value=normDigits(this.value).replace(/[^0-9]/g,'');osRowChg(${id})" onkeydown="if(event.key==='Enter'){event.preventDefault();osNextRow(${id})}"></div>
@@ -212,7 +214,19 @@ function osAddRow(){
     <div><label>النوع</label><select id="oac-${id}" onchange="osRowComp(${id})">${OS_COMPS.map(c=>`<option value="${c}" ${c===c0?'selected':''}>${OS_LBL[c]||c}</option>`).join('')}</select></div>
     <button class="btn" title="حذف" onclick="osDelRow(${id})" style="color:#B91C1C"><i class="ti ti-x"></i></button>`;
   G('oa-rows').appendChild(d); osRowComp(id);
-  if(_oaRows.length>1) G('oaq-'+id)?.focus();
+  if(!noFocus && _oaRows.length>1) G('oaq-'+id)?.focus();
+}
+const OS_SANE=3000;
+// تجهيز مستشفى: عدد القناني يولّد أسطراً بنفس العدد (لا تُحذف الأسطر المملوءة تلقائياً)
+function osHospBuild(){
+  if(_oaKind!=='hospital') return;
+  const cnt=Math.min(parseInt(G('oa-cnt')?.value)||0,OS_SANE), box=G('oa-rows');
+  if(parseInt(G('oa-cnt')?.value)>OS_SANE) toast('العدد كبير جداً — تأكد من الرقم','error');
+  while(_oaRows.length<cnt) osAddRow(true);
+  while(_oaRows.length>cnt){ const l=_oaRows[_oaRows.length-1]; if(l.q||l.b) break; _oaRows.pop(); G('oar-'+l.id)?.remove(); }
+  if(!cnt && !_oaRows.length) box.innerHTML='<div style="border:1.5px dashed #D1D5DB;border-radius:12px;padding:22px 12px;text-align:center;color:#6B7280">اكتب عدد القناني لتظهر الأسطر</div>';
+  else if(cnt && box.firstElementChild && !box.firstElementChild.id) box.firstElementChild.remove();
+  osSum();
 }
 function osNextRow(id){ const last=_oaRows[_oaRows.length-1]; if(last&&last.id===id) osAddRow(); else { const i=_oaRows.findIndex(x=>x.id===id); G('oaq-'+_oaRows[i+1].id)?.focus(); } }
 function osDelRow(id){ if(_oaRows.length<=1) return; _oaRows=_oaRows.filter(r=>r.id!==id); G('oar-'+id)?.remove(); osSum(); }
@@ -246,6 +260,7 @@ async function osSubmit(){
   else if(kind==='hand'){ patient=G('oa-pat').value.trim(); hosp=hv(); note=G('oa-hcomp').value; if(note==='أخرى') note=G('oa-hcomp-o').value.trim(); if(!patient||!hosp||!note){ toast('أكمل اسم المريض والمستشفى ونوع التعويض','error'); return; } }
   else { note=G('oa-reason').value; if(note==='أخرى') note=G('oa-reason-o').value.trim(); if(!note){ toast('اختر سبب الإتلاف','error'); return; } }
   _oaRows.forEach(r=>osRowChg(r.id));
+  if(kind==='hospital'){ const cn=parseInt(G('oa-cnt').value)||0; if(!(cn>0)){ toast('اكتب عدد القناني','error'); return; } const done=_oaRows.filter(r=>r.b&&r.n>0).length; if(done!==cn||_oaRows.length!==cn){ toast('عدد القناني '+cn+' لكن المكتمل '+done+' سطر — أكمل كل الأسطر','error'); return; } }
   { const dup=_oaRows.map(r=>r.q).filter(Boolean).find((q,i,a)=>a.indexOf(q)!==i); if(dup){ toast('رقم القنينة '+dup+' مكرر','error'); return; } }
   const _agg={}; _oaRows.filter(r=>r.b&&r.n>0).forEach(r=>{ const k=r.c+'|'+r.b; (_agg[k]=_agg[k]||{c:r.c,b:r.b,n:0}).n+=1; });
   const items=Object.values(_agg);
